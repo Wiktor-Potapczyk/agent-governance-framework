@@ -1,0 +1,91 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"/path/to/your/hooks/user-prompt-submit.py\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"/path/to/your/hooks/skill-routing-check.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"/path/to/your/hooks/bash-safety-guard.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"/path/to/your/hooks/skill-step-reminder.py\""
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"/path/to/your/hooks/subagent-governance.py\""
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"/path/to/your/hooks/subagent-quality-check.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"/path/to/your/hooks/classifier-field-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"/path/to/your/hooks/dispatch-compliance-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"/path/to/your/hooks/governance-log.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"/path/to/your/hooks/process-step-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"/path/to/your/hooks/dark-zone-check.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
