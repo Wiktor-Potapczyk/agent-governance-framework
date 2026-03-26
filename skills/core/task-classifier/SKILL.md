@@ -156,7 +156,8 @@ APPROACH: [Declare the primary path, then check EACH of the 5 primitive operatio
   Example: "Build via blueprint-mode. Research: yes (technical-researcher for API docs). Analysis: yes (architect-review for post-build). Planning: no. QA: yes (test hook fires in fresh session)."
   Note: Content is a domain specialization of Build, not a primitive. These 5 are the irreducible operations of knowledge work.]
 MISSED: [one sentence from Step 2 — what would I miss by handling it this way? Quick tasks: write "N/A"]
-MUST DISPATCH: [see rules below. Quick tasks: omit this field.]
+MUST DISPATCH: [see rules below. Quick tasks: omit this field.
+  **PM SELF-CHECK before writing this line:** count the "yes" answers above. If 2 or more → pm MUST be in this list. The Stop hook will block you if it's missing.]
 ```
 
 **APPROACH** declares the full compound mixture — not just the primary path but all secondary compounds the task contains. Each compound names its agents. The process skill for TYPE handles the primary path; the compound agents handle the secondary paths within it. If APPROACH only names one agent for a task that IMPLIES reveals has multiple dimensions, you've missed a compound.
