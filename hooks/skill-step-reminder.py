@@ -50,9 +50,9 @@ PROCESS_REMINDERS = {
         "PROCESS REMINDER: You MUST follow these steps in order. "
         "Step 1: List every verifiable claim (QA SCOPE block). "
         "Step 2: Choose verification method per claim. "
-        "Step 3: Execute each test -- do NOT reason about passing, actually run it. "
+        "Step 3: Execute each test — do NOT reason about passing, actually run it. "
         "Step 4: Output QA REPORT with PASS/FAIL per claim. "
-        "Step 5: Escalate failures -- do NOT fix them, report them."
+        "Step 5: Escalate failures — do NOT fix them, report them."
     ),
 }
 

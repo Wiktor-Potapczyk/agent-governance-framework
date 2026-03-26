@@ -80,7 +80,7 @@ def main():
                 pass
             return
 
-    # Command is safe -- allow silently
+    # Command is safe — allow silently
     return
 
 

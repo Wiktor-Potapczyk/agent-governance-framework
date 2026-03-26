@@ -15,7 +15,7 @@ Before any work, write this block:
 BUILD SCOPE
 Goal: [what is being built — one sentence]
 Inputs: [specs, designs, or requirements this builds from]
-Tech: [language, platform, framework — e.g., Python, JavaScript, workflow JSON]
+Tech: [language, platform, framework — e.g., n8n workflow JSON, JavaScript, Python]
 Output path: Projects/[Name]/work/YYYY-MM-DD-[artifact-name].[ext]
 ```
 
@@ -41,9 +41,8 @@ Include in the prompt:
 - All source files, specs, and context needed to build
 - Instruction: implement according to the plan, produce working code/config, save to the output path
 
-<!-- Domain-specific: customize for your stack -->
-For workflow automation tools (e.g., n8n):
-- Always fetch the current workflow first before making changes
+For n8n workflows:
+- Always fetch the current workflow first (`n8n_get_workflow`)
 - Never apply changes directly — produce the spec/JSON for the user to apply
 - Include node IDs and connection maps in the output
 
@@ -72,13 +71,12 @@ Before marking build complete:
 - [ ] Review passed or issues resolved
 - [ ] Output saved to the correct path in Projects/[Name]/work/
 - [ ] No unsolicited changes beyond what was scoped
-- [ ] **Live verification:** If the build produced artifacts that describe or depend on a live system (deployed service, API, automation platform), fetch the current live state and confirm the artifact matches reality. If the user deployed some components but not others, update the work file to reflect what actually exists — not what was planned.
+- [ ] **Live verification:** If the build produced artifacts that describe or depend on a live system (n8n workflow, deployed service, API), fetch the current live state and confirm the artifact matches reality. If the user deployed some components but not others, update the work file to reflect what actually exists — not what was planned.
 
 If any check fails: for runtime errors or unexpected behavior, delegate to **debugger** to diagnose first. For implementation issues, fix via the build agent (Step 3), then re-run review (Step 4).
 
 ## Notes
 
 - Never build without a plan. If Step 2 reveals the task is underspecified, stop and say so.
-<!-- Domain-specific: customize for your stack -->
-- Never apply automation workflow changes without explicit user instruction.
+- Never apply n8n workflow changes without explicit user instruction.
 - The value of this process is separation: planning, building, and reviewing are done by different agents with different objectives.

@@ -88,7 +88,7 @@ If all 4 lenses reach the same conclusion, say so explicitly — the value was i
 Ensemble lenses reason but do not research. Their outputs are ungrounded hypotheses. Immediately after producing the divergence map, verify the key claims:
 
 1. Extract the 2-3 most consequential claims from the divergence map (positions that would change the decision if wrong).
-2. For each claim, check: is there evidence in the conversation, in project files, or in prior research that supports or contradicts it?
+2. For each claim, check: is there evidence in the conversation, in vault files, or in prior research that supports or contradicts it?
 3. If a claim is ungrounded (no evidence found), flag it: `[UNGROUNDED]`
 4. If a claim contradicts known evidence, flag it: `[CONTRADICTED BY: source]`
 5. If a claim is supported, flag it: `[SUPPORTED BY: source]`
@@ -104,9 +104,9 @@ For important questions, offer to save the divergence map to a work file.
 
 <!--
 Evidence basis:
-- Ensemble experiment: 5 tasks × 3 lenses, 35% avg overlap. Genuine divergence confirmed.
-- Debate debunked: <20% win rate over CoT. Blind parallel > debate.
-- SelfOrg: strong models gain nothing from debate. Blind independence is key.
+- Ensemble experiment (2026-03-20): 5 tasks × 3 lenses, 35% avg overlap. Genuine divergence confirmed.
+- Debate debunked: <20% win rate over CoT (2025). Blind parallel > debate.
+- SelfOrg 2026: strong models gain nothing from debate. Blind independence is key.
 - Lu et al. 2025: cross-family > intra-family, but prompt diversity works for framing tasks.
 - Adversarial lens catches unique risks other lenses miss consistently.
 -->

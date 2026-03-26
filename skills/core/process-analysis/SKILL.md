@@ -41,8 +41,7 @@ Delegate to the appropriate specialist based on what is being evaluated:
 | Runtime errors, failures, unexpected behavior | debugger |
 | API design, endpoint quality, auth patterns | api-designer |
 | Data schema, field mapping, pipeline quality | data-engineer |
-<!-- Domain-specific: customize for your stack -->
-| Workflow logic, branching, error recovery | workflow-orchestrator |
+| n8n workflow logic, branching, error recovery | workflow-orchestrator |
 | Security (API, webhooks, auth) | api-security-audit |
 | Multiple of the above | Run applicable agents in parallel |
 

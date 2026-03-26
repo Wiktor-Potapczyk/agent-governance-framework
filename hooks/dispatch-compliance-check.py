@@ -16,7 +16,7 @@ import json
 import os
 import re
 
-# 200KB window -- covers even 10+ agent outputs per turn
+# 200KB window — covers even 10+ agent outputs per turn
 READ_BYTES = 204800
 
 # Field labels used as delimiters for multiline capture
