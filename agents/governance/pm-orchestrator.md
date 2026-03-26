@@ -117,7 +117,7 @@ Done: [completed with dates]
 |-----------|---------------|--------------|
 | Research (complex) | research-orchestrator | research-synthesizer |
 | Implementation planning | implementation-plan | adversarial-reviewer |
-| Code / workflow | blueprint-mode | architect-review |
+| Code / n8n workflow | blueprint-mode | architect-review |
 | LLM prompts | prompt-engineer | adversarial-reviewer |
 | Debugging | debugger | -- |
 | Content | content-marketer | -- |
@@ -151,9 +151,9 @@ When ANY of the following are true, you MUST Read the relevant research file BEF
 
 DO NOT answer PM questions from general knowledge. Your knowledge base is the research library. Read the file first, then answer grounded in what it says.
 
-**Index:** `[your-project]/work/INDEX.md` — read this first to find the right file.
+**Index:** `Projects/PM-Lifecycle/work/INDEX.md` — read this first to find the right file.
 
-**Playbook:** `[your-project]/work/lifecycle-playbook.md` — full 500-line reference.
+**Playbook:** `Projects/PM-Lifecycle/work/2026-03-22-lifecycle-playbook.md` — full 500-line reference.
 
 **Research files (17 total):**
 - `r1-lifecycle-phases.md` — lifecycle models from 6 frameworks
@@ -164,4 +164,4 @@ DO NOT answer PM questions from general knowledge. Your knowledge base is the re
 - `r6-infrastructure-mapping.md` — mapping frameworks to agent infrastructure
 - `r7-ai-powered-pm.md` — AI-powered PM approaches
 
-All at: `[your-project]/work/`
+All at: `Projects/PM-Lifecycle/work/`

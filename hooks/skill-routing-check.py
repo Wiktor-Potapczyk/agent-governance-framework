@@ -28,7 +28,7 @@ ROUTING = {
 # Process skills that are subject to routing validation
 PROCESS_SKILLS = set(ROUTING.values())
 
-# 200KB window -- covers even 10+ agent outputs per turn
+# 200KB window — covers even 10+ agent outputs per turn
 READ_BYTES = 204800
 
 
@@ -64,7 +64,7 @@ def main():
     if skill_name not in PROCESS_SKILLS:
         return
 
-    # It IS a process skill -- check if it matches the last classification
+    # It IS a process skill — check if it matches the last classification
     transcript_path = payload.get("transcript_path")
     if not transcript_path or not os.path.exists(transcript_path):
         return  # Can't verify, allow
@@ -138,7 +138,7 @@ def main():
             pass
         return
 
-    # Correct routing -- allow
+    # Correct routing — allow
     return
 
 

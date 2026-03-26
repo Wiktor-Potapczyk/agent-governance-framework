@@ -17,7 +17,7 @@ description: Clean up and organize a project's work files. Inventories work/ dir
 
 Use the Agent tool with `subagent_type: "general-purpose"`. Include in the prompt:
 
-- The project path (e.g., `Projects/[Name]/`)
+- The project path (e.g., `Projects/Agent-Suite/`)
 - The current STATE.md content (paste it — the agent can't see our context)
 - All classification rules and decision rules from below
 - Instruction to present the classification table, execute moves, and update STATE.md
@@ -45,20 +45,20 @@ TASK:
 | DELETE | Empty files, duplicate copies, temporary debug output | Delete after confirming |
 
 Decision rules:
-- Referenced in STATE.md work files -> default KEEP unless clearly stale
-- Loop prompt that already produced output -> ARCHIVE
-- One-time script already run -> ARCHIVE
-- Plan already executed -> ARCHIVE (decisions in STATE.md)
-- Research findings -> KEEP (long shelf life reference)
-- Test harnesses and reusable scripts -> KEEP
-- When in doubt -> KEEP. Over-archiving is worse than messy.
+- Referenced in STATE.md work files → default KEEP unless clearly stale
+- Loop prompt that already produced output → ARCHIVE
+- One-time script already run → ARCHIVE
+- Plan already executed → ARCHIVE (decisions in STATE.md)
+- Research findings → KEEP (long shelf life reference)
+- Test harnesses and reusable scripts → KEEP
+- When in doubt → KEEP. Over-archiving is worse than messy.
 
 5. Present classification table grouped by category:
    | File | Size | Category | Reason |
 
 6. Execute: move ARCHIVE files, merge MERGE files, do NOT delete without confirmation
 
-7. Update the Work Files section in STATE.md -- organize into logical groups (entry points, research, tools), include counts
+7. Update the Work Files section in STATE.md — organize into logical groups (entry points, research, tools), include counts
 
 8. Report summary: X kept, Y archived, Z merged. New file count in work/.
 ```

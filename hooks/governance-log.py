@@ -2,7 +2,7 @@
 Governance Log - Stop Hook
 Captures classification, dispatch, and agent activity per response.
 Appends one JSON line to governance-log.jsonl per response.
-Does NOT block -- logging only.
+Does NOT block — logging only.
 
 Regex hardening (2026-03-22):
 - 200KB window (up from 80KB) to capture large agent outputs
@@ -23,7 +23,7 @@ LOG_PATH = os.path.join(
     "governance-log.jsonl"
 )
 
-# 200KB window -- covers even 10+ agent outputs per turn
+# 200KB window — covers even 10+ agent outputs per turn
 READ_BYTES = 204800
 
 VALID_TYPES = re.compile(

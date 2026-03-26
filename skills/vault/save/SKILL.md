@@ -20,7 +20,7 @@ Read the current STATE.md. Rewrite it with updated content, preserving the exist
 ```yaml
 date: YYYY-MM-DD       # original creation date — preserve from existing
 updated: YYYY-MM-DD    # today's date
-last_action: "..."     # one-line summary of what was accomplished, <=120 chars
+last_action: "..."     # one-line summary of what was accomplished, ≤120 chars
 tags: #state           # preserve existing tags
 status: "#active"      # or #blocked, #waiting, #done
 milestone: "..."       # current milestone name (if applicable)
@@ -35,11 +35,11 @@ milestone: "..."       # current milestone name (if applicable)
 | `## Built` / `## Built This Epoch` | Cumulative completed items. **Never delete existing items** — append new ones. |
 | `## Next` | Strategic next steps (1-5 items). WHAT, not HOW. |
 | `## Blocked` | Active blockers with dates. "None" if clear. |
-| `## Recent Decisions` | Decisions made this epoch. Format: `YYYY-MM-DD -- decision -- rationale`. Prune entries >14 days old. |
+| `## Recent Decisions` | Decisions made this epoch. Format: `YYYY-MM-DD — decision — rationale`. Prune entries >14 days old. |
 | `## Work Files` | One-line index of active work files. Maintained by /maintain — preserve if present. |
 
 **Rules:**
-- Be concise. Target <=60 lines but don't truncate important content to hit a number.
+- Be concise. Target ≤60 lines but don't truncate important content to hit a number.
 - Merge new info into existing content. Do not lose previously recorded items.
 - If STATE.md has non-standard sections (On Watch, Background Tasks, Key Findings), preserve them unless the user says to restructure.
 
@@ -69,8 +69,7 @@ Check if `Projects/[Name]/task_plan.md` exists.
 
 Review the conversation for reusable knowledge: API quirks, tool gotchas, architectural decisions, user preferences, project context that future sessions need.
 
-<!-- Domain-specific: customize the memory path for your vault setup -->
-**Memory path:** `.claude/projects/[your-project-path]/memory/`
+**Memory path:** `.claude/projects/<project-slug>/memory/`
 
 For each piece of knowledge worth persisting:
 

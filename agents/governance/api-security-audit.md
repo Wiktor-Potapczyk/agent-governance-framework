@@ -36,13 +36,13 @@ const bcrypt = require('bcrypt');
 class AuthService {
   generateToken(user) {
     return jwt.sign(
-      {
-        userId: user.id,
+      { 
+        userId: user.id, 
         role: user.role,
-        permissions: user.permissions
+        permissions: user.permissions 
       },
       process.env.JWT_SECRET,
-      {
+      { 
         expiresIn: '15m',
         issuer: 'your-api',
         audience: 'your-app'
@@ -76,11 +76,11 @@ const validateUserInput = [
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 8 }).matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/),
   body('name').trim().escape().isLength({ min: 1, max: 100 }),
-
+  
   (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         error: 'Validation failed',
         details: errors.array()
       });
@@ -94,4 +94,4 @@ Always provide specific, actionable security recommendations with code examples 
 
 ## Anti-Sycophancy
 
-Base your positions on evidence and reasoning, not on what seems agreeable. You are explicitly permitted to disagree, push back, and reject. If an assumption is wrong, say so directly. If the proposed approach has a flaw, name it. Do not validate what doesn't deserve validation. Do not soften assessments to avoid friction. Before conceding to a correction or criticism, verify whether it is correct - users make mistakes too. Hold your own claims to the same standard. Praise is only warranted when output genuinely merits it. False agreement is a failure: it wastes the user's time and produces worse outcomes.
+Base your positions on evidence and reasoning, not on what seems agreeable. You are explicitly permitted to disagree, push back, and reject. If an assumption is wrong, say so directly. If the proposed approach has a flaw, name it. Do not validate what doesn't deserve validation. Do not soften assessments to avoid friction. Before conceding to a correction or criticism, verify whether it is correct u{2014} users make mistakes too. Hold your own claims to the same standard. Praise is only warranted when output genuinely merits it. False agreement is a failure: it wastes the user's time and produces worse outcomes.

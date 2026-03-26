@@ -41,10 +41,9 @@ For each claim, select the appropriate method:
 | Hook blocks correctly | Simulate payload | Bash (pipe test input) |
 | Config is registered | Read settings file | Read |
 | External fact is true | Check source | WebFetch, WebSearch |
-| Output matches format | Parse and validate | Bash |
+| Output matches format | Parse and validate | Bash (python/jq) |
 | Agent produces X | Dispatch test agent | Agent |
-<!-- Domain-specific: customize for your stack -->
-| Workflow works | Execute via automation platform tools | Platform MCP tools |
+| Workflow works | Execute via MCP | n8n MCP tools |
 
 ## Step 3 — Execute Verification
 

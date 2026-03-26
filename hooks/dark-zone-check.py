@@ -2,7 +2,7 @@
 Dark Zone Check - Stop Hook
 Detects when agent output may have been ignored by the main session.
 Logs warnings when agents were dispatched but their findings aren't referenced
-in the final response. Does NOT block -- monitoring only.
+in the final response. Does NOT block — monitoring only.
 
 The Dark Zone: agent output dispatched but not utilized. FM-2.5 in MAST taxonomy.
 Every framework solves data AVAILABILITY. None solve UTILIZATION.
@@ -11,10 +11,10 @@ This hook makes non-utilization DETECTABLE.
 Checks:
 - If Agent tool was used, does the final response text reference agent output?
 - Looks for citation patterns: "Per [agent-name]:", "agent found", "review identified"
-- Counts agent dispatches vs references -- ratio logged for analysis
+- Counts agent dispatches vs references — ratio logged for analysis
 
 This is a MONITORING hook. It logs to governance-log.jsonl but does not block.
-Blocking would be too aggressive -- not every agent dispatch needs explicit citation
+Blocking would be too aggressive — not every agent dispatch needs explicit citation
 (e.g., architect-review findings might be applied silently).
 """
 
@@ -134,7 +134,7 @@ def main():
     agent_count = len(agents_dispatched)
 
     # Determine severity
-    # File writes count as utilization -- agents that produce files are being used
+    # File writes count as utilization — agents that produce files are being used
     effective_citations = citation_count + files_written
     effective_ratio = effective_citations / agent_count if agent_count > 0 else 0
 
@@ -167,7 +167,7 @@ def main():
     except Exception:
         pass
 
-    # No blocking -- monitoring only
+    # No blocking — monitoring only
     # Future: could inject additionalContext warning when severity=high
 
 

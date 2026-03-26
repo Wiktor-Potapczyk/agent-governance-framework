@@ -4,7 +4,7 @@ description: Process all notes in the Inbox/ folder. Classify, tag, and move eac
 disable-model-invocation: true
 ---
 
-Process the inbox using the vault-keeper agent.
+Process my inbox using the vault-keeper agent.
 
 1. Read every file in `Inbox/`
 2. For each note: classify it (Task, Idea, Meeting note, Research, Personal), add complete YAML frontmatter (date, tags, status), rename to kebab-case if needed, move it to the correct folder
