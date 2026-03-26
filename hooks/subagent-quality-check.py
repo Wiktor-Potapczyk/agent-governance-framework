@@ -38,6 +38,14 @@ def main():
                 f.write(f"{timestamp} | agent={agent_type} | id={agent_id} | len={message_len} | result={result} | failed={check_failed}\n")
         except Exception:
             pass
+        # Also log to governance-log.jsonl
+        try:
+            gov_log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+            entry = json.dumps({"ts": timestamp, "event": "block", "hook": "subagent-quality-check", "agent_type": agent_type, "agent_id": agent_id, "message_len": message_len, "check_failed": check_failed})
+            with open(gov_log_path, "a", encoding="utf-8") as f:
+                f.write(entry + "\n")
+        except Exception:
+            pass
         response = {"decision": "block", "reason": reason}
         print(json.dumps(response))
         sys.exit(0)
