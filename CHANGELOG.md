@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-03-26 — PM Enforcement Hardening
+
+Prompt-based PM enforcement was unreliable (LLM skipped pm in MUST DISPATCH despite 2+ compounds). Added hook-level enforcement + inline self-check.
+
+### Changes
+
+**task-classifier/SKILL.md**
+- Added PM SELF-CHECK inline in the MUST DISPATCH template field — LLM reads it while writing the field, cannot miss it
+- Text: "count the yes answers above. If 2 or more → pm MUST be in this list. The Stop hook will block you if it's missing."
+
+**hooks/classifier-field-check.py**
+- Added compound-counting logic after existing field checks
+- Parses APPROACH section, counts compounds marked "yes", blocks if 2+ and pm not in MUST DISPATCH
+- Fires on Stop event — post-hoc catch, forces re-classification
+
+### Enforcement Architecture (updated)
+
+| Layer | When | Type |
+|-------|------|------|
+| PM SELF-CHECK in template | During classification | Prompt (inline) |
+| classifier-field-check.py | Stop (post-response) | Hook (hard block) |
+| dispatch-compliance-check.py | Stop (post-response) | Hook (contract check) |
+| check_pm_after_increment | Stop (post-response) | Hook (TaskCreate safety net) |
+| check_pm_checkpoint_report | Stop (post-response) | Hook (artifact check) |
+
+---
+
 ## 2026-03-26 — PM Integration Fix (Systemic)
 
 PM lifecycle management elevated from optional overlay to enforced infrastructure, achieving parity with QA enforcement.
