@@ -32,8 +32,7 @@ Scan each type and note which ones apply. For each match, note whether it is **p
 - **Research** — open questions, needs source materials → `architect-loop` → research team
 - **Analysis** — investigating causes, diagnosing behavior, evaluating artifacts, reasoning about architecture, tracing failures, comparing options — any task where understanding WHY or HOW matters → specialist agent or inline reasoning with evidence
 - **Content** — producing written copy for an audience → research-orchestrator → content-marketer
-<!-- Domain-specific: customize for your stack -->
-- **Build** — implementing code, scripts, or workflow JSON → implementation-plan → blueprint-mode
+- **Build** — implementing code, scripts, or n8n workflow JSON → implementation-plan → blueprint-mode
 - **Planning** — designing architecture, sequencing work, creating a spec → implementation-plan
 
 If no types match → candidate for Quick (proceed to Step 3).
@@ -47,10 +46,20 @@ If two or more match → the **primary** type becomes TYPE. Secondary types are 
 | Build | Analysis | architect-review | Every build needs post-build quality review |
 | Planning | Analysis | adversarial-reviewer | Every plan needs challenge before committing |
 | **ALL non-Quick** | **QA** | **process-qa** | **Every non-Quick task produces claims that must be verified before completing. QA is not optional — it is the mechanism that extends autonomous run length.** |
+| **2+ compounds detected** | **PM** | **pm** | **Tasks with 2+ compounds are complex enough to need project management oversight. PM reviews project state, validates scope, and catches phase transitions.** |
 
 These are floor rules — the classifier MUST mark these compounds as "yes" regardless of what the task looks like. Additional compounds are still detected normally.
 
 **QA enforcement:** process-qa goes into MUST DISPATCH for every non-Quick task. The dispatch-compliance Stop hook verifies it was invoked. The QA process must produce a QA REPORT block with PASS/FAIL counts — this is the machine-checkable proof that verification happened. QA does NOT fix failures — it reports them. If all attempts to fix fail, escalate to the user.
+
+**PM enforcement:** `pm` goes into MUST DISPATCH when the classifier detects 2+ compounds in APPROACH. The dispatch-compliance Stop hook verifies it was invoked. The process-step-check hook provides a safety net via TaskCreate count (2+ TaskCreate also triggers PM enforcement independently).
+
+**PM reactive triggers:** Beyond the 2+ compound floor rule, the classifier MUST also add `pm` to MUST DISPATCH when ANY of these signals are present in the user's message. If a reactive trigger fires on what would otherwise be Quick, escalate to Analysis (reactive triggers indicate state change, which is never Quick):
+- **Scope change** — user introduces new requirements, changes direction, or says "actually", "instead", "let's pivot"
+- **Blocker reported** — user says something is stuck, blocked, or not working as expected
+- **New workstream** — user starts work on something clearly outside the current task_plan.md scope
+- **Phase transition** — user reports a milestone is complete, all tasks are done, or asks "what's next?"
+These signals indicate project state has changed and PM needs to re-evaluate. When a reactive trigger fires, PM runs BEFORE the primary task — it orients the session before work begins.
 
 ## Step 1.5 — Domain Detection
 
@@ -58,7 +67,6 @@ If the task involves a specialist domain, note it. Domain detection overrides th
 
 | Domain | Specialist Agent | Trigger |
 |--------|-----------------|---------|
-<!-- Domain-specific: customize for your stack -->
 | n8n workflows | workflow-orchestrator (design) / blueprint-mode (build) | n8n nodes, workflow JSON, execution errors |
 | MCP servers/clients | mcp-server-architect (design) / mcp-developer (build) | MCP protocol, transport, tool definitions |
 | PostgreSQL | postgres-pro | queries, EXPLAIN, replication, pgBouncer, JSONB |
@@ -160,7 +168,7 @@ MUST DISPATCH: [see rules below. Quick tasks: omit this field.]
 - If APPROACH says "Research: yes (technical-researcher)" → technical-researcher goes in MUST DISPATCH
 - If APPROACH says "Analysis: yes (architect-review)" → architect-review goes in MUST DISPATCH
 - **QA is ALWAYS in MUST DISPATCH for non-Quick tasks** — add `process-qa` to every non-Quick MUST DISPATCH list. This is non-negotiable.
-- **PM checkpoint (`pm`) is in MUST DISPATCH for multi-step increments** — if the task will require TaskCreate (2+ steps or compounds), add `pm` to MUST DISPATCH at classification time. Single-step tasks skip PM.
+- **PM checkpoint (`pm`) is in MUST DISPATCH when 2+ compounds are detected OR a reactive PM trigger fires** — if APPROACH lists 2 or more compounds marked "yes", add `pm` to MUST DISPATCH. Also add `pm` if any reactive trigger signal is present (scope change, blocker, new workstream, phase transition — see PM reactive triggers above). Single-compound tasks without reactive triggers skip PM.
 - All compound agents are enforced — the Stop hook verifies each was actually invoked
 - If IMPLIES reveals the work can be done inline with no compounds → `none` — BUT QA still applies. MUST DISPATCH is at minimum `process-qa` for non-Quick.
 - Format: only comma-separated names or `none`. No parenthetical explanations after `none`. `none` is ONLY valid for Quick tasks.
@@ -208,12 +216,12 @@ MUST DISPATCH: [see rules below. Quick tasks: omit this field.]
 
 4. **If pentesting finds HIGH severity issues:** fix them, re-test, then report. After 2 failed fix attempts on the same finding, escalate to the user.
 
-5. **After pentest completes:** invoke `/pm` to run a PM checkpoint. This reviews project state, recommends next action, and catches phase transitions. PM goes into MUST DISPATCH for multi-step increments.
+5. **After pentest completes:** invoke `/pm` to run a PM checkpoint. This reviews project state, recommends next action, and catches phase transitions. PM is in MUST DISPATCH whenever the classifier detected 2+ compounds (see mandatory compounds table).
 
-6. **Single-step non-Quick tasks** (one compound, no decomposition needed): skip TaskCreate. QA still fires per task. Pentesting and PM are not required for single tasks — QA covers it.
+6. **Single-compound non-Quick tasks** (one compound, no decomposition needed): skip TaskCreate. QA still fires per task. Pentesting and PM are not required for single-compound tasks — QA covers it.
 
 ## Notes
 
-- This classification routes to the **delegation rules in your project's CLAUDE.md** — use those to pick the specific agent within each type.
+- This classification routes to the **delegation rules in CLAUDE.md** — use those to pick the specific agent within each type.
 - When in doubt between two types, **pick the one that requires MORE investigation, not less.** The cost of over-investigating is low (extra time). The cost of under-investigating is high (wrong output, rework, missed complexity). Default to depth.
 - **Compound tasks**: invoke `process-analysis` in Decomposition mode. It will break the request into sub-tasks, classify each (TYPE + DOMAIN), identify dependencies, and invoke each sub-task's process skill in order. Do NOT decompose inline — delegate to the process.
