@@ -106,6 +106,16 @@ def main():
             }
         }
         print(json.dumps(result))
+        # Log deny event
+        try:
+            from datetime import datetime
+            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+            session_id = os.path.splitext(os.path.basename(transcript_path))[0][:12] if transcript_path else "unknown"
+            entry = json.dumps({"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "deny", "hook": "agent-dispatch-check", "session": session_id, "agent_type": agent_type, "must_dispatch": must_dispatch})
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(entry + "\n")
+        except Exception:
+            pass
         return
 
     # Agent is in the list — allow

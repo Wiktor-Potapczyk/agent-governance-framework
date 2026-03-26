@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-03-26 — Monitoring Coverage Extension
+
+Added governance-log.jsonl writes to 4 enforcement hooks that were previously silent. All enforcement events (block/deny) now flow to the central governance log.
+
+### Hooks updated
+
+| Hook | Type | Event logged |
+|------|------|-------------|
+| `agent-dispatch-check.py` | PreToolUse:Agent | `deny` — undeclared agent dispatch |
+| `subagent-quality-check.py` | SubagentStop | `block` — empty/error/unstructured agent output |
+| `epistemic-check.py` | Stop | `block` — overconfident response (Haiku-evaluated) |
+| `delegation-check.ps1` | Stop | `block` — APPROACH said delegate but no Agent tool used |
+
+### Coverage: 11/16 hooks now log to governance-log.jsonl (was 7)
+
+All enforcement hooks centrally logged. Remaining 5 are context-injection only.
+
+---
+
 ## 2026-03-26 — PM Enforcement Hardening
 
 Prompt-based PM enforcement was unreliable (LLM skipped pm in MUST DISPATCH despite 2+ compounds). Added hook-level enforcement + inline self-check.
