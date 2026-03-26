@@ -39,10 +39,21 @@ Detect the current phase and run the appropriate phase protocol. Report:
 - Blockers
 - Recommended next action
 - If at a phase transition: run viability check (Q6)
-
-Note: PM fires AFTER pentest in the lifecycle (classifier Step 6 enforces ordering: tasks -> pentest -> PM). Do not re-check for pentest -- it already ran.
 ```
 
 ### 3. Report results
 
 Relay the PM orchestrator's output verbatim. If the output contains a kill recommendation, scope change, or escalation, prefix it with a visible warning.
+
+**After relaying the output, you MUST produce a PM CHECKPOINT REPORT block** (this is checked by hooks):
+
+```
+PM CHECKPOINT REPORT
+Project: [name]
+Phase: [0-4]
+Viability: PASS | HOLD | KILL
+Blockers: [count] — [list or "none"]
+Next: [recommended next action]
+```
+
+Populate from the pm-orchestrator's output. If the orchestrator didn't produce a viability verdict, default to PASS (checkpoint ran, no kill signal).

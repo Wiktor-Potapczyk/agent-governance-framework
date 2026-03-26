@@ -21,7 +21,7 @@ import json
 import os
 import re
 
-# 200KB window -- matches other hardened hooks
+# 200KB window — matches other hardened hooks
 READ_BYTES = 204800
 
 # Expected SCOPE block per process skill
@@ -75,6 +75,51 @@ def check_pentest_report(process_skill, text_blocks):
     return False, "Missing PENTEST REPORT with findings and recommendation"
 
 
+def check_pm_checkpoint_report(lines):
+    """HARD: When /pm was invoked, check for PM CHECKPOINT REPORT with Viability verdict.
+    Independent of process-skill tracking — scans full transcript like check_pm_after_increment."""
+    pm_invoked = False
+    text_after_pm = []
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        if entry.get("type") != "assistant":
+            continue
+
+        message = entry.get("message", {})
+        for block in message.get("content", []):
+            if block.get("type") == "tool_use" and block.get("name") == "Skill":
+                inp = block.get("input", {})
+                if isinstance(inp, str):
+                    try:
+                        inp = json.loads(inp)
+                    except (json.JSONDecodeError, TypeError):
+                        inp = {}
+                skill = (inp.get("skill") or "").lower()
+                if skill == "pm":
+                    pm_invoked = True
+                    text_after_pm = []  # Reset — track text after latest /pm invocation
+
+            if pm_invoked and block.get("type") == "text":
+                text_after_pm.append(block.get("text", ""))
+
+    if not pm_invoked:
+        return True, ""  # /pm not invoked — nothing to check
+
+    for text in text_after_pm:
+        if "PM CHECKPOINT REPORT" in text and re.search(r'Viability:\s*(?:PASS|HOLD|KILL)', text):
+            return True, ""
+
+    return False, "PM invoked but missing PM CHECKPOINT REPORT with Viability verdict"
+
+
 def check_synthesis(process_skill, agents):
     """SOFT: If 2+ agents dispatched in research/analysis, synthesis needed."""
     if process_skill not in ("process-research", "process-analysis"):
@@ -108,11 +153,10 @@ def check_agent_dispatch(process_skill, agents):
 
 def check_pm_after_increment(lines):
     """HARD: Multi-step increments (2+ TaskCreate) require /pm after all tasks complete + pentest.
-    Independent of process skill invocations -- runs on every Stop event."""
+    Independent of process skill invocations — runs on every Stop event."""
     task_creates = 0
     task_completes = 0
     pentest_seen = False
-    pm_seen = False
 
     for line in lines:
         line = line.strip()
@@ -152,7 +196,6 @@ def check_pm_after_increment(lines):
                     task_creates = 0
                     task_completes = 0
                     pentest_seen = False
-                    pm_seen = False  # Reset -- next increment needs its own PM
 
     # Only enforce for multi-step increments
     if task_creates < 2:
@@ -162,15 +205,13 @@ def check_pm_after_increment(lines):
     if task_completes < task_creates:
         return True, ""
 
-    # Pentest not done yet -- pentest enforcement handles this separately
+    # Pentest not done yet — pentest enforcement handles this separately
     if not pentest_seen:
         return True, ""
 
-    # All tasks done + pentest done + no PM
-    if not pm_seen:
-        return False, f"Increment complete ({task_creates} tasks + pentest) but /pm checkpoint not invoked"
-
-    return True, ""
+    # All tasks done + pentest done — PM should have been invoked (which resets task_creates).
+    # If we reach here, task_creates >= 2 means PM was NOT invoked for this increment.
+    return False, f"Increment complete ({task_creates} tasks + pentest) but /pm checkpoint not invoked"
 
 
 def main():
@@ -215,7 +256,7 @@ def main():
             continue
 
         # User message = turn boundary. If a process skill was found in a
-        # previous turn, a user message means that turn completed -- reset.
+        # previous turn, a user message means that turn completed — reset.
         if entry.get("type") == "user" and found_skill:
             # The previous turn had a process skill. Check if it already
             # passed (has SCOPE + QA REPORT as needed). If so, clear state
@@ -287,8 +328,33 @@ def main():
         print(json.dumps({"decision": "block", "reason": reason}))
         return
 
+    # --- PM checkpoint report check (independent of process skill invocation) ---
+    pm_report_passed, pm_report_msg = check_pm_checkpoint_report(lines)
+    if not pm_report_passed:
+        hard_failures_pm = [pm_report_msg]
+        try:
+            from datetime import datetime
+            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+            session_id = os.path.splitext(os.path.basename(transcript_path))[0][:12]
+            log_entry = json.dumps({
+                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "event": "block",
+                "hook": "process-step-check",
+                "session": session_id,
+                "process": "pm-report-enforcement",
+                "hard_failures": hard_failures_pm,
+                "soft_warnings": [],
+            })
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(log_entry + "\n")
+        except Exception:
+            pass
+        reason = f"PM REPORT: {pm_report_msg}. Add PM CHECKPOINT REPORT block after /pm output."
+        print(json.dumps({"decision": "block", "reason": reason}))
+        return
+
     if not last_process_skill or not found_skill:
-        return  # No process skill invoked this turn -- nothing to check
+        return  # No process skill invoked this turn — nothing to check
 
     # --- HARD checks (block on failure) ---
     hard_failures = []

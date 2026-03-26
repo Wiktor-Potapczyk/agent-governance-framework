@@ -9,18 +9,24 @@ You have been routed here by the task-classifier. The task type is Planning.
 
 ## Step 1 — Define Scope
 
-Before any work, write this block:
+**Before writing the scope block, check for project context.** If `Projects/[Name]/STATE.md` or `Projects/[Name]/PROJECT.md` exist, read them using the Read tool:
+- Import **appetite** (Small/Medium/Large) from PROJECT.md into Constraints — the plan must fit within it
+- Import **current phase** and **active tasks** from STATE.md into Inputs — the plan must build on current state, not contradict it
+- If neither file exists, proceed without them — project context is optional, not blocking
+
+Then write this block:
 
 ```
 PLANNING SCOPE
 Goal: [what is being designed or planned — one sentence]
-Constraints: [tech stack, timeline, dependencies, team size, budget]
-Inputs: [existing specs, prior research, requirements docs]
+Constraints: [tech stack, timeline, dependencies, team size, budget, appetite from PROJECT.md if available]
+Inputs: [existing specs, prior research, requirements docs, STATE.md current phase if available]
 Deliverable: [architecture doc, implementation plan, sequence diagram, spec]
 Output path: Projects/[Name]/work/YYYY-MM-DD-[plan-name].md
 ```
 
 If the goal is unclear or requirements are missing, route to Research first.
+If the plan scope exceeds the declared appetite, flag this explicitly before proceeding — do not silently produce an oversized plan.
 
 ## Step 2 — Research (if needed)
 
@@ -88,3 +94,4 @@ If any check fails: identify the gap, revise (Step 5), and re-check.
 - A plan without acceptance criteria is not a plan. Every step must have a way to verify it's done.
 - Prefer smaller increments over monolithic plans. If the plan has more than 7 steps, consider breaking it into phases.
 - The plan is a living document — it will be revised as implementation reveals new information. Don't over-specify.
+- **STATE.md is owned by pm-orchestrator.** Do not write to STATE.md from this skill. Save output to `work/` only. The `/pm` checkpoint (which fires for 2+ compound tasks) handles STATE.md updates.
