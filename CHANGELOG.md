@@ -1,5 +1,47 @@
 # Changelog
 
+## 2026-04-06 — Quality Enforcement + PM Simplification
+
+Major evolution from compliance-only to compliance + quality enforcement. Hooks now check tool usage during QA, not just format. PM trigger simplified from "2+ compounds" to "every non-Quick."
+
+### New: work-verification-check.py (Stop hook #12)
+
+Three checks forcing actual execution and autonomous exhaustion:
+1. **QA/Pentest Execution (HARD):** QA REPORT filed with zero execution tools → block
+2. **Premature Escalation (HARD):** Asking user for help with <3 tools used → block
+3. **Zero-Work Non-Quick (SOFT):** Non-Quick + zero tools → governance log warning
+
+### Rewritten: process-qa/SKILL.md
+
+- Step 3 split into 3a (run test) / 3b (show raw output) / 3c (judge PASS/FAIL)
+- Step 4 NEW — Coverage Check (mandatory before reporting)
+- Evidence rules: "Looks correct" without specific output = INVALID
+- Scope check: if N artifacts built, N must be tested
+- Hook warning at bottom
+
+### Rewritten: process-pentest/SKILL.md
+
+- Step 3 split into 3a-3d matching process-qa pattern: State → Execute → Show raw → Judge
+
+### Simplified: PM enforcement (every non-Quick)
+
+Previous trigger (2+ compounds) was circular — depended on Claude's own classification behavior. Simplified to: every non-Quick task → pm in MUST DISPATCH. No compound counting.
+
+Files updated:
+- `skills/core/task-classifier/SKILL.md` — mandatory compounds table, PM enforcement text, PM SELF-CHECK, Step 6
+- `hooks/classifier-field-check.py` — compound counting regex → simple non-Quick + pm check
+- `settings/settings.local.json.example` — work-verification-check.py added to Stop hooks
+
+### Updated: CLAUDE.md
+
+- "Exhaust before asking" rule (4 steps: Execute, Read, Retry, Delegate)
+- "Test what you build" rule (work-verification hook enforces)
+- PM enforcement line: every non-Quick gets PM oversight
+- Model cost rule phrasing tightened
+- PreCompact hook auto-saves noted
+
+---
+
 ## 2026-03-26 — Monitoring Coverage Extension
 
 Added governance-log.jsonl writes to 4 enforcement hooks that were previously silent. All enforcement events (block/deny) now flow to the central governance log.

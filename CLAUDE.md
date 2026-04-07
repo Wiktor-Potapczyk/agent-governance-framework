@@ -62,6 +62,15 @@ The next step being obvious is not a reason to skip this review.
 
 **Context discipline:** don't trash your own context with inline work. Delegate to specialist agents. Every complex task done inline is a bias risk.
 
+**Exhaust before asking.** Before escalating to the user — before ANY question that asks for help, permission, or a decision — verify you have tried:
+1. **Execute** — run it with Bash, test it via MCP, pipe input through it
+2. **Read** — check error messages, read the actual output, grep for similar patterns
+3. **Retry** — try a different approach, a different tool, a workaround
+4. **Delegate** — ask an agent for a second opinion
+Only after all four: escalate. The work-verification-check Stop hook enforces this — it will block you if you ask the user with fewer than 3 tool uses this turn.
+
+**Test what you build.** Every non-Quick task that produces an artifact must include empirical verification — run the code, trigger the hook, execute the workflow, check the live system. Reading a file and claiming PASS is not QA. The work-verification-check Stop hook blocks QA/pentest reports filed with zero execution tools.
+
 ## CRITICAL RULE: Task Classification
 
 **Before any substantive task, invoke the `task-classifier` skill.** Classification starts with IMPLIES — "what does this prompt mean beneath the words?" — not type-matching. The burden of proof is on Quick; ambiguity always resolves to depth.
@@ -70,7 +79,7 @@ Every task is a mixture of **5 primitives**: Research, Analysis, Planning, Build
 
 **QA is mandatory for all non-Quick tasks.** Every non-Quick task produces claims that need empirical verification. The classifier declares QA as a compound, and process-qa goes into MUST DISPATCH.
 
-**Multi-step increments get lifecycle treatment:** TaskCreate defines the increment. All tasks done = Tier 2 pentest via `process-pentest`, then `/pm` checkpoint before reporting back.
+**Every non-Quick task gets PM oversight.** `/pm` is in MUST DISPATCH for all non-Quick tasks — no compound counting. PM reviews project state and catches phase transitions regardless of task size.
 
 After classification, invoke the corresponding process skill:
 - Research → `process-research`
@@ -109,7 +118,7 @@ QA is Popperian falsification. It proves absence of *found* bugs, not absence of
 
 **Inline ONLY for:** single-field edits, one-sentence factual answers, moving/renaming files with zero judgment required.
 
-**Model cost rule:** Always pass `model: "sonnet"` when dispatching Explore, general-purpose, or Plan agents. These built-in types inherit the main session model otherwise. Only use a larger model for agents that explicitly need it (e.g., a synthesizer holding multiple large agent outputs). Every agent spawn loads ~60K context overhead.
+**Model cost rule:** Always pass `model: "sonnet"` when dispatching Explore, general-purpose, or Plan agents. These built-in types inherit the main session model otherwise. Only use Opus for agents that explicitly need it (e.g., research-synthesizer). Every agent spawn loads ~60K context overhead.
 
 **Before writing any spec, prompt, code, or plan inline — stop and ask: which agent should do this?**
 
@@ -193,7 +202,7 @@ All generated output (research, plans, prompt drafts, agent loop results) goes t
 - `MEMORY.md` — stable facts only (role, rules, environment). No volatile project data.
 - Don't memorize volatile data (IDs, deadlines, architecture) — fetch from source.
 
-**Save STATE.md:** after milestones, before compaction, before session end.
+**Save STATE.md:** after milestones, before compaction, before session end. PreCompact hook auto-saves; other triggers are soft rules — do them proactively.
 
 ## Compaction Instructions
 
