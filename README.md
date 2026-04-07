@@ -14,24 +14,27 @@ The framework operationalizes three research-backed principles: classify before 
 
 ## Architecture
 
-The framework operates across four layers, with 11 active Python hooks as the enforcement mechanism:
+The framework operates across four layers, with 12 active Python hooks (plus 4 optional in `hooks/disabled/`):
 
 | Layer | What it does | Hook events |
 |---|---|---|
-| **Classifier** | Forces task classification on every non-trivial prompt; enforces all required fields (IMPLIES, TASK TYPE, APPROACH, MISSED) | `UserPromptSubmit`, `Stop` (classifier-field-check) |
+| **Classifier** | Forces task classification on every non-trivial prompt; enforces all required fields (IMPLIES, TASK TYPE, APPROACH, MISSED); enforces PM in MUST DISPATCH for every non-Quick task | `UserPromptSubmit`, `Stop` (classifier-field-check) |
 | **Process Skills** | Routes tasks to typed process flows (research, analysis, build, QA, planning); validates skill selection matches classifier output | `PreToolUse` (skill-routing-check), `PostToolUse` (skill-step-reminder) |
 | **Agent Delegation** | Enforces MUST DISPATCH items from the classifier; injects behavioral governance into every subagent at spawn; quality-checks subagent output on exit | `SubagentStart`, `SubagentStop`, `Stop` (dispatch-compliance-check) |
+| **Quality Enforcement** | Blocks QA/pentest reports filed with zero execution tools; blocks premature escalation to user with fewer than 3 tool uses; monitors zero-work non-Quick tasks | `Stop` (work-verification-check) |
 | **Tool Safety** | Blocks dangerous Bash commands (rm -rf, force-push, credential exposure); monitors for unsupported citation patterns and dark-zone reasoning failures | `PreToolUse` (bash-safety-guard), `Stop` (dark-zone-check, process-step-check, governance-log) |
 
 All hooks are stateless Python scripts that read from stdin and write to stdout. They require no database, no server, and no persistent process.
+
+For a detailed technical walkthrough of the architecture, see [docs/architecture.md](docs/architecture.md).
 
 ## Repository Structure
 
 ```
 framework-repo/
 ├── agents/
-│   ├── governance/          # 25 specialist agents (research team, architect, QA, planning, etc.)
-│   └── domain-examples/     # 4 example domain agents (content, competitive, workflow, vault)
+│   ├── governance/          # 29 specialist agents (research team, architect, QA, planning, etc.)
+│   └── domain-examples/     # Example domain-specific agents
 ├── hooks/
 │   ├── user-prompt-submit.py        # Context bar + classifier enforcement on every message
 │   ├── skill-routing-check.py       # PreToolUse: validates skill matches classifier TYPE
@@ -44,14 +47,16 @@ framework-repo/
 │   ├── governance-log.py            # Stop: JSONL audit log of session governance events
 │   ├── process-step-check.py        # Stop: L1 exit gate -- blocks missing SCOPE or QA REPORT
 │   ├── dark-zone-check.py           # Stop: monitors unsupported citations and reasoning gaps
-│   └── disabled/                    # 2 experimental hooks (not active)
+│   ├── work-verification-check.py   # Stop: blocks lazy QA and premature user escalation
+│   └── disabled/                    # 4 optional hooks (agent-dispatch-check, delegation-check, epistemic-check, weekly-usage)
 ├── skills/
-│   ├── core/                # 11 governance skills (task-classifier, process-*, verify, ensemble, etc.)
+│   ├── core/                # 12 governance skills (task-classifier, process-*, verify, ensemble, pm, etc.)
 │   ├── vault/               # 5 knowledge-management skills (save, inbox, standup, etc.)
 │   └── domain-examples/     # 19 domain skills across Apify and n8n
 ├── settings/
-│   └── settings.json.example  # Hook registration template for Claude Code settings
-├── docs/                    # Customization guides (see docs/customization.md)
+│   ├── settings.json.example        # Global hook registration template
+│   └── settings.local.json.example  # Project-level override (includes all 12 hooks)
+├── docs/                    # Architecture reference and customization guides
 ├── LICENSE.txt
 └── INSTALL.md
 ```

@@ -80,7 +80,7 @@ def main():
 RESPONSE TO EVALUATE:
 {response_snippet}
 
-EVALUATION CRITERIA -- block if ANY of these are true:
+EVALUATION CRITERIA — block if ANY of these are true:
 1. Presents a conclusion or recommendation without stating what assumptions it depends on
 2. Picks one direction without naming what would be lost by going another way
 3. Claims something is true or confirmed without citing specific evidence
@@ -94,7 +94,7 @@ ALLOW only if:
 - OR the response already acknowledges what it doesn't know
 
 Return ONLY this JSON, nothing else:
-{{"decision": "allow" or "block", "reason": "one sentence -- what specifically is overconfident or missing"}}
+{{"decision": "allow" or "block", "reason": "one sentence — what specifically is overconfident or missing"}}
 
 When in doubt, BLOCK. It is better to force one moment of reflection than to let overconfidence through unchallenged."""
 
@@ -125,6 +125,16 @@ When in doubt, BLOCK. It is better to force one moment of reflection than to let
                 "reason": f"EPISTEMIC CHECK: {haiku_eval.get('reason', 'State your uncertainties and assumptions before concluding.')}"
             })
             print(block_json)
+            # Log to governance-log.jsonl
+            try:
+                from datetime import datetime
+                gov_log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+                session_id = os.path.splitext(os.path.basename(transcript_path))[0][:12] if transcript_path else "unknown"
+                entry = json.dumps({"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "block", "hook": "epistemic-check", "session": session_id, "reason": haiku_eval.get("reason", "")})
+                with open(gov_log_path, "a", encoding="utf-8") as f:
+                    f.write(entry + "\n")
+            except Exception:
+                pass
 
     except (subprocess.TimeoutExpired, json.JSONDecodeError, KeyError):
         return

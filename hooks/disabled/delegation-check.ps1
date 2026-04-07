@@ -74,6 +74,14 @@ if (-not $agentUsed) {
     $reason = "DELEGATION CHECK: APPROACH said delegate ($approachLine) but no Agent tool was used. Delegate now."
     $blockJson = @{ decision = "block"; reason = $reason } | ConvertTo-Json -Compress
     Write-Output $blockJson
+    # Log to governance-log.jsonl
+    try {
+        $govLogPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "governance-log.jsonl"
+        $sessionId = if ($transcriptPath) { [System.IO.Path]::GetFileNameWithoutExtension($transcriptPath).Substring(0, [Math]::Min(12, [System.IO.Path]::GetFileNameWithoutExtension($transcriptPath).Length)) } else { "unknown" }
+        $entry = @{ ts = (Get-Date -Format "yyyy-MM-dd HH:mm:ss"); event = "block"; hook = "delegation-check"; session = $sessionId; approach = $approachLine } | ConvertTo-Json -Compress
+        Add-Content -Path $govLogPath -Value $entry -Encoding UTF8 -NoNewline
+        Add-Content -Path $govLogPath -Value "`n" -NoNewline
+    } catch {}
 }
 
 exit 0
