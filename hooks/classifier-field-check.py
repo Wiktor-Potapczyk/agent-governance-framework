@@ -100,24 +100,13 @@ def main():
         if not has_must_dispatch:
             missing.append("MUST DISPATCH")
 
-    # --- PM compound enforcement ---
-    # If 2+ compounds marked "yes" in APPROACH but pm not in MUST DISPATCH, block
-    if not is_quick and has_approach and has_must_dispatch and not missing:
-        # Extract APPROACH section (everything between APPROACH: and MISSED:)
-        approach_match = re.search(r'APPROACH:(.+?)(?:MISSED:|MUST DISPATCH:|$)', last_classifier_text, re.DOTALL | re.IGNORECASE)
-        if approach_match:
-            approach_text = approach_match.group(1)
-            # Count compounds marked "yes" (e.g., "Analysis: yes", "QA: yes")
-            compound_yes = re.findall(r'(?:Research|Analysis|Planning|Build|QA)\s*(?:compound)?\s*\??\s*:?\s*yes', approach_text, re.IGNORECASE)
-            if len(compound_yes) >= 2:
-                # Check if pm is in MUST DISPATCH
-                dispatch_match = re.search(r'MUST DISPATCH:\s*(.+)', last_classifier_text, re.IGNORECASE)
-                if dispatch_match:
-                    dispatch_text = dispatch_match.group(1).lower()
-                    if 'pm' not in dispatch_text.split(',') and 'pm' not in dispatch_text.split(', '):
-                        # pm not found — check more loosely
-                        if not re.search(r'\bpm\b', dispatch_text):
-                            missing.append("pm in MUST DISPATCH (2+ compounds detected — PM is mandatory per floor rule)")
+    # --- PM enforcement (every non-Quick task) ---
+    if not is_quick and has_must_dispatch and not missing:
+        dispatch_match = re.search(r'MUST DISPATCH:\s*(.+)', last_classifier_text, re.IGNORECASE)
+        if dispatch_match:
+            dispatch_text = dispatch_match.group(1).lower()
+            if not re.search(r'\bpm\b', dispatch_text):
+                missing.append("pm in MUST DISPATCH (every non-Quick task requires PM oversight)")
 
     if missing:
         reason = f"INCOMPLETE CLASSIFICATION: Missing fields: {', '.join(missing)}. All classifier fields are mandatory. Re-classify with all fields before proceeding."
