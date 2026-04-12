@@ -29,6 +29,14 @@ def main():
     message = payload.get("last_assistant_message", "")
     message_len = len(message)
 
+    # P1-D fix (2026-04-09): Extract full session UUID from transcript_path
+    # (fallback to "unknown" if not in payload). Needed for cross-source joins.
+    transcript_path = payload.get("transcript_path")
+    if transcript_path:
+        session_id = os.path.splitext(os.path.basename(transcript_path))[0]
+    else:
+        session_id = "unknown"
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "subagent-quality.log")
 
@@ -39,9 +47,20 @@ def main():
         except Exception:
             pass
         # Also log to governance-log.jsonl
+        # P1-D + P1-E fix (2026-04-09): added session + schema fields for analytics joins
         try:
             gov_log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            entry = json.dumps({"ts": timestamp, "event": "block", "hook": "subagent-quality-check", "agent_type": agent_type, "agent_id": agent_id, "message_len": message_len, "check_failed": check_failed})
+            entry = json.dumps({
+                "ts": timestamp,
+                "schema": 2,
+                "event": "block",
+                "hook": "subagent-quality-check",
+                "session": session_id,
+                "agent_type": agent_type,
+                "agent_id": agent_id,
+                "message_len": message_len,
+                "check_failed": check_failed,
+            })
             with open(gov_log_path, "a", encoding="utf-8") as f:
                 f.write(entry + "\n")
         except Exception:

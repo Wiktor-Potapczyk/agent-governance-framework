@@ -149,7 +149,7 @@ def main():
     try:
         from datetime import datetime
         log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-        session_id = os.path.splitext(os.path.basename(transcript_path))[0][:12]
+        session_id = os.path.splitext(os.path.basename(transcript_path))[0]  # Full UUID (P1-D fix 2026-04-09)
         log_entry = json.dumps({
             "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "event": "dark-zone",
@@ -161,6 +161,7 @@ def main():
             "files_written": files_written,
             "ratio": round(effective_ratio, 2),
             "severity": severity,
+            "schema": 2,
         })
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(log_entry + "\n")

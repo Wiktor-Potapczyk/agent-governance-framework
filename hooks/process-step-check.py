@@ -310,7 +310,7 @@ def main():
         try:
             from datetime import datetime
             log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0][:12]
+            session_id = os.path.splitext(os.path.basename(transcript_path))[0]  # Full UUID (P1-D fix 2026-04-09)
             log_entry = json.dumps({
                 "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "event": "block",
@@ -319,6 +319,7 @@ def main():
                 "process": "pm-enforcement",
                 "hard_failures": [pm_msg],
                 "soft_warnings": [],
+                "schema": 2,
             })
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(log_entry + "\n")
@@ -335,7 +336,7 @@ def main():
         try:
             from datetime import datetime
             log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0][:12]
+            session_id = os.path.splitext(os.path.basename(transcript_path))[0]  # Full UUID (P1-D fix 2026-04-09)
             log_entry = json.dumps({
                 "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "event": "block",
@@ -344,6 +345,7 @@ def main():
                 "process": "pm-report-enforcement",
                 "hard_failures": hard_failures_pm,
                 "soft_warnings": [],
+                "schema": 2,
             })
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(log_entry + "\n")
@@ -390,7 +392,7 @@ def main():
     try:
         from datetime import datetime
         log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-        session_id = os.path.splitext(os.path.basename(transcript_path))[0][:12]
+        session_id = os.path.splitext(os.path.basename(transcript_path))[0]  # Full UUID (P1-D fix 2026-04-09)
         log_entry = json.dumps({
             "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "event": "block" if hard_failures else ("warn" if soft_warnings else "pass"),
@@ -401,6 +403,7 @@ def main():
             "soft_warnings": soft_warnings,
             "agent_count": len(agents_after_skill),
             "agents": agents_after_skill,
+            "schema": 2,
         })
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(log_entry + "\n")

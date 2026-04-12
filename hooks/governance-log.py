@@ -34,6 +34,55 @@ VALID_TYPES = re.compile(
 # Field labels used as delimiters for multiline capture
 FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
 
+# Known agent and skill names for must_dispatch extraction (P0 fix 2026-04-09)
+# Must_dispatch raw text often contains trailing reasoning after the comma-separated
+# names. This set filters to only valid names, discarding garbage tokens.
+KNOWN_DISPATCH_NAMES = {
+    # Agents (from .claude/agents/)
+    "adversarial-reviewer", "api-designer", "api-security-audit", "architect-review",
+    "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
+    "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
+    "mcp-developer", "mcp-registry-navigator", "mcp-server-architect", "n8n-reviewer",
+    "nosql-specialist", "pm-orchestrator", "postgres-pro", "powershell-7-expert",
+    "prompt-engineer", "query-clarifier", "report-generator", "research-analyst",
+    "research-coordinator", "research-orchestrator", "research-synthesizer",
+    "technical-researcher", "vault-keeper", "workflow-orchestrator",
+    # Skills (from .claude/skills/) — only process/governance skills likely in MUST DISPATCH
+    "process-qa", "process-analysis", "process-build", "process-planning",
+    "process-research", "process-pentest", "pm", "task-classifier", "verify",
+    "ensemble", "architect-loop", "save", "maintain", "index",
+}
+
+
+def extract_dispatch_names(raw_text):
+    """Extract only known agent/skill names from a must_dispatch raw string.
+
+    The classifier often appends reasoning text after the comma-separated names:
+      'process-qa, pm Let me break down...'
+    This function splits on commas and whitespace, matches each token against
+    KNOWN_DISPATCH_NAMES, and returns only the valid names as a clean comma-separated string.
+    """
+    if not raw_text:
+        return None
+    raw_lower = raw_text.lower().strip()
+    if raw_lower.startswith("none") or raw_lower.startswith("n/a"):
+        return "none"
+
+    # Split on commas first, then check each segment
+    found = []
+    for segment in raw_text.split(","):
+        segment = segment.strip()
+        # The name might be followed by reasoning text — try matching the first word(s)
+        # that form a known name (handles multi-word like "architect-review")
+        words = segment.split()
+        for i in range(min(3, len(words)), 0, -1):
+            candidate = " ".join(words[:i]).strip().lower().rstrip(".,;:")
+            if candidate in KNOWN_DISPATCH_NAMES:
+                found.append(candidate)
+                break
+
+    return ", ".join(found) if found else None
+
 
 def strip_fences(text):
     """Remove markdown fenced code blocks to prevent false matches on examples/docs."""
@@ -125,10 +174,7 @@ def main():
                     if md:
                         raw = md.group(1).strip().strip('`')
                         raw = re.sub(r'\s+', ' ', raw)
-                        if raw.lower().startswith("none") or raw.lower().startswith("n/a"):
-                            last_must_dispatch = "none"
-                        else:
-                            last_must_dispatch = raw
+                        last_must_dispatch = extract_dispatch_names(raw)
 
             # Track dispatches after classification
             if block.get("type") == "tool_use":
@@ -156,7 +202,8 @@ def main():
 
     log_entry = {
         "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "session": session_id[:12],
+        "schema": 2,  # P1-E: schema version field (2026-04-09)
+        "session": session_id,  # Full UUID (P1-D fix 2026-04-09)
         "type": last_type,
         "implies": last_implies,
         "domain": last_domain,
