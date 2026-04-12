@@ -187,11 +187,14 @@ def main():
         return
 
     # --- CHECK 3: Zero-Work Non-Quick (SOFT — log only) ---
+    # INFO-4 fix (2026-04-09): Track whether warn was emitted to prevent
+    # double-logging (warn + pass on same turn would corrupt analytics).
+    warn_emitted = False
     if is_non_quick and tool_count == 0:
         try:
             from datetime import datetime
             log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0][:12]
+            session_id = os.path.splitext(os.path.basename(transcript_path))[0]  # Full UUID (P1-D fix 2026-04-09)
             log_entry = json.dumps({
                 "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "event": "warn",
@@ -201,18 +204,21 @@ def main():
                 "tool_count": 0,
                 "has_qa_report": has_qa_report,
                 "is_non_quick": is_non_quick,
+                "schema": 2,
             })
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(log_entry + "\n")
+            warn_emitted = True
         except Exception:
             pass
 
     # --- Log pass for monitoring ---
-    if is_non_quick or has_qa_report or has_pentest_report:
+    # Skip if warn was already emitted this turn (prevents double-counting)
+    if (is_non_quick or has_qa_report or has_pentest_report) and not warn_emitted:
         try:
             from datetime import datetime
             log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0][:12]
+            session_id = os.path.splitext(os.path.basename(transcript_path))[0]  # Full UUID (P1-D fix 2026-04-09)
             log_entry = json.dumps({
                 "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "event": "pass",
@@ -223,6 +229,7 @@ def main():
                 "has_qa_report": has_qa_report,
                 "has_pentest_report": has_pentest_report,
                 "response_asks_user": response_asks_user,
+                "schema": 2,
             })
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(log_entry + "\n")

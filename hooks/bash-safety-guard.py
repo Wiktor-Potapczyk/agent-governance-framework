@@ -69,11 +69,23 @@ def main():
             }
             print(json.dumps(result))
             # Log deny event (truncate command, never log credential content)
+            # P1-D + P1-E fix (2026-04-09): added session + schema fields for analytics joins
             try:
                 import os
                 from datetime import datetime
                 log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-                entry = json.dumps({"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "deny", "hook": "bash-safety-guard", "pattern": description, "command_prefix": command[:50]})
+                # Extract session from transcript_path if available
+                transcript_path = payload.get("transcript_path", "")
+                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+                entry = json.dumps({
+                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "schema": 2,
+                    "event": "deny",
+                    "hook": "bash-safety-guard",
+                    "session": session_id,
+                    "pattern": description,
+                    "command_prefix": command[:50],
+                })
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(entry + "\n")
             except Exception:
