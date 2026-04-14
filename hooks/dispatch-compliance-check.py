@@ -27,8 +27,7 @@ FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
 # trailing reasoning text that would otherwise cause false-positive blocks.
 KNOWN_DISPATCH_NAMES = {
     # Agents
-    "adversarial-reviewer", "api-designer", "api-security-audit",
-    "architect-review",  # declared name (MUST DISPATCH). Runtime name = "architect-reviewer" (via SKILL_AGENT_ALIASES)
+    "adversarial-reviewer", "api-designer", "api-security-audit", "architect-review",
     "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
     "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
     "mcp-developer", "mcp-registry-navigator", "mcp-server-architect", "n8n-reviewer",
@@ -48,32 +47,12 @@ KNOWN_DISPATCH_NAMES = {
 # uses the agent's runtime name (e.g., "architect-review" declared but
 # "architect-reviewer" dispatched), alias resolution prevents false blocks.
 SKILL_AGENT_ALIASES = {
-    # Atomic skill/name aliases
     "pm": {"pm-orchestrator"},
     "architect-review": {"architect-reviewer"},
-    # process-research: B1 fix (2026-04-13) — added research-synthesizer, report-generator
-    "process-research": {
-        "research-orchestrator", "technical-researcher", "research-analyst",
-        "research-synthesizer", "report-generator",
-    },
-    # process-analysis: S3 fix (2026-04-13) — expanded from 2 to 10 per SKILL.md
-    "process-analysis": {
-        "architect-reviewer", "adversarial-reviewer",
-        "prompt-engineer", "debugger", "api-designer",
-        "data-engineer", "workflow-orchestrator", "api-security-audit",
-        "research-synthesizer", "report-generator",
-    },
-    # process-planning: S3 fix (2026-04-13) — expanded from 2 to 9 per SKILL.md
-    "process-planning": {
-        "implementation-plan", "adversarial-reviewer", "architect-reviewer",
-        "technical-researcher", "research-analyst", "api-designer",
-        "llm-architect", "data-engineer", "prompt-engineer",
-    },
-    # process-build: S3 fix (2026-04-13) — added prompt-engineer, debugger
-    "process-build": {
-        "blueprint-mode", "architect-reviewer", "implementation-plan",
-        "prompt-engineer", "debugger",
-    },
+    "process-planning": {"implementation-plan", "adversarial-reviewer"},
+    "process-build": {"blueprint-mode", "architect-reviewer", "implementation-plan"},
+    "process-research": {"research-orchestrator", "technical-researcher", "research-analyst"},
+    "process-analysis": {"architect-reviewer", "adversarial-reviewer"},
     "process-qa": {"debugger"},
     "process-pentest": {"debugger"},
     "architect-loop": {"architect-reviewer", "adversarial-reviewer"},
@@ -136,6 +115,7 @@ def main():
     must_dispatch = []
     dispatched = set()
     found_contract = False
+    task_type_str = ""  # Fix 3 (2026-04-14): captured per classification block
 
     for line in lines:
         line = line.strip()
@@ -167,6 +147,10 @@ def main():
                     must_dispatch = []
                     dispatched = set()
                     found_contract = False
+                    # Fix 3 (2026-04-14): capture the TASK TYPE token so the
+                    # general-purpose substitution warning can decide whether to fire.
+                    _tt_token = tt_match.group(0).split(":", 1)[-1].strip().lower()
+                    task_type_str = _tt_token
                     # Multiline MUST DISPATCH: capture until next field label, fence, or end
                     m = re.search(
                         r'MUST DISPATCH:\s*(.*?)(?=\n\s*' + FIELD_LABELS + r'\s*:|\Z)',
@@ -232,6 +216,35 @@ def main():
             entry = json.dumps({"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "block", "hook": "dispatch-compliance", "session": session_id, "declared": must_dispatch, "missing": missing, "schema": 2})
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(entry + "\n")
+        except Exception:
+            pass
+
+        # Fix 3 (2026-04-14): general-purpose substitution soft warning.
+        # Pure observability — does NOT change block/pass behavior, only writes
+        # an additional JSONL line so we can see how often the assistant
+        # substitutes general-purpose for a declared specialist.
+        try:
+            if (
+                "general-purpose" in dispatched
+                and task_type_str
+                and task_type_str != "quick"
+            ):
+                from datetime import datetime
+                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+                warn_entry = json.dumps({
+                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "event": "warning",
+                    "warning": "general-purpose substitution",
+                    "hook": "dispatch-compliance",
+                    "session": session_id,
+                    "task_type": task_type_str,
+                    "declared": must_dispatch,
+                    "missing": missing,
+                    "schema": 2,
+                })
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(warn_entry + "\n")
         except Exception:
             pass
     else:
