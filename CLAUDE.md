@@ -40,7 +40,7 @@ Classify each note as:
 - Filenames: kebab-case; dates: YYYY-MM-DD prefix
 - Tags: #project/[your-project], #idea, #research, #task, #personal
 - Status tags: #active, #waiting, #done, #archived
-- Wiki-links [[note-name]] for internal references; all notes in English
+- Wiki-links (e.g. `[[note-name]]`) for internal references; all notes in English
 - Frontmatter: always include date, tags, status
 
 ## CRITICAL RULE: Iterative Working Mindset

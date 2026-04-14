@@ -195,5 +195,54 @@ class TestPassEventLogic(unittest.TestCase):
         self.assertEqual(missing, [])
 
 
+class TestMultilineMustDispatch(unittest.TestCase):
+    """B4 fix 2026-04-13: multiline MUST DISPATCH handling."""
+
+    def test_multiline_pm_on_line2_extracted(self):
+        """PM on second line of MUST DISPATCH should be extracted."""
+        import re
+        FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
+        text = (
+            "MUST DISPATCH:\n"
+            "  process-research,\n"
+            "  pm,\n"
+            "  process-qa\n"
+            "MISSED: something"
+        )
+        m = re.search(
+            r'MUST DISPATCH:\s*(.*?)(?=\n\s*' + FIELD_LABELS + r'\s*:|\Z)',
+            text, re.DOTALL | re.IGNORECASE
+        )
+        self.assertIsNotNone(m)
+        raw = re.sub(r'\s+', ' ', m.group(1).strip().strip('`'))
+        names = extract_dispatch_names(raw)
+        self.assertIn("pm", names)
+        self.assertIn("process-research", names)
+        self.assertIn("process-qa", names)
+
+    def test_multiline_pm_check_passes(self):
+        """classifier-field-check PM enforcement should find pm on line 2."""
+        import re
+        FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
+        classifier_text = (
+            "IMPLIES: test\n"
+            "TASK TYPE: Build\n"
+            "APPROACH: build\n"
+            "MUST DISPATCH:\n"
+            "  process-build,\n"
+            "  pm,\n"
+            "  process-qa\n"
+            "MISSED: nothing"
+        )
+        dispatch_match = re.search(
+            r'MUST DISPATCH:\s*(.*?)(?=\n\s*' + FIELD_LABELS + r'\s*:|\Z)',
+            classifier_text, re.DOTALL | re.IGNORECASE
+        )
+        self.assertIsNotNone(dispatch_match)
+        dispatch_text = re.sub(r'\s+', ' ', dispatch_match.group(1).strip()).lower()
+        self.assertTrue(re.search(r'\bpm\b', dispatch_text),
+                        f"pm not found in multiline dispatch: '{dispatch_text}'")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

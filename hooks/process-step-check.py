@@ -77,8 +77,11 @@ def check_pentest_report(process_skill, text_blocks):
 
 def check_pm_checkpoint_report(lines):
     """HARD: When /pm was invoked, check for PM CHECKPOINT REPORT with Viability verdict.
+    B2 fix (2026-04-13): Also verifies pm-orchestrator was actually dispatched — prevents
+    rubber-stamping by writing an inline report without dispatching the agent.
     Independent of process-skill tracking — scans full transcript like check_pm_after_increment."""
     pm_invoked = False
+    pm_orchestrator_dispatched = False  # B2 fix: track agent dispatch
     text_after_pm = []
 
     for line in lines:
@@ -105,7 +108,20 @@ def check_pm_checkpoint_report(lines):
                 skill = (inp.get("skill") or "").lower()
                 if skill == "pm":
                     pm_invoked = True
+                    pm_orchestrator_dispatched = False  # Reset per-invocation
                     text_after_pm = []  # Reset — track text after latest /pm invocation
+
+            # B2 fix: detect pm-orchestrator Agent dispatch after pm Skill
+            if pm_invoked and block.get("type") == "tool_use" and block.get("name") == "Agent":
+                inp = block.get("input", {})
+                if isinstance(inp, str):
+                    try:
+                        inp = json.loads(inp)
+                    except (json.JSONDecodeError, TypeError):
+                        inp = {}
+                agent_type = (inp.get("subagent_type") or "").lower()
+                if agent_type == "pm-orchestrator":
+                    pm_orchestrator_dispatched = True
 
             if pm_invoked and block.get("type") == "text":
                 text_after_pm.append(block.get("text", ""))
@@ -115,7 +131,11 @@ def check_pm_checkpoint_report(lines):
 
     for text in text_after_pm:
         if "PM CHECKPOINT REPORT" in text and re.search(r'Viability:\s*(?:PASS|HOLD|KILL)', text):
-            return True, ""
+            # B2 fix: report present — but was pm-orchestrator actually dispatched?
+            if pm_orchestrator_dispatched:
+                return True, ""
+            else:
+                return False, "PM CHECKPOINT REPORT present but pm-orchestrator agent was not dispatched — inline PM is not valid"
 
     return False, "PM invoked but missing PM CHECKPOINT REPORT with Viability verdict"
 

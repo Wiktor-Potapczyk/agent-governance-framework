@@ -1,5 +1,48 @@
 # Changelog
 
+## 2026-04-13 — Alignment Fix Implementation (11/14 findings)
+
+Comprehensive alignment analysis (8 routes, 14 findings) revealed that hooks enforce format, not correctness. This release fixes 11 of 14 findings across 4 phases.
+
+### Phase 1: Structural Correctness
+
+- **B4 fix:** Multiline MUST DISPATCH regex in `classifier-field-check.py` and `agent-dispatch-check.py`. Both now use `re.DOTALL` with FIELD_LABELS delimiter, matching `dispatch-compliance-check.py` pattern.
+- **B5 fix:** `architect-review` vs `architect-reviewer` naming contract documented in all KNOWN_DISPATCH_NAMES copies.
+
+### Phase 2: Alias Expansion (S3/B1)
+
+- **SKILL_AGENT_ALIASES expanded** in `agent-dispatch-check.py` and `dispatch-compliance-check.py`:
+  - `process-research`: +research-synthesizer, +report-generator (fixes B1: direct-dispatch path Step 4-5 was blocked)
+  - `process-analysis`: expanded from 2 to 10 agents (all Step 2 specialists)
+  - `process-planning`: expanded from 2 to 9 agents (Steps 2-4)
+  - `process-build`: +prompt-engineer, +debugger
+- **Canonical SKILL_AGENT_ALIASES** added to `scripts/shared/known_names.py`
+- **Drift guard test** extended to cover SKILL_AGENT_ALIASES consistency across hooks + canonical
+
+### Phase 3: Enforcement Uplift
+
+- **S1 fix:** `classifier-field-check.py` now requires JUSTIFICATION field for Quick classifications (blocks if missing)
+- **M1 fix:** `user-prompt-submit.py` adds 9 depth-signal patterns ("are you sure?", "analyze this", "why did", etc.) that inject stronger classifier warnings via additionalContext
+- **B2 fix:** `process-step-check.py` `check_pm_checkpoint_report()` now verifies pm-orchestrator agent was dispatched, not just that a PM CHECKPOINT REPORT text block exists (prevents rubber-stamping)
+
+### Phase 4: Independent Fixes
+
+- **B3 fix:** Scheduled tasks (`daily-memory-update`, `weekly-memory-update`) corrected to reference actual `score-memory.py` path
+- **M4 fix:** 4 process skill docs corrected from "caught by the Stop hook" to "logged by the Stop hook — soft enforcement"
+- **M6 fix:** `governance-log.py` no longer skips blocked turns; logs with `blocked_turn: true` field
+
+### Deferred (3/14)
+
+- **S2** (TaskCreate enforcement hook) — requires new hook architecture, deferred to next iteration
+- **M3** (shared checkpoint timer) — low impact, fix complexity not justified
+- **M5** (dark-zone enforcement) — needs 30 days of log data before hardening
+
+### Test Progression
+
+87 → 120 tests. 3 new test files: `test_classifier_field_check.py`, `test_user_prompt_submit.py`, `test_process_step_check.py`.
+
+---
+
 ## 2026-04-06 — Quality Enforcement + PM Simplification
 
 Major evolution from compliance-only to compliance + quality enforcement. Hooks now check tool usage during QA, not just format. PM trigger simplified from "2+ compounds" to "every non-Quick."
