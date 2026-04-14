@@ -39,7 +39,8 @@ FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
 # names. This set filters to only valid names, discarding garbage tokens.
 KNOWN_DISPATCH_NAMES = {
     # Agents (from .claude/agents/)
-    "adversarial-reviewer", "api-designer", "api-security-audit", "architect-review",
+    "adversarial-reviewer", "api-designer", "api-security-audit",
+    "architect-review",  # declared name (MUST DISPATCH). Runtime name = "architect-reviewer" (via SKILL_AGENT_ALIASES)
     "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
     "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
     "mcp-developer", "mcp-registry-navigator", "mcp-server-architect", "n8n-reviewer",
@@ -99,9 +100,9 @@ def main():
     except json.JSONDecodeError:
         return
 
-    # Don't log during stop-hook-active retries
-    if payload.get("stop_hook_active"):
-        return
+    # M6 fix (2026-04-13): Log blocked turns with blocked_turn=true instead of skipping.
+    # Previously returned early, causing blocked turns to have no rich governance-log entry.
+    is_blocked_turn = bool(payload.get("stop_hook_active"))
 
     transcript_path = payload.get("transcript_path")
     if not transcript_path or not os.path.exists(transcript_path):
@@ -212,6 +213,7 @@ def main():
         "skills": skills_invoked,
         "agent_count": len(agents_dispatched),
         "skill_count": len(skills_invoked),
+        "blocked_turn": is_blocked_turn,  # M6 fix (2026-04-13)
     }
 
     try:

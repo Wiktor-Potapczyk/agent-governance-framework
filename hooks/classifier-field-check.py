@@ -92,7 +92,12 @@ def main():
     if not has_type:
         missing.append("TASK TYPE")
 
-    if not is_quick:
+    if is_quick:
+        # S1 fix (2026-04-13): Quick must have JUSTIFICATION per task-classifier spec
+        has_justification = bool(re.search(r'JUSTIFICATION:', last_classifier_text, re.IGNORECASE))
+        if not has_justification:
+            missing.append("JUSTIFICATION (Quick tasks must justify why no specialist agent applies)")
+    else:
         if not has_approach:
             missing.append("APPROACH")
         if not has_missed:
@@ -101,10 +106,18 @@ def main():
             missing.append("MUST DISPATCH")
 
     # --- PM enforcement (every non-Quick task) ---
+    # Multiline-aware capture (B4 fix 2026-04-13): MUST DISPATCH may span lines.
+    # Uses same FIELD_LABELS delimiter as dispatch-compliance-check.py.
+    FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
     if not is_quick and has_must_dispatch and not missing:
-        dispatch_match = re.search(r'MUST DISPATCH:\s*(.+)', last_classifier_text, re.IGNORECASE)
+        dispatch_match = re.search(
+            r'MUST DISPATCH:\s*(.*?)(?=\n\s*' + FIELD_LABELS + r'\s*:|\Z)',
+            last_classifier_text,
+            re.DOTALL | re.IGNORECASE
+        )
         if dispatch_match:
-            dispatch_text = dispatch_match.group(1).lower()
+            # Collapse multiline whitespace into single string for pm check
+            dispatch_text = re.sub(r'\s+', ' ', dispatch_match.group(1).strip()).lower()
             if not re.search(r'\bpm\b', dispatch_text):
                 missing.append("pm in MUST DISPATCH (every non-Quick task requires PM oversight)")
 

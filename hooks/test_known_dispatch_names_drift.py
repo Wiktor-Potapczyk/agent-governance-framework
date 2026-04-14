@@ -109,5 +109,68 @@ class TestKnownDispatchNamesDrift(unittest.TestCase):
         self.assertEqual(self.canonical, self.agent.KNOWN_DISPATCH_NAMES)
 
 
+class TestSkillAgentAliasesDrift(unittest.TestCase):
+    """Step 2.3 (2026-04-13): SKILL_AGENT_ALIASES must stay in sync between hooks + canonical."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.disp = load_hook("dispatch-compliance-check.py")
+        cls.agent = load_hook("agent-dispatch-check.py")
+        from shared.known_names import SKILL_AGENT_ALIASES as canonical
+        cls.canonical = canonical
+
+    def test_dispatch_compliance_has_aliases(self):
+        self.assertTrue(hasattr(self.disp, "SKILL_AGENT_ALIASES"))
+        self.assertIsInstance(self.disp.SKILL_AGENT_ALIASES, dict)
+
+    def test_agent_dispatch_has_aliases(self):
+        self.assertTrue(hasattr(self.agent, "SKILL_AGENT_ALIASES"))
+        self.assertIsInstance(self.agent.SKILL_AGENT_ALIASES, dict)
+
+    def test_hooks_aliases_identical(self):
+        """Both hooks must have identical SKILL_AGENT_ALIASES."""
+        self.assertEqual(
+            set(self.disp.SKILL_AGENT_ALIASES.keys()),
+            set(self.agent.SKILL_AGENT_ALIASES.keys()),
+            "SKILL_AGENT_ALIASES keys differ between hooks"
+        )
+        for key in self.disp.SKILL_AGENT_ALIASES:
+            self.assertEqual(
+                self.disp.SKILL_AGENT_ALIASES[key],
+                self.agent.SKILL_AGENT_ALIASES[key],
+                f"SKILL_AGENT_ALIASES['{key}'] differs between hooks"
+            )
+
+    def test_canonical_matches_hooks(self):
+        """Canonical source must match both hooks."""
+        for key in self.canonical:
+            self.assertIn(key, self.agent.SKILL_AGENT_ALIASES,
+                          f"Canonical key '{key}' missing from agent-dispatch-check")
+            self.assertEqual(self.canonical[key], self.agent.SKILL_AGENT_ALIASES[key],
+                             f"Canonical['{key}'] != agent-dispatch-check['{key}']")
+
+    def test_all_keys_in_known_dispatch_names(self):
+        """Every alias key must be a recognized name."""
+        from shared.known_names import KNOWN_DISPATCH_NAMES
+        for key in self.canonical:
+            self.assertIn(key, KNOWN_DISPATCH_NAMES,
+                          f"Alias key '{key}' not in KNOWN_DISPATCH_NAMES")
+
+    def test_all_values_are_valid_agent_names(self):
+        """Every alias value must be a recognized agent name (in KNOWN_DISPATCH_NAMES
+        or a known runtime-only name like architect-reviewer)."""
+        from shared.known_names import KNOWN_DISPATCH_NAMES
+        # Runtime-only names: agent name: field values not in KNOWN_DISPATCH_NAMES
+        RUNTIME_ONLY = {"architect-reviewer"}
+        all_values = set()
+        for agents in self.canonical.values():
+            all_values.update(agents)
+        for val in all_values:
+            self.assertTrue(
+                val in KNOWN_DISPATCH_NAMES or val in RUNTIME_ONLY,
+                f"Alias value '{val}' not in KNOWN_DISPATCH_NAMES or RUNTIME_ONLY"
+            )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -101,12 +101,12 @@ class TestSkillAgentAliases(unittest.TestCase):
         self.assertIn("architect-reviewer", allowed)
         self.assertIn("adversarial-reviewer", allowed)
 
-    def test_process_research_does_not_include_downstream(self):
-        """process-research must NOT alias research-synthesizer or report-generator.
-        Those are dispatched by research-orchestrator internally, not by main session."""
+    def test_process_research_includes_synthesizer_and_reporter(self):
+        """B1 fix (2026-04-13): process-research Step 3B direct path dispatches
+        research-synthesizer (Step 4) and report-generator (Step 5) directly."""
         allowed = resolve_allowed(["process-research"])
-        self.assertNotIn("research-synthesizer", allowed)
-        self.assertNotIn("report-generator", allowed)
+        self.assertIn("research-synthesizer", allowed)
+        self.assertIn("report-generator", allowed)
 
     def test_unrelated_agent_still_blocked(self):
         """Alias expansion must NOT let arbitrary agents through."""
@@ -188,6 +188,64 @@ class TestAliasMappingIntegrity(unittest.TestCase):
 
     def test_architect_review_maps_to_architect_reviewer(self):
         self.assertEqual(SKILL_AGENT_ALIASES["architect-review"], {"architect-reviewer"})
+
+    def test_process_analysis_has_all_specialists(self):
+        """S3 fix: process-analysis should cover all 10 SKILL.md Step 2 agents."""
+        expected = {
+            "architect-reviewer", "adversarial-reviewer", "prompt-engineer",
+            "debugger", "api-designer", "data-engineer", "workflow-orchestrator",
+            "api-security-audit", "research-synthesizer", "report-generator",
+        }
+        self.assertEqual(SKILL_AGENT_ALIASES["process-analysis"], expected)
+
+    def test_process_planning_has_research_and_review_agents(self):
+        """S3 fix: process-planning should cover Steps 2-4 agents."""
+        aliases = SKILL_AGENT_ALIASES["process-planning"]
+        self.assertIn("technical-researcher", aliases)
+        self.assertIn("research-analyst", aliases)
+        self.assertIn("prompt-engineer", aliases)
+        self.assertIn("architect-reviewer", aliases)
+        self.assertEqual(len(aliases), 9)
+
+    def test_process_build_has_prompt_engineer(self):
+        """S3 fix: process-build Step 4 prompt-engineer should be aliased."""
+        self.assertIn("prompt-engineer", SKILL_AGENT_ALIASES["process-build"])
+        self.assertIn("debugger", SKILL_AGENT_ALIASES["process-build"])
+
+    def test_process_analysis_allows_specialist_dispatch(self):
+        """S3 fix integration: dispatching prompt-engineer under process-analysis is allowed."""
+        allowed = resolve_allowed(["process-analysis"])
+        self.assertIn("prompt-engineer", allowed)
+        self.assertIn("debugger", allowed)
+        self.assertIn("api-designer", allowed)
+        self.assertIn("workflow-orchestrator", allowed)
+
+
+class TestMultilineMustDispatch(unittest.TestCase):
+    """B4 fix 2026-04-13: multiline MUST DISPATCH extraction."""
+
+    def test_multiline_must_dispatch_extracts_all_names(self):
+        """Agent names on line 2+ of MUST DISPATCH should be in allowed set."""
+        import re
+        FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
+        text = (
+            "TASK TYPE: Build\n"
+            "MUST DISPATCH:\n"
+            "  process-build,\n"
+            "  pm,\n"
+            "  process-qa\n"
+            "MISSED: nothing"
+        )
+        m = re.search(
+            r'MUST DISPATCH:\s*(.*?)(?=\n\s*' + FIELD_LABELS + r'\s*:|\Z)',
+            text, re.DOTALL | re.IGNORECASE
+        )
+        self.assertIsNotNone(m)
+        raw = re.sub(r'\s+', ' ', m.group(1).strip().strip('`'))
+        names = extract_dispatch_names(raw)
+        self.assertIn("process-build", names)
+        self.assertIn("pm", names)
+        self.assertIn("process-qa", names)
 
 
 if __name__ == "__main__":

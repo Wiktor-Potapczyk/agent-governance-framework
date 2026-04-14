@@ -27,7 +27,8 @@ FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
 # trailing reasoning text that would otherwise cause false-positive blocks.
 KNOWN_DISPATCH_NAMES = {
     # Agents
-    "adversarial-reviewer", "api-designer", "api-security-audit", "architect-review",
+    "adversarial-reviewer", "api-designer", "api-security-audit",
+    "architect-review",  # declared name (MUST DISPATCH). Runtime name = "architect-reviewer" (via SKILL_AGENT_ALIASES)
     "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
     "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
     "mcp-developer", "mcp-registry-navigator", "mcp-server-architect", "n8n-reviewer",
@@ -47,12 +48,32 @@ KNOWN_DISPATCH_NAMES = {
 # uses the agent's runtime name (e.g., "architect-review" declared but
 # "architect-reviewer" dispatched), alias resolution prevents false blocks.
 SKILL_AGENT_ALIASES = {
+    # Atomic skill/name aliases
     "pm": {"pm-orchestrator"},
     "architect-review": {"architect-reviewer"},
-    "process-planning": {"implementation-plan", "adversarial-reviewer"},
-    "process-build": {"blueprint-mode", "architect-reviewer", "implementation-plan"},
-    "process-research": {"research-orchestrator", "technical-researcher", "research-analyst"},
-    "process-analysis": {"architect-reviewer", "adversarial-reviewer"},
+    # process-research: B1 fix (2026-04-13) — added research-synthesizer, report-generator
+    "process-research": {
+        "research-orchestrator", "technical-researcher", "research-analyst",
+        "research-synthesizer", "report-generator",
+    },
+    # process-analysis: S3 fix (2026-04-13) — expanded from 2 to 10 per SKILL.md
+    "process-analysis": {
+        "architect-reviewer", "adversarial-reviewer",
+        "prompt-engineer", "debugger", "api-designer",
+        "data-engineer", "workflow-orchestrator", "api-security-audit",
+        "research-synthesizer", "report-generator",
+    },
+    # process-planning: S3 fix (2026-04-13) — expanded from 2 to 9 per SKILL.md
+    "process-planning": {
+        "implementation-plan", "adversarial-reviewer", "architect-reviewer",
+        "technical-researcher", "research-analyst", "api-designer",
+        "llm-architect", "data-engineer", "prompt-engineer",
+    },
+    # process-build: S3 fix (2026-04-13) — added prompt-engineer, debugger
+    "process-build": {
+        "blueprint-mode", "architect-reviewer", "implementation-plan",
+        "prompt-engineer", "debugger",
+    },
     "process-qa": {"debugger"},
     "process-pentest": {"debugger"},
     "architect-loop": {"architect-reviewer", "adversarial-reviewer"},

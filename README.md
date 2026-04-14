@@ -14,7 +14,7 @@ The framework operationalizes three research-backed principles: classify before 
 
 ## Architecture
 
-The framework operates across four layers, with 12 active Python hooks (plus 4 optional in `hooks/disabled/`):
+The framework operates across five layers, with 18 active Python hooks:
 
 | Layer | What it does | Hook events |
 |---|---|---|
@@ -48,7 +48,7 @@ framework-repo/
 │   ├── process-step-check.py        # Stop: L1 exit gate -- blocks missing SCOPE or QA REPORT
 │   ├── dark-zone-check.py           # Stop: monitors unsupported citations and reasoning gaps
 │   ├── work-verification-check.py   # Stop: blocks lazy QA and premature user escalation
-│   └── disabled/                    # 4 optional hooks (agent-dispatch-check, delegation-check, epistemic-check, weekly-usage)
+│   └── disabled/                    # Optional/experimental hooks
 ├── skills/
 │   ├── core/                # 12 governance skills (task-classifier, process-*, verify, ensemble, pm, etc.)
 │   ├── vault/               # 5 knowledge-management skills (save, inbox, standup, etc.)

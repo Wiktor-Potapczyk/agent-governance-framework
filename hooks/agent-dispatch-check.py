@@ -30,21 +30,43 @@ ALWAYS_ALLOWED = {"general-purpose", "explore", "plan", "bash"}
 #   MUST DISPATCH: [pm] → dispatch pm-orchestrator → BLOCKED (false positive)
 #   MUST DISPATCH: [architect-review] → dispatch architect-reviewer → BLOCKED
 SKILL_AGENT_ALIASES = {
-    # Skills that dispatch agents with different names
+    # Atomic skill/name aliases
     "pm": {"pm-orchestrator"},
     "architect-review": {"architect-reviewer"},
-    # Process skills dispatch their primary agents
-    "process-planning": {"implementation-plan", "adversarial-reviewer"},
-    "process-build": {"blueprint-mode", "architect-reviewer", "implementation-plan"},
-    "process-research": {"research-orchestrator", "technical-researcher", "research-analyst"},
-    "process-analysis": {"architect-reviewer", "adversarial-reviewer"},
-    # PRE-I2-A (2026-04-12): 3 additional aliases from plan v2 audit
-    "process-qa": {"debugger"},  # dispatched conditionally on QA failure
-    "process-pentest": {"debugger"},  # pentest dispatches debugger on findings, not architect-reviewer (skill says "execute yourself")
-    "architect-loop": {"architect-reviewer", "adversarial-reviewer"},  # Ralph Loop dispatches reviewers
-    # NOTE: process-research does NOT alias research-synthesizer/report-generator —
-    # those are dispatched by research-orchestrator internally, not by the main session.
-    # Direct dispatch of downstream agents without process-research is a process violation.
+    # process-research: Steps 3B (direct) dispatch these agents.
+    # B1 fix (2026-04-13): research-synthesizer and report-generator added because
+    # Step 3B runs without research-orchestrator. They are NOT dispatched by
+    # the main session on the 3A (Ralph Loop) path.
+    "process-research": {
+        "research-orchestrator", "technical-researcher", "research-analyst",
+        "research-synthesizer", "report-generator",
+    },
+    # process-analysis: routes to any specialist based on domain (Step 2 table)
+    # S3 fix (2026-04-13): expanded from 2 to 10 agents per SKILL.md audit
+    "process-analysis": {
+        "architect-reviewer", "adversarial-reviewer",
+        "prompt-engineer", "debugger", "api-designer",
+        "data-engineer", "workflow-orchestrator", "api-security-audit",
+        "research-synthesizer", "report-generator",
+    },
+    # process-planning: Step 2 (research), Step 3 (design), Step 4 (review)
+    # S3 fix (2026-04-13): expanded from 2 to 9 agents per SKILL.md audit
+    "process-planning": {
+        "implementation-plan", "adversarial-reviewer", "architect-reviewer",
+        "technical-researcher", "research-analyst", "api-designer",
+        "llm-architect", "data-engineer", "prompt-engineer",
+    },
+    # process-build: Steps 2-5 per SKILL.md
+    # S3 fix (2026-04-13): added prompt-engineer and debugger
+    "process-build": {
+        "blueprint-mode", "architect-reviewer", "implementation-plan",
+        "prompt-engineer", "debugger",
+    },
+    # process-qa and process-pentest: debugger on failure
+    "process-qa": {"debugger"},
+    "process-pentest": {"debugger"},
+    # architect-loop: Ralph Loop dispatches reviewers
+    "architect-loop": {"architect-reviewer", "adversarial-reviewer"},
 }
 
 # Known agent/skill names — same set as governance-log.py and dispatch-compliance-check.py
@@ -52,7 +74,8 @@ SKILL_AGENT_ALIASES = {
 # discarding trailing reasoning text that would otherwise cause false DENIES.
 KNOWN_DISPATCH_NAMES = {
     # Agents
-    "adversarial-reviewer", "api-designer", "api-security-audit", "architect-review",
+    "adversarial-reviewer", "api-designer", "api-security-audit",
+    "architect-review",  # declared name (MUST DISPATCH). Runtime name = "architect-reviewer" (via SKILL_AGENT_ALIASES)
     "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
     "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
     "mcp-developer", "mcp-registry-navigator", "mcp-server-architect", "n8n-reviewer",
@@ -146,6 +169,9 @@ def main():
         if entry.get("type") != "assistant":
             continue
 
+        # Multiline MUST DISPATCH delimiter (B4 fix 2026-04-13)
+        FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
+
         message = entry.get("message", {})
         for block in message.get("content", []):
             if block.get("type") == "text":
@@ -153,9 +179,14 @@ def main():
                 if valid_types.search(text):
                     # New classification resets
                     must_dispatch = []
-                    m = re.search(r'MUST DISPATCH:\s*(.+)', text)
+                    # B4 fix (2026-04-13): multiline-aware capture using DOTALL
+                    m = re.search(
+                        r'MUST DISPATCH:\s*(.*?)(?=\n\s*' + FIELD_LABELS + r'\s*:|\Z)',
+                        text,
+                        re.DOTALL | re.IGNORECASE
+                    )
                     if m:
-                        raw = m.group(1).strip().strip('`')
+                        raw = re.sub(r'\s+', ' ', m.group(1).strip().strip('`'))
                         # P0 fix (2026-04-09): extract only known names,
                         # filter trailing reasoning text to prevent false DENIES
                         must_dispatch = extract_dispatch_names(raw)
