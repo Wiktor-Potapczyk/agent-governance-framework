@@ -27,7 +27,7 @@ FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
 # trailing reasoning text that would otherwise cause false-positive blocks.
 KNOWN_DISPATCH_NAMES = {
     # Agents
-    "adversarial-reviewer", "api-designer", "api-security-audit", "architect-review",
+    "adversarial-reviewer", "api-designer", "api-security-audit", "architect-review", "architect-reviewer",
     "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
     "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
     "mcp-developer", "mcp-registry-navigator", "mcp-server-architect", "n8n-reviewer",
@@ -188,7 +188,42 @@ def main():
                     if agent_type:
                         dispatched.add(agent_type)
 
-    if not found_contract or not must_dispatch:
+    if not found_contract:
+        return
+
+    # H3 fix (2026-04-18): reject empty MUST DISPATCH on non-Quick tasks.
+    # The classifier spec states "none is ONLY valid for Quick tasks." Previously
+    # this hook accepted any empty must_dispatch silently — the composed B1+B2+B3
+    # bypass relied on this. Block non-Quick MUST DISPATCH: none at the contract
+    # level before any dispatch checks run.
+    # "task_type_str" is lowercase already (line 152); Quick literal is "quick".
+    if not must_dispatch:
+        if task_type_str and task_type_str != "quick":
+            reason = (
+                f"DISPATCH COMPLIANCE: MUST DISPATCH is empty ('none') but TASK TYPE "
+                f"is '{task_type_str}'. 'none' is ONLY valid for Quick tasks per the "
+                f"classifier spec. Re-classify or populate MUST DISPATCH."
+            )
+            print(json.dumps({"decision": "block", "reason": reason}))
+            try:
+                from datetime import datetime
+                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+                entry = json.dumps({
+                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "event": "block",
+                    "hook": "dispatch-compliance",
+                    "session": session_id,
+                    "reason": "empty_must_dispatch_on_non_quick",
+                    "task_type": task_type_str,
+                    "schema": 2,
+                })
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(entry + "\n")
+            except Exception:
+                pass
+            return
+        # Quick or unknown type with empty MUST DISPATCH — valid, no enforcement needed
         return
 
     # Alias-aware missing check (2026-04-12 coherence fix):
@@ -250,19 +285,33 @@ def main():
     else:
         # P2-B (2026-04-09): Log pass event when all declared items are dispatched.
         # Required for DAR computation without relying on absence-of-block heuristic.
+        # H1 fix (2026-04-18): alias-expand matched computation so declared items
+        # satisfied via SKILL_AGENT_ALIASES (e.g., architect-review → architect-reviewer)
+        # are correctly counted. Previously this used raw set intersection which
+        # recorded matched=[], matched_count=0 for every legitimate alias-satisfied
+        # Build/Planning pass — silently corrupting DAR analytics for the two
+        # highest-frequency task types.
         try:
             from datetime import datetime
             log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
             session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+            matched_alias_aware = []
+            for item in must_dispatch:
+                if item in dispatched:
+                    matched_alias_aware.append(item)
+                else:
+                    aliases = SKILL_AGENT_ALIASES.get(item, set())
+                    if aliases & dispatched:
+                        matched_alias_aware.append(item)
             entry = json.dumps({
                 "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "event": "pass",
                 "hook": "dispatch-compliance",
                 "session": session_id,
                 "declared": must_dispatch,
-                "matched": sorted(dispatched & set(must_dispatch)),  # sorted for deterministic order
+                "matched": sorted(matched_alias_aware),
                 "declared_count": len(must_dispatch),
-                "matched_count": len([x for x in must_dispatch if x in dispatched]),
+                "matched_count": len(matched_alias_aware),
                 "schema": 2,
             })
             with open(log_path, "a", encoding="utf-8") as f:

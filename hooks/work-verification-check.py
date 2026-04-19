@@ -96,10 +96,19 @@ def main():
                 text = block.get("text", "")
                 last_turn_text.append(text)
 
-                # Check for QA/pentest reports
-                if "QA REPORT" in text and re.search(r'(?:PASS|FAIL)', text):
+                # Check for QA/pentest reports.
+                # Opus-4.7 adversarial-review fix (2026-04-18): tightened from naive
+                # substring+word match to structural-block detection. Narrative
+                # mentions like "the earlier QA REPORT showed PASS" used to trigger
+                # has_qa_report → CHECK 1b then blocked legitimate recaps. New regex
+                # requires "QA REPORT" at start-of-line (or after newline), followed
+                # by colon or newline (structural marker), with PASS/FAIL verdict
+                # within the next 500 chars as a whole word.
+                if re.search(r'(?:^|\n)\s*QA REPORT\s*[\n:].{0,500}?\b(?:PASS|FAIL)\b',
+                             text, re.DOTALL):
                     has_qa_report = True
-                if "PENTEST REPORT" in text and re.search(r'(?:PASS|FAIL|SHIP|FIX|ESCALATE)', text):
+                if re.search(r'(?:^|\n)\s*PENTEST REPORT\s*[\n:].{0,500}?\b(?:PASS|FAIL|SHIP|FIX|ESCALATE)\b',
+                             text, re.DOTALL):
                     has_pentest_report = True
 
                 # Check for non-Quick classification
@@ -133,6 +142,7 @@ def main():
     full_text = "\n".join(last_turn_text)
 
     # --- CHECK 1: QA/Pentest Execution (HARD) ---
+    # Catches lazy execution WITHIN an invoked process-qa/process-pentest skill.
     if (has_qa_report or has_pentest_report) and (has_process_qa or has_process_pentest):
         if len(execution_tools) == 0:
             # Check if Read/Grep were used (acceptable for some claim types)
@@ -155,6 +165,64 @@ def main():
             # but not for "hook blocks correctly" or "workflow runs"
             # Log it but don't block
             pass
+
+    # --- CHECK 1b: QA/Pentest Report Inline Without Skill Invocation (HARD) ---
+    # H5 fix (2026-04-18): The original CHECK 1 above only fires when the process
+    # skill was invoked. An agent that writes `QA REPORT: PASS` inline WITHOUT
+    # calling /process-qa (or /process-pentest) bypassed the gate entirely.
+    # This check closes that hole: producing a QA/Pentest verdict on a non-Quick
+    # task requires actually invoking the corresponding process skill.
+    if is_non_quick:
+        if has_qa_report and not (has_process_qa or has_process_pentest):
+            reason = (
+                "WORK VERIFICATION: QA REPORT block produced on a non-Quick task "
+                "without invoking /process-qa (or /process-pentest). Writing a "
+                "QA verdict inline bypasses the QA process. Invoke the /process-qa "
+                "skill properly — it structures scope, execution, and reporting. "
+                "Inline QA reports are not valid evidence of verification."
+            )
+            print(json.dumps({"decision": "block", "reason": reason}))
+            try:
+                from datetime import datetime
+                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+                entry = json.dumps({
+                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "event": "block",
+                    "hook": "work-verification-check",
+                    "session": session_id,
+                    "check": "inline-qa-without-skill",
+                    "schema": 2,
+                })
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(entry + "\n")
+            except Exception:
+                pass
+            return
+        if has_pentest_report and not has_process_pentest:
+            reason = (
+                "WORK VERIFICATION: PENTEST REPORT block produced on a non-Quick "
+                "task without invoking /process-pentest. Inline pentest verdicts "
+                "bypass the pentest process. Invoke /process-pentest properly."
+            )
+            print(json.dumps({"decision": "block", "reason": reason}))
+            try:
+                from datetime import datetime
+                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+                entry = json.dumps({
+                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "event": "block",
+                    "hook": "work-verification-check",
+                    "session": session_id,
+                    "check": "inline-pentest-without-skill",
+                    "schema": 2,
+                })
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(entry + "\n")
+            except Exception:
+                pass
+            return
 
     # --- CHECK 2: Premature Escalation (HARD) ---
     # Detect: response asks user for help/decision with minimal tool usage

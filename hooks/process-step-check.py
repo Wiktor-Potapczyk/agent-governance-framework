@@ -10,7 +10,7 @@ HARD blocks (clear violations):
 
 SOFT logging (judgment-dependent, collected for analysis):
 - Synthesis not dispatched when 2+ agents contributed
-- architect-review not dispatched for process-build/process-planning
+- architect-reviewer not dispatched for process-build/process-planning
 - Zero agent dispatches for process skills that should delegate
 
 All checks logged to governance-log.jsonl for analysis.
@@ -76,12 +76,16 @@ def check_pentest_report(process_skill, text_blocks):
 
 
 def check_pm_checkpoint_report(lines):
-    """HARD: When /pm was invoked, check for PM CHECKPOINT REPORT with Viability verdict.
-    B2 fix (2026-04-13): Also verifies pm-orchestrator was actually dispatched — prevents
-    rubber-stamping by writing an inline report without dispatching the agent.
-    Independent of process-skill tracking — scans full transcript like check_pm_after_increment."""
+    """HARD: When /pm was invoked, check for PM CHECKPOINT REPORT with Viability verdict
+    AND that pm-orchestrator Agent was dispatched after the skill (not just inline text).
+
+    Rubber-stamp hardening (B2 fix 2026-04-13, originally failing test_pm_without_orchestrator_inline_report_blocked;
+    implemented 2026-04-18 as part of Opus-4.7 adversarial review of H1 sprint):
+    The /pm Skill MUST dispatch pm-orchestrator — otherwise the checkpoint is an inline
+    rubber stamp, defeating the whole point of having a PM orchestrator agent.
+    """
     pm_invoked = False
-    pm_orchestrator_dispatched = False  # B2 fix: track agent dispatch
+    pm_orchestrator_dispatched = False
     text_after_pm = []
 
     for line in lines:
@@ -108,10 +112,10 @@ def check_pm_checkpoint_report(lines):
                 skill = (inp.get("skill") or "").lower()
                 if skill == "pm":
                     pm_invoked = True
-                    pm_orchestrator_dispatched = False  # Reset per-invocation
-                    text_after_pm = []  # Reset — track text after latest /pm invocation
+                    pm_orchestrator_dispatched = False  # Reset — track dispatch after latest /pm
+                    text_after_pm = []
 
-            # B2 fix: detect pm-orchestrator Agent dispatch after pm Skill
+            # Track pm-orchestrator Agent dispatches that happen AFTER /pm was invoked
             if pm_invoked and block.get("type") == "tool_use" and block.get("name") == "Agent":
                 inp = block.get("input", {})
                 if isinstance(inp, str):
@@ -119,8 +123,8 @@ def check_pm_checkpoint_report(lines):
                         inp = json.loads(inp)
                     except (json.JSONDecodeError, TypeError):
                         inp = {}
-                agent_type = (inp.get("subagent_type") or "").lower()
-                if agent_type == "pm-orchestrator":
+                subagent = (inp.get("subagent_type") or "").lower()
+                if subagent == "pm-orchestrator":
                     pm_orchestrator_dispatched = True
 
             if pm_invoked and block.get("type") == "text":
@@ -129,13 +133,22 @@ def check_pm_checkpoint_report(lines):
     if not pm_invoked:
         return True, ""  # /pm not invoked — nothing to check
 
-    for text in text_after_pm:
-        if "PM CHECKPOINT REPORT" in text and re.search(r'Viability:\s*(?:PASS|HOLD|KILL)', text):
-            # B2 fix: report present — but was pm-orchestrator actually dispatched?
-            if pm_orchestrator_dispatched:
-                return True, ""
-            else:
-                return False, "PM CHECKPOINT REPORT present but pm-orchestrator agent was not dispatched — inline PM is not valid"
+    has_report = any(
+        "PM CHECKPOINT REPORT" in text and re.search(r'Viability:\s*(?:PASS|HOLD|KILL)', text)
+        for text in text_after_pm
+    )
+
+    # Rubber-stamp guard: if report is present but pm-orchestrator was never dispatched,
+    # the report is inline text without the orchestrator actually running. Block.
+    if has_report and not pm_orchestrator_dispatched:
+        return False, (
+            "PM REPORT: inline PM CHECKPOINT REPORT found but pm-orchestrator agent was "
+            "not dispatched. /pm requires the pm-orchestrator Agent to run the checkpoint; "
+            "writing the report inline is a rubber stamp. Invoke pm-orchestrator properly."
+        )
+
+    if has_report:
+        return True, ""
 
     return False, "PM invoked but missing PM CHECKPOINT REPORT with Viability verdict"
 
@@ -153,13 +166,13 @@ def check_synthesis(process_skill, agents):
 
 
 def check_architect_review(process_skill, agents):
-    """SOFT: For build/planning, architect-review should be dispatched."""
+    """SOFT: For build/planning, architect-reviewer should be dispatched."""
     if process_skill not in ("process-build", "process-planning"):
         return True, ""
     agent_names = {a.lower() for a in agents}
     if any("architect" in a and "review" in a for a in agent_names):
         return True, ""
-    return False, "No architect-review dispatch"
+    return False, "No architect-reviewer dispatch"
 
 
 def check_agent_dispatch(process_skill, agents):
