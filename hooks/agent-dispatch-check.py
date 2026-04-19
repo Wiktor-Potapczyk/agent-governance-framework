@@ -23,6 +23,43 @@ READ_BYTES = 204800
 # Agent types that are always allowed (infrastructure, not specialist routing)
 ALWAYS_ALLOWED = {"general-purpose", "explore", "plan", "bash"}
 
+# Process skills that legitimately route to multiple specialists not pre-enumerated
+# in classifier MUST DISPATCH. When ANY of these appears in MUST DISPATCH, the main
+# session is delegating routing to the skill; any agent in registry.json should be
+# allowed through (2026-04-18 fix — architectural bug where allowlist was exclusive).
+PROCESS_ROUTING_SKILLS = {
+    "process-research", "process-analysis", "process-build",
+    "process-planning", "process-qa", "process-pentest",
+}
+
+# Registry path — loaded lazily to list all valid agents (local + plugin)
+REGISTRY_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "registry.json"
+)
+
+
+def load_registry_agents():
+    """Return set of valid agent names from .claude/registry.json (lowercase).
+    Registry schema: agents is a dict keyed by agent name.
+    """
+    try:
+        with open(REGISTRY_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        agents = data.get("agents", {})
+        if isinstance(agents, dict):
+            return {name.lower() for name in agents.keys() if name}
+        # Fallback: list-of-dicts schema (legacy)
+        if isinstance(agents, list):
+            return {
+                (a.get("name") or "").lower()
+                for a in agents
+                if isinstance(a, dict) and a.get("name")
+            }
+        return set()
+    except Exception:
+        return set()
+
 # Skill/short-name → agent-name aliases (bug fix 2026-04-10)
 # When a skill or short name appears in MUST DISPATCH, dispatching its
 # underlying agent(s) should also be allowed. Previously the hook did an
@@ -30,43 +67,21 @@ ALWAYS_ALLOWED = {"general-purpose", "explore", "plan", "bash"}
 #   MUST DISPATCH: [pm] → dispatch pm-orchestrator → BLOCKED (false positive)
 #   MUST DISPATCH: [architect-review] → dispatch architect-reviewer → BLOCKED
 SKILL_AGENT_ALIASES = {
-    # Atomic skill/name aliases
+    # Skills that dispatch agents with different names
     "pm": {"pm-orchestrator"},
     "architect-review": {"architect-reviewer"},
-    # process-research: Steps 3B (direct) dispatch these agents.
-    # B1 fix (2026-04-13): research-synthesizer and report-generator added because
-    # Step 3B runs without research-orchestrator. They are NOT dispatched by
-    # the main session on the 3A (Ralph Loop) path.
-    "process-research": {
-        "research-orchestrator", "technical-researcher", "research-analyst",
-        "research-synthesizer", "report-generator",
-    },
-    # process-analysis: routes to any specialist based on domain (Step 2 table)
-    # S3 fix (2026-04-13): expanded from 2 to 10 agents per SKILL.md audit
-    "process-analysis": {
-        "architect-reviewer", "adversarial-reviewer",
-        "prompt-engineer", "debugger", "api-designer",
-        "data-engineer", "workflow-orchestrator", "api-security-audit",
-        "research-synthesizer", "report-generator",
-    },
-    # process-planning: Step 2 (research), Step 3 (design), Step 4 (review)
-    # S3 fix (2026-04-13): expanded from 2 to 9 agents per SKILL.md audit
-    "process-planning": {
-        "implementation-plan", "adversarial-reviewer", "architect-reviewer",
-        "technical-researcher", "research-analyst", "api-designer",
-        "llm-architect", "data-engineer", "prompt-engineer",
-    },
-    # process-build: Steps 2-5 per SKILL.md
-    # S3 fix (2026-04-13): added prompt-engineer and debugger
-    "process-build": {
-        "blueprint-mode", "architect-reviewer", "implementation-plan",
-        "prompt-engineer", "debugger",
-    },
-    # process-qa and process-pentest: debugger on failure
-    "process-qa": {"debugger"},
-    "process-pentest": {"debugger"},
-    # architect-loop: Ralph Loop dispatches reviewers
-    "architect-loop": {"architect-reviewer", "adversarial-reviewer"},
+    # Process skills dispatch their primary agents
+    "process-planning": {"implementation-plan", "adversarial-reviewer"},
+    "process-build": {"blueprint-mode", "architect-reviewer", "implementation-plan"},
+    "process-research": {"research-orchestrator", "technical-researcher", "research-analyst"},
+    "process-analysis": {"architect-reviewer", "adversarial-reviewer"},
+    # PRE-I2-A (2026-04-12): 3 additional aliases from plan v2 audit
+    "process-qa": {"debugger"},  # dispatched conditionally on QA failure
+    "process-pentest": {"debugger"},  # pentest dispatches debugger on findings, not architect-reviewer (skill says "execute yourself")
+    "architect-loop": {"architect-reviewer", "adversarial-reviewer"},  # Ralph Loop dispatches reviewers
+    # NOTE: process-research does NOT alias research-synthesizer/report-generator —
+    # those are dispatched by research-orchestrator internally, not by the main session.
+    # Direct dispatch of downstream agents without process-research is a process violation.
 }
 
 # Known agent/skill names — same set as governance-log.py and dispatch-compliance-check.py
@@ -74,8 +89,7 @@ SKILL_AGENT_ALIASES = {
 # discarding trailing reasoning text that would otherwise cause false DENIES.
 KNOWN_DISPATCH_NAMES = {
     # Agents
-    "adversarial-reviewer", "api-designer", "api-security-audit",
-    "architect-review",  # declared name (MUST DISPATCH). Runtime name = "architect-reviewer" (via SKILL_AGENT_ALIASES)
+    "adversarial-reviewer", "api-designer", "api-security-audit", "architect-review", "architect-reviewer",
     "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
     "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
     "mcp-developer", "mcp-registry-navigator", "mcp-server-architect", "n8n-reviewer",
@@ -169,9 +183,6 @@ def main():
         if entry.get("type") != "assistant":
             continue
 
-        # Multiline MUST DISPATCH delimiter (B4 fix 2026-04-13)
-        FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
-
         message = entry.get("message", {})
         for block in message.get("content", []):
             if block.get("type") == "text":
@@ -179,14 +190,9 @@ def main():
                 if valid_types.search(text):
                     # New classification resets
                     must_dispatch = []
-                    # B4 fix (2026-04-13): multiline-aware capture using DOTALL
-                    m = re.search(
-                        r'MUST DISPATCH:\s*(.*?)(?=\n\s*' + FIELD_LABELS + r'\s*:|\Z)',
-                        text,
-                        re.DOTALL | re.IGNORECASE
-                    )
+                    m = re.search(r'MUST DISPATCH:\s*(.+)', text)
                     if m:
-                        raw = re.sub(r'\s+', ' ', m.group(1).strip().strip('`'))
+                        raw = m.group(1).strip().strip('`')
                         # P0 fix (2026-04-09): extract only known names,
                         # filter trailing reasoning text to prevent false DENIES
                         must_dispatch = extract_dispatch_names(raw)
@@ -206,29 +212,59 @@ def main():
 
     # Check if this agent is in the MUST DISPATCH list (or aliased from it)
     if agent_type not in allowed:
+        # B: conditional exemption — if MUST DISPATCH contains any process-* routing
+        # skill, the session is legitimately delegating routing to the skill. Any
+        # agent listed in registry.json is valid in that context.
+        has_process_skill = any(d in PROCESS_ROUTING_SKILLS for d in must_dispatch)
+        registry_agents = load_registry_agents() if has_process_skill else set()
+        if has_process_skill and agent_type in registry_agents:
+            try:
+                from datetime import datetime
+                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+                entry = json.dumps({
+                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "event": "allow_process_skill_exemption",
+                    "hook": "agent-dispatch-check",
+                    "session": session_id,
+                    "agent_type": agent_type,
+                    "must_dispatch": must_dispatch,
+                    "schema": 2,
+                })
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(entry + "\n")
+            except Exception:
+                pass
+            return  # Allowed via process-skill routing exemption
+
+        # A: warn-downgrade — not blocked, but logged and surfaced to stderr.
+        # Preserves observability of off-contract dispatches without breaking flow.
+        # Original deny mode was too strict (2026-04-18 fix).
         reason = (
-            f"AGENT DISPATCH: '{agent_type}' is not in MUST DISPATCH list "
-            f"[{', '.join(must_dispatch)}]. Only dispatch declared agents."
+            f"AGENT DISPATCH (advisory): '{agent_type}' is not in MUST DISPATCH list "
+            f"[{', '.join(must_dispatch)}] and no process-* skill is present to "
+            f"authorize specialist routing. Logged for review."
         )
-        result = {
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": reason,
-            }
-        }
-        print(json.dumps(result))
-        # Log deny event
+        print(reason, file=sys.stderr)
+        # Log warn event (schema: event=warn, not deny)
         try:
             from datetime import datetime
             log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"  # Full UUID (P1-D fix 2026-04-09)
-            entry = json.dumps({"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "deny", "hook": "agent-dispatch-check", "session": session_id, "agent_type": agent_type, "must_dispatch": must_dispatch, "schema": 2})
+            session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+            entry = json.dumps({
+                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "event": "warn",
+                "hook": "agent-dispatch-check",
+                "session": session_id,
+                "agent_type": agent_type,
+                "must_dispatch": must_dispatch,
+                "schema": 2,
+            })
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(entry + "\n")
         except Exception:
             pass
-        return
+        return  # No deny — advisory only
 
     # Agent is in the list — allow
     return

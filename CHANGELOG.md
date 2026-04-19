@@ -1,5 +1,45 @@
 # Changelog
 
+## 2026-04-18 — Infrastructure Audit Sprint (7 HIGH fixes + 4 adversarial-review fixes)
+
+Comprehensive infrastructure audit across 5 surfaces (hooks, agents, skills, CLAUDE.md/MEMORY.md, cross-component deps) followed by Opus-4.7 adversarial self-review. 7 HIGH findings shipped + 4 additional bugs caught by adversarial review. 112/112 regression tests pass.
+
+### Hook fixes shipped
+
+- **H3 — `dispatch-compliance-check.py`:** Reject `MUST DISPATCH: none` on non-Quick tasks. Keystone fix — breaks the composed B1+B2+B3 enforcement bypass (fenced classification + empty dispatch + inline QA REPORT).
+- **H5 — `work-verification-check.py`:** New CHECK 1b blocks inline QA/PENTEST REPORT without invoking `/process-qa` or `/process-pentest`. Previous CHECK 1 required BOTH conditions and missed the skipped-skill-entirely case.
+- **H2 — `bash-safety-guard.py`:** Inert-context stripping. `python -c`, `bash -c`, `grep`, `echo`, heredocs now pre-stripped before pattern matching, reducing false positives on legitimate analytics/audit work without loosening real enforcement.
+- **H7 — `epistemic-check.py`:** PATH robustness via `shutil.which("claude")` with fallback paths. Silent failures now log to `epistemic-check.log`.
+- **H1 — `architect-review` → `architect-reviewer` consolidation:** Canonical name used across all skills + `KNOWN_DISPATCH_NAMES` in 3 hooks. Deprecated alias kept as backward-compat safety net. DAR pass-log alias-expanded.
+- **O1 — `KNOWN_DISPATCH_NAMES` additions** (caught by adversarial review): `architect-reviewer` was missing from all 3 hooks' known-names sets after the H1 rename. `extract_dispatch_names()` silently dropped the token. Fixed by adding it.
+- **O2 — `has_qa_report` regex tightened** (caught by adversarial review): Was matching narrative mentions like "as mentioned in the QA REPORT, all tests pass." Now requires structural block: `^\s*QA REPORT\s*[\n:].{0,500}?\b(?:PASS|FAIL)\b`. Same fix applied to PENTEST REPORT detection.
+- **O4 — PM rubber-stamp gap** (caught by adversarial review): `check_pm_checkpoint_report` only verified report text presence, not that `pm-orchestrator` Agent was actually dispatched after `/pm`. Now tracks dispatches; BLOCKS when report present without orchestrator invocation. Closes a silent bypass documented by a failing test since 2026-04-13 but never implemented.
+
+### Architectural findings (deferred as design decisions)
+
+- **H6** — `governance-log.jsonl` rotation: deferred to the next-increment monitoring overhaul (now shipped as the observability v2 design, see research repo).
+- **H9** — Content routing: `task-classifier` Content row now routes through `process-research` (if research needed) → `content-marketer` as terminal writer. Removed the broken `process-build with DOMAIN: content` path.
+- **H10** — `process-planning` researcher-bypass closed: Step 2 now routes through `process-research` skill rather than dispatching `technical-researcher` / `research-analyst` directly. Respects the research entry-point rule.
+- **H11 POC** — Sidecar file pattern verified (`DISPATCHES.json`). `sidecar_loader.py` reusable loader added. Next step is wiring `load_dispatches()` into `dispatch-compliance-check.py` as transcript-classification fallback.
+
+### Pattern captured — "rubber-stamp enforcement gaps"
+
+Hooks that verify output text but not real dispatch create silent bypass paths. The audit surfaced this in both `check_pm_checkpoint_report` (O4) and `work-verification-check` CHECK 1 (H5). Both were fixed; the pattern template is: `if has_output and not has_real_invocation: BLOCK`. Invoke-side verification complements output-side verification; AND/OR logic matters.
+
+### Pattern captured — "abandoned-TDD"
+
+Failing tests in this repo often encode unimplemented intent — someone wrote the test as TDD but never shipped the fix. Example: `test_pm_without_orchestrator_inline_report_blocked` was written 2026-04-13; implementation landed 2026-04-18 (as O4). Treat persistent failing tests as free bug reports.
+
+### Regression
+
+- 112/112 tests pass after all fixes.
+- Composed B1+B2+B3 bypass attempt: BLOCKED by H3.
+- Inline QA REPORT without `/process-qa`: BLOCKED by H5.
+- Quick classification: preserved.
+- Legitimate `architect-reviewer` dispatch via Agent hook: ALLOWED.
+
+---
+
 ## 2026-04-13 — Alignment Fix Implementation (11/14 findings)
 
 Comprehensive alignment analysis (8 routes, 14 findings) revealed that hooks enforce format, not correctness. This release fixes 11 of 14 findings across 4 phases.
