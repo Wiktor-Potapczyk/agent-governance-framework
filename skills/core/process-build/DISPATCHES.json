@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "skill": "process-build",
+  "purpose": "Machine-readable dispatch contract for process-build. Hooks read this as fallback ground truth when transcript classification is missing or truncated (e.g., after compaction — H11 audit finding 2026-04-18). Prose contract in SKILL.md remains canonical for agent guidance; this file mirrors it for enforcement.",
+  "mandatory_dispatches": [
+    {
+      "name": "implementation-plan",
+      "role": "step-2-plan",
+      "required": true
+    },
+    {
+      "name": "blueprint-mode",
+      "role": "step-3-build",
+      "required": true,
+      "notes": "Primary builder for code/n8n/scripts. Replaced by a domain specialist when DOMAIN is set (see classifier routing)."
+    },
+    {
+      "name": "architect-reviewer",
+      "role": "step-4-review",
+      "required": true,
+      "notes": "Post-build review is mandatory per task-classifier mandatory-compound rule. Name was previously documented as 'architect-review' (ghost) — consolidated 2026-04-18 H1 fix."
+    }
+  ],
+  "conditional_dispatches": [
+    {
+      "name": "prompt-engineer",
+      "condition": "artifact contains LLM prompts or agent designs",
+      "role": "step-4-parallel-review",
+      "required_when_condition_true": true
+    }
+  ],
+  "allowed_specialists_via_process_exemption": [
+    "data-engineer",
+    "api-designer",
+    "workflow-orchestrator",
+    "mcp-developer",
+    "postgres-pro",
+    "nosql-specialist",
+    "powershell-7-expert",
+    "llm-architect"
+  ],
+  "notes": "Content tasks route through process-research then content-marketer directly. Do NOT dispatch content-marketer from inside process-build — that path was deprecated 2026-04-18 (H9 audit finding).",
+  "last_reviewed": "2026-04-18",
+  "linked_skill_md": ".claude/skills/process-build/SKILL.md"
+}

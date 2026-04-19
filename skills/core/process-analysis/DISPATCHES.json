@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "skill": "process-analysis",
+  "purpose": "Machine-readable dispatch contract for process-analysis. Hooks read this as fallback ground truth when transcript classification is missing or truncated (H11 audit finding 2026-04-18). Prose contract in SKILL.md remains canonical; this file mirrors it for enforcement.",
+  "mandatory_dispatches": [],
+  "conditional_dispatches": [
+    {
+      "name": "research-synthesizer",
+      "condition": "2+ specialist agents dispatched in step 2",
+      "role": "step-3-synthesis",
+      "required_when_condition_true": true,
+      "notes": "Mandatory if multiple specialists contributed. Skipped if single-specialist evaluation."
+    },
+    {
+      "name": "report-generator",
+      "condition": "complex multi-agent evaluation requiring formal report",
+      "role": "step-4-report"
+    }
+  ],
+  "allowed_specialists_via_process_exemption": [
+    "prompt-engineer",
+    "architect-reviewer",
+    "debugger",
+    "api-designer",
+    "data-engineer",
+    "workflow-orchestrator",
+    "api-security-audit",
+    "adversarial-reviewer"
+  ],
+  "notes": "No hard mandatory dispatch — specialist selection is subject-dependent (see SKILL.md Subject→Agent routing table). Decomposition mode may dispatch downstream process skills (process-build, process-research) as sub-tasks.",
+  "last_reviewed": "2026-04-19",
+  "linked_skill_md": ".claude/skills/process-analysis/SKILL.md"
+}
