@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "skill": "process-research",
+  "purpose": "Machine-readable dispatch contract for process-research. Hooks read this as fallback ground truth when transcript classification is missing or truncated (H11 audit finding 2026-04-18). Prose contract in SKILL.md remains canonical; this file mirrors it for enforcement.",
+  "mandatory_dispatches": [
+    {
+      "name": "report-generator",
+      "role": "step-5-report",
+      "required": true,
+      "notes": "Terminal writer for final report. Step 5 in process-research."
+    }
+  ],
+  "conditional_dispatches": [
+    {
+      "name": "research-synthesizer",
+      "condition": "2+ researcher agents dispatched in step 3",
+      "role": "step-4-synthesis",
+      "required_when_condition_true": true,
+      "notes": "Mandatory if multiple researchers contributed. Skipped if single-agent research."
+    },
+    {
+      "name": "research-orchestrator",
+      "condition": "complex multi-phase research (4+ sub-questions)",
+      "role": "step-3-coordination"
+    },
+    {
+      "name": "research-analyst",
+      "condition": "web sources / trends / market data / multi-source synthesis",
+      "role": "step-3-web-research"
+    },
+    {
+      "name": "technical-researcher",
+      "condition": "code repos / technical docs / API behavior / implementation",
+      "role": "step-3-technical-research"
+    },
+    {
+      "name": "query-clarifier",
+      "condition": "ambiguous research question needing clarification",
+      "role": "step-1-scope-refinement"
+    }
+  ],
+  "allowed_specialists_via_process_exemption": [],
+  "notes": "Research entry-point rule: only process-research may dispatch downstream researchers. Main session MUST NOT bypass by dispatching technical-researcher/research-analyst/research-orchestrator directly.",
+  "last_reviewed": "2026-04-19",
+  "linked_skill_md": ".claude/skills/process-research/SKILL.md"
+}

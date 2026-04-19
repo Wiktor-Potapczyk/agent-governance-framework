@@ -16,6 +16,18 @@ import json
 import os
 import re
 
+# H11 integration (2026-04-19): sidecar_loader import with graceful fallback.
+# Used when transcript classification block is missing/truncated (post-compaction
+# blind spot). Hook dir injected into sys.path so `sidecar_loader` resolves.
+_HOOK_DIR = os.path.dirname(os.path.abspath(__file__))
+if _HOOK_DIR not in sys.path:
+    sys.path.insert(0, _HOOK_DIR)
+try:
+    from sidecar_loader import mandatory_agent_names
+    _SIDECAR_AVAILABLE = True
+except ImportError:
+    _SIDECAR_AVAILABLE = False
+
 # 200KB window — covers even 10+ agent outputs per turn
 READ_BYTES = 204800
 
@@ -117,6 +129,14 @@ def main():
     found_contract = False
     task_type_str = ""  # Fix 3 (2026-04-14): captured per classification block
 
+    # H11 integration (2026-04-19): unconditional tracking for post-compaction
+    # sidecar fallback. `all_dispatched` mirrors `dispatched` but is populated
+    # regardless of `found_contract`. `recent_process_skill` is the last-seen
+    # process-* / task-classifier Skill invocation — used to identify the active
+    # skill when no classification block survives in the window.
+    all_dispatched = set()
+    recent_process_skill = None
+
     for line in lines:
         line = line.strip()
         if not line:
@@ -169,8 +189,11 @@ def main():
                         found_contract = True
                         dispatched = set()
 
-            # Track Skill and Agent dispatches after the contract
-            if found_contract and block.get("type") == "tool_use":
+            # Track Skill and Agent dispatches. Two trackers:
+            # - `dispatched`: gated on `found_contract` (existing behavior for
+            #   enforcement against the current classification's MUST DISPATCH)
+            # - `all_dispatched`: unconditional — feeds H11 post-compaction fallback
+            if block.get("type") == "tool_use":
                 name = block.get("name", "")
                 inp = block.get("input", {})
                 if isinstance(inp, str):
@@ -179,14 +202,64 @@ def main():
                     except (json.JSONDecodeError, TypeError):
                         inp = {}
 
+                dispatched_name = None
                 if name == "Skill":
-                    skill = (inp.get("skill") or "").lower()
-                    if skill:
-                        dispatched.add(skill)
+                    dispatched_name = (inp.get("skill") or "").lower()
+                    # H11: track most-recent NON-TERMINAL process-* skill invocation for fallback.
+                    # Exclude terminal skills (process-qa, process-pentest) — they have empty
+                    # mandatory lists, so letting them overwrite recent_process_skill nullifies
+                    # enforcement for the earlier process-build/process-planning/etc.
+                    # (2026-04-19 architect-reviewer Q4 fix: close exploitable nullification gap.)
+                    if dispatched_name and (
+                        dispatched_name.startswith("process-")
+                        or dispatched_name == "task-classifier"
+                    ) and dispatched_name not in ("process-qa", "process-pentest"):
+                        recent_process_skill = dispatched_name
                 elif name == "Agent":
-                    agent_type = (inp.get("subagent_type") or "").lower()
-                    if agent_type:
-                        dispatched.add(agent_type)
+                    dispatched_name = (inp.get("subagent_type") or "").lower()
+
+                if dispatched_name:
+                    all_dispatched.add(dispatched_name)
+                    if found_contract:
+                        dispatched.add(dispatched_name)
+
+    # H11 fallback (2026-04-19): if no classification block found in the 200KB
+    # window but a process-* skill was invoked, load the machine-readable
+    # mandatory-dispatch contract from the skill's DISPATCHES.json sidecar.
+    # This closes the post-compaction enforcement blind spot surfaced by audit
+    # finding H11 (2026-04-18). Acts only when the existing transcript scan
+    # found nothing — normal contract-present flow is unchanged.
+    if not found_contract and recent_process_skill and _SIDECAR_AVAILABLE:
+        try:
+            sidecar_mandatory = mandatory_agent_names(recent_process_skill)
+        except Exception:
+            sidecar_mandatory = []
+        if sidecar_mandatory:
+            must_dispatch = sidecar_mandatory
+            dispatched = set(all_dispatched)
+            found_contract = True
+            task_type_str = "sidecar-fallback"  # non-"quick" so H3 guard passes through
+            # Log fallback activation (observability)
+            try:
+                from datetime import datetime
+                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+                entry = json.dumps({
+                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "event": "h11_sidecar_fallback_activated",
+                    "hook": "dispatch-compliance",
+                    "session": session_id,
+                    "skill": recent_process_skill,
+                    "must_dispatch": must_dispatch,
+                    "schema": 2,
+                })
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(entry + "\n")
+            except Exception:
+                pass
+        # If sidecar exists but has no mandatory dispatches (e.g. process-qa/pentest
+        # — terminal skills), fall through to the normal `if not found_contract` return.
+        # If sidecar is missing entirely, also fall through (no enforcement possible).
 
     if not found_contract:
         return

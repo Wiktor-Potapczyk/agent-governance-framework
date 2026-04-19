@@ -1,5 +1,38 @@
 # Changelog
 
+## 2026-04-19 — H11 Integration + Observability v2 Hook Fixes
+
+### H11 integration shipped — post-compaction enforcement blind spot closed
+
+The 2026-04-18 sidecar POC (`sidecar_loader.py` + `process-build/DISPATCHES.json`) is now wired into `dispatch-compliance-check.py` as a fallback when transcript classification blocks fall outside the hook's 200 KB read window (the canonical post-compaction bypass vector).
+
+**Hook changes:**
+
+- `hooks/dispatch-compliance-check.py` — 4 surgical edits:
+  1. Import block: `sidecar_loader.mandatory_agent_names` with graceful `_SIDECAR_AVAILABLE` fallback on `ImportError`.
+  2. Unconditional tool_use tracking: `all_dispatched` + `recent_process_skill` populated regardless of `found_contract`, feeding the fallback path without affecting the existing contract-present flow.
+  3. Post-loop fallback: when the scan yields no contract but a `process-*` skill was invoked, load the skill's `DISPATCHES.json` and enforce its `mandatory_dispatches` list. Emits `h11_sidecar_fallback_activated` event for observability.
+  4. Q4 gap closed (caught by adversarial review): terminal skills (`process-qa`, `process-pentest`) are excluded from overwriting `recent_process_skill`. Without this, invoking a terminal skill after a planning/build skill would nullify enforcement for the earlier skill.
+
+**Sidecar files added:**
+
+- `hooks/sidecar_loader.py` — POC shipped 2026-04-18 but never synced to this repo. Now present.
+- `skills/core/{process-build,process-planning,process-research,process-analysis,process-qa,process-pentest}/DISPATCHES.json` — machine-readable dispatch contracts for all 6 process skills. Mandatory lists: process-planning `[implementation-plan, architect-reviewer, adversarial-reviewer]`; process-build `[implementation-plan, blueprint-mode, architect-reviewer]`; process-research `[report-generator]`; process-analysis / process-qa / process-pentest have empty mandatory lists (analysis is subject-dependent; qa/pentest are terminal).
+
+**Verification:**
+
+- Syntax: `ast.parse` on the modified hook exits 0.
+- 4 behavioral tests (synthetic JSONL transcripts): fallback fires on process-planning invocation with missing mandatory dispatches (BLOCK); Quick silent on no-classification-no-skill session; existing contract-present path unchanged; Q4 regression test — planning-then-qa still enforces planning's mandatory list.
+- 6/6 sidecars load via `sidecar_loader.py` self-test.
+
+### Observability v2 — Ralph Loop implementation shipped (separate track)
+
+A Ralph Loop earlier 2026-04-19 wired 6 P0 telemetry events + dashboard alert infrastructure. 7 iterations, all P0 events proven emitting. NOT included in this commit set — those hook edits live in the vault's `.claude/hooks/` and will propagate in a subsequent sync.
+
+### Pattern captured — sidecar-file contracts for post-compaction enforcement
+
+The combination (a) hook-based dispatch enforcement in an AI agent orchestration framework + (b) per-skill JSON sidecar as fallback when conversation history is compacted + (c) terminal-skill exclusion to prevent state-tracker overwrite nullification — does not appear in the public literature surveyed. Constituent components have precedent (sidecar configs: pre-commit, Conftest, Terraform state, Microsoft agent-governance-toolkit; file-fallback: solved in infrastructure-as-code but not agent governance; terminal-skill exclusion: no analog found). The assembly is novel in the agent-governance context. See the research repo insight `sidecar-files-for-post-compaction-enforcement.md` for the full write-up.
+
 ## 2026-04-18 — Infrastructure Audit Sprint (7 HIGH fixes + 4 adversarial-review fixes)
 
 Comprehensive infrastructure audit across 5 surfaces (hooks, agents, skills, CLAUDE.md/MEMORY.md, cross-component deps) followed by Opus-4.7 adversarial self-review. 7 HIGH findings shipped + 4 additional bugs caught by adversarial review. 112/112 regression tests pass.
