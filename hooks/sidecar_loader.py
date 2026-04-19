@@ -12,10 +12,13 @@ Any hook can import this module and call load_dispatches() to get:
 - list of process-exemption-allowed specialists
 
 Design notes:
-- Skill dirs live at .claude/skills/<skill>/DISPATCHES.json (sibling to SKILL.md).
-- If the sidecar is missing, return a sentinel (empty dict) — caller decides
-  whether absence is valid (most process skills will eventually have a sidecar;
-  skills without one fall back to prose-only contract).
+- Skill dirs live at <parent-of-hooks>/skills/<skill>/DISPATCHES.json in the
+  vault layout, or <parent-of-hooks>/skills/core/<skill>/DISPATCHES.json in the
+  framework-repo layout. The loader tries both locations so the same file
+  works in both environments without per-deployment patching.
+- If the sidecar is missing at all candidate paths, return a sentinel (empty
+  dict) — caller decides whether absence is valid (most process skills will
+  eventually have a sidecar; skills without one fall back to prose-only contract).
 - Silent-on-malformed: log warn to governance-log but don't crash the hook.
   Caller treats missing/malformed as "no sidecar available".
 """
@@ -24,10 +27,12 @@ import os
 from datetime import datetime
 
 
-SKILLS_ROOT = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "skills"
-)
+_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Try both layouts — flat (vault) and nested-under-core (framework-repo).
+SKILLS_ROOT_CANDIDATES = [
+    os.path.join(_PARENT, "skills"),
+    os.path.join(_PARENT, "skills", "core"),
+]
 GOVERNANCE_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
 
 
@@ -57,8 +62,13 @@ def load_dispatches(skill_name):
     """
     if not skill_name:
         return {}
-    path = os.path.join(SKILLS_ROOT, skill_name, "DISPATCHES.json")
-    if not os.path.isfile(path):
+    path = None
+    for root in SKILLS_ROOT_CANDIDATES:
+        candidate = os.path.join(root, skill_name, "DISPATCHES.json")
+        if os.path.isfile(candidate):
+            path = candidate
+            break
+    if path is None:
         return {}
     try:
         with open(path, "r", encoding="utf-8") as f:
