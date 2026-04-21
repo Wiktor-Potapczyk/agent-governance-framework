@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-04-21 — Workflow Discipline + Adoption Sprint
+
+### New CRITICAL RULEs
+- **Task Plan Alignment** — at session start, verify the top-of-queue task_plan.md item still matches STATE.md Next.
+- **Task Plan Sync** — update task_plan.md as part of every non-Quick task completion; the task is not complete until task_plan.md is synced.
+- **/rewind discipline** — prefer /rewind for wrong/suboptimal answers over inline correction, unless the mistake will be referenced in subsequent turns or delegated agent prompts.
+
+### Hooks
+- `memory-schema-check.py` — added 3 optional lifecycle fields (`superseded_by`, `last_accessed`, `status`) with validation for date format and .md-filename-only refs. 73 existing memory files remain valid.
+- `settings.json` — hardened pre-compact hook command to full `python.exe` absolute path to avoid Windows Store stub hazard.
+- New PreToolUse Write|Edit matcher: forbidden-tokens grep gate (`check_forbidden_tokens.py` + `forbidden-tokens.json`) with project-level override support.
+
+### Agents
+- `pm-orchestrator.md` — Checkpoint Protocol body extended: "5 Questions + Re-Rank". Added mandatory "Re-Ranked Next-3-Tickets" output block with promotion/demotion tracking.
+
+### Documented findings
+- implementation-plan agent fabricates Bash + Read tool output, not only Write confirmations. Mitigation documented: always run main-session Glob to establish authoritative inventory before passing plans to downstream agents.
+
+### Deferred
+- Skill header retrofit (Use-when / Do-NOT-use-when / Gotchas sections across all SKILL.md files) — attempted and halted in planning: implementation-plan agent's fabricated inventory could not be trusted; ground-truth Glob by the orchestrator is required before re-attempt.
+
 ## 2026-04-19 — H11 Integration + Observability v2 Hook Fixes
 
 ### H11 integration shipped — post-compaction enforcement blind spot closed
