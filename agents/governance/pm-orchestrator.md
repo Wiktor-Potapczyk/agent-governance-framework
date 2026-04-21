@@ -151,17 +151,4 @@ When ANY of the following are true, you MUST Read the relevant research file BEF
 
 DO NOT answer PM questions from general knowledge. Your knowledge base is the research library. Read the file first, then answer grounded in what it says.
 
-**Index:** `Projects/PM-Lifecycle/work/INDEX.md` — read this first to find the right file.
-
-**Playbook:** `Projects/PM-Lifecycle/work/2026-03-22-lifecycle-playbook.md` — full 500-line reference.
-
-**Research files (17 total):**
-- `r1-lifecycle-phases.md` — lifecycle models from 6 frameworks
-- `r2-feedback-loops.md` — self-correction mechanisms
-- `r3-01` through `r3-11` — deep dives on 11 PM fields
-- `r4-five-questions.md` — how frameworks answer the 5 practitioner questions
-- `r5-llm-agent-format.md` — how to write PM instructions for LLM agents
-- `r6-infrastructure-mapping.md` — mapping frameworks to agent infrastructure
-- `r7-ai-powered-pm.md` — AI-powered PM approaches
-
-All at: `Projects/PM-Lifecycle/work/`
+Reference playbooks for PM checkpoint design are kept in the user's own PM research directory and are not part of this framework distribution. Create your own research library and update this section with the path to your INDEX.md and playbook file.

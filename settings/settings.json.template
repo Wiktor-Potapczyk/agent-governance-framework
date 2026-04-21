@@ -1,0 +1,191 @@
+{
+  "env": {
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "400000"
+  },
+  "permissions": {
+    "allow": [
+      "Read({{HOME_OR_VAULT}}/**)",
+      "Read({{HOME}}/.claude/skills/**)",
+      "Bash(claude plugin:*)",
+      "Bash(npx skills:*)",
+      "Bash(node:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(jq:*)",
+      "Bash(xargs grep:*)",
+      "Bash(bash --version)",
+      "Bash(jq --version)",
+      "Bash(find {{HOME_OR_VAULT}}/.claude -name apify-*.md)",
+      "Bash(find {{HOME_OR_VAULT}}/.claude -path */skills/apify*)",
+      "Bash(find {{HOME_OR_VAULT}}/.claude/plugins/cache -name stop-hook* -o -name *stop*hook*)",
+      "Bash(find {{HOME_OR_VAULT}}/.claude/plugins/cache -name plugin.json -not -path */node_modules/*)",
+      "Bash(xargs ls:*)",
+      "Bash(cat)",
+      "Bash(while read:*)",
+      "Bash(do grep:*)",
+      "Bash(done)",
+      "Bash(powershell -NonInteractive -ExecutionPolicy Bypass -Command \":*)",
+      "Bash(powershell -NonInteractive:*)",
+      "Bash(powershell -Command \":*)",
+      "Bash(powershell -NonInteractive -ExecutionPolicy Bypass -File /tmp/*.ps1)",
+      "Bash(powershell -File:*)",
+      "Bash(npm cache:*)",
+      "Bash(npm install:*)",
+      "Bash(npm prefix:*)",
+      "Bash(npx promptfoo@latest --version)",
+      "Bash(promptfoo --version)",
+      "Skill(ralph-loop:ralph-loop)",
+      "Skill(ralph-loop:ralph-loop:*)",
+      "Skill(ralph-loop:cancel-ralph)",
+      "Skill(ralph-loop:cancel-ralph:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:code.claude.ai)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:deepwiki.com)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/user-prompt-submit.py\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/skill-routing-check.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/bash-safety-guard.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/agent-dispatch-check.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/memory-dedup-check.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/scripts/check_forbidden_tokens.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/skill-step-reminder.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/memory-schema-check.py\""
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/subagent-governance.py\""
+          },
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/agent-registry-check.py\""
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/subagent-quality-check.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/classifier-field-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/dispatch-compliance-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/governance-log.py\""
+          },
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/process-step-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/dark-zone-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/work-verification-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/token-breakdown.py\""
+          }
+        ]
+      }
+    ]
+  },
+  "prefersReducedMotion": false
+}
