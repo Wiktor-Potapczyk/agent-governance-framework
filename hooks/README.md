@@ -1,6 +1,6 @@
 # Hook Registry
 
-This framework uses 11 active hooks across 6 event types. Two additional hooks are disabled — see `disabled/README.md` for why.
+This framework uses 18 active hooks across 6 event types. Two additional hooks are disabled — see `disabled/README.md` for why.
 
 ## Active Hooks
 
@@ -17,6 +17,13 @@ This framework uses 11 active hooks across 6 event types. Two additional hooks a
 | governance-log.py | Stop | (all) | Logging only — writes JSONL governance record including IMPLIES text extracted from classifier output | No |
 | process-step-check.py | Stop | (all) | L1 exit gate — hard blocks on missing SCOPE or missing QA REPORT; soft logs synthesis gaps and architect-review gaps | Yes (on hard failures) |
 | dark-zone-check.py | Stop | (all) | Monitoring only — detects citation patterns and scores severity; never blocks | No |
+| agent-dispatch-check.py | PreToolUse | Agent | Advisory governance — logs agent dispatches, registry-exempts process-* skill dispatches, and warns on off-contract dispatches without blocking | No (warns only) |
+| memory-dedup-check.py | PreToolUse | Write | Detects near-duplicate memory entries and surfaces an advisory warning when a candidate write overlaps significantly with an existing memory file | No (additionalContext advisory) |
+| check_forbidden_tokens.py | PreToolUse | Write\|Edit | Blocks writes containing forbidden strings (credential patterns, repo-specific NDA terms) to prevent secret and PII leakage into public artifacts | Yes |
+| memory-schema-check.py | PostToolUse | Write\|Edit | Validates memory frontmatter after writes (required fields: name, description, type, confidence, last_verified, expires); logs schema violations | No (logs only) |
+| agent-registry-check.py | SubagentStart | (all) | Advisory: when a general-purpose agent is dispatched, suggests specialist agents whose keywords match the task. Injects suggestion as additionalContext | No (additionalContext) |
+| work-verification-check.py | Stop | (all) | L1 exit gate — blocks QA/pentest reports filed with zero execution tool uses; also catches inline QA/PENTEST REPORT blocks filed without invoking the corresponding process skill | Yes |
+| token-breakdown.py | Stop | (all) | Logging only — records per-session token usage breakdown by subagent/tool for cost monitoring dashboards | No |
 
 ## How Hooks Work
 
@@ -91,3 +98,25 @@ if "task-classifier" not in transcript.lower():
 - **Self-log all blocks.** Write a JSONL record when a hook blocks something — you need this data to tune the hook over time.
 - **Hardcode a transcript window** (e.g., 200KB). Don't read unbounded transcripts.
 - **Strip code fences** before scanning transcript text. The model's output is often wrapped in markdown.
+
+## Observability
+
+The governance hooks emit structured JSONL events that can be visualized locally.
+
+**Governance log:** `governance-log.py` (Stop hook) writes one line per session end to `.claude/hooks/governance-log.jsonl`. Records include the IMPLIES text from the task-classifier, task type, dispatched agents/skills, and QA outcome.
+
+**Dashboard:** a reference observability dashboard lives at `.claude/observability-dashboard/`:
+
+- `server.py` — minimal HTTP server exposing `/api/events` (raw governance-log stream) and `/api/query` (aggregations)
+- `app.js` — front-end renderer
+- `index.html` — layout
+- `styles.css` — presentation
+- `vendor/chart.umd.min.js` — vendored Chart.js (pinned, offline-capable)
+
+Run locally from the dashboard directory:
+
+```bash
+python server.py
+```
+
+The dashboard surfaces per-session classifier output (IMPLIES, TASK TYPE, MUST DISPATCH), dispatch compliance outcomes (what was declared vs what was invoked), QA FAIL counts from `qa_fail_reported` events, and turn-level token breakdown. It is a read-only reporting layer over the governance log — no hook behavior depends on it.
