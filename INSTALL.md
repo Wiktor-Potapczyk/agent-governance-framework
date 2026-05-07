@@ -27,7 +27,7 @@ cp agents/governance/*.md ~/.claude/agents/
 cp agents/governance/*.md /your/project/.claude/agents/
 ```
 
-The 25 governance agents cover: research pipeline (orchestrator, analyst, synthesizer, reporter), planning (implementation-plan, architect-review, adversarial-reviewer), building (blueprint-mode, debugger, api-designer, data-engineer), and specialist roles (prompt-engineer, llm-architect, mcp-developer, and others).
+The 29 governance agents cover: research pipeline (orchestrator, analyst, synthesizer, reporter, query-clarifier, research-coordinator, technical-researcher), planning (implementation-plan, architect-review, adversarial-reviewer), building (blueprint-mode, debugger, api-designer, data-engineer), AI/prompts (prompt-engineer, llm-architect), MCP development (mcp-developer, mcp-server-architect, mcp-registry-navigator), database specialists (postgres-pro, nosql-specialist), platform specialists (powershell-7-expert), security audit (api-security-audit), git flow (git-flow-manager), workflow orchestration (workflow-orchestrator), vault/productivity (vault-keeper, content-marketer, competitive-analyst), and PM (pm-orchestrator).
 
 ## 3. Copy Hooks
 
@@ -151,8 +151,7 @@ Each hook exits with code 0 on success. A non-zero exit code means the hook bloc
 
 The repository includes domain-specific agents and skills as worked examples. These are not required for the governance framework to operate.
 
-**Domain-example agents** (4 total in `agents/domain-examples/`):
-- `content-marketer.md`, `competitive-analyst.md`, `workflow-orchestrator.md`, `vault-keeper.md`
+**Domain-example agents:** `agents/domain-examples/` is currently a placeholder for project-specific agent examples; reference implementations may be added in future releases. The domain-flavored agents that ship today live in `agents/governance/` and can be used directly: `content-marketer.md`, `competitive-analyst.md`, `workflow-orchestrator.md`, `vault-keeper.md`.
 
 **Domain-example skills** (19 total in `skills/domain-examples/`):
 - Apify: 12 skills covering scraping, lead generation, market research, and more
@@ -165,7 +164,7 @@ Copy any of these the same way as core skills:
 
 ```bash
 cp -r skills/domain-examples/n8n/* /your/project/.claude/skills/
-cp agents/domain-examples/workflow-orchestrator.md /your/project/.claude/agents/
+cp agents/governance/workflow-orchestrator.md /your/project/.claude/agents/
 ```
 
 ## Troubleshooting

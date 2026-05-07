@@ -65,6 +65,8 @@ Forces task classification before any work begins. Every user message triggers c
 
 **Key artifact:** The classification block output by the task-classifier skill. Contains IMPLIES (depth analysis), TASK TYPE, DOMAIN, APPROACH (compound mixture), MISSED (blind spot check), and MUST DISPATCH (enforcement contract).
 
+**Step 3a — Explicit Imperative Fast Path.** Before applying the burden-of-proof Quick check in Step 3, the classifier scans for explicit imperative patterns (`rename X to Y`, `move X to Y`, `fix typo in X`, `delete the unused X`, `add line/comment W to file V`, `rerun X`). When matched, the default flips to Quick. The classifier auto-escalates only if a depth signal is also present (composed depth ask, hypothesis preamble, directive to reconsider, or an ambiguous target requiring investigation). Step 3a does NOT weaken Step 3's burden of proof for general ambiguity — it explicitly recognizes a class where ambiguity does not exist (the imperative names target and action precisely). Empirical motivation: governance-log analysis showed disproportionate ceremony cost (full process skill + QA + PM dispatch chain) on one-line edits being classified as Analysis under the original burden-of-proof rule.
+
 ### Layer 1: Process Skills
 
 Routes classified tasks to typed process flows. Each process skill defines a step sequence that the model must follow.
@@ -162,6 +164,31 @@ Quality assurance is structured as Popperian falsification across three tiers:
 
 **Untested Surface** is mandatory in both tiers. Every report must name what was NOT tested and why.
 
+## Two-Phase Agent Orchestration (Optional Pattern)
+
+When agent work requires separating discovery/design from implementation with a human review gate between them, the framework supports a two-phase pattern. The motivating use case is workflow building (e.g., n8n), but the pattern generalizes to any domain where blueprint-then-build with human approval reduces wrong-direction cost.
+
+**Phase 1 — Architect agent.** Owns all discovery, template selection, design decisions, and validation planning. Produces a `.md` blueprint at `Projects/<name>/work/YYYY-MM-DD-blueprint-<artifact>.md` containing:
+
+- Frontmatter with `status: #pending-human-review`
+- Milestones (3-5 sub-steps each)
+- Per-milestone validation checkpoints
+- Architectural rationale
+
+The architect makes ZERO implementation moves — no files are created or modified beyond the blueprint itself.
+
+**Human gate.** The user reads the blueprint (≤30 seconds for typical scope), then either:
+
+- Approves verbally — main session flips frontmatter `status: #pending-human-review` → `#approved` via Edit
+- Annotates corrections — main session re-dispatches architect with corrections
+- Manually edits frontmatter to `#approved`
+
+**Phase 2 — Builder agent.** Reads the blueprint, refuses to run if `status` is anything other than `#approved`, implements EXACTLY per blueprint, validates after every 3-5 sub-steps, and STOPS-and-reports on any blueprint gap or validation failure. The builder makes ZERO architectural decisions — on ambiguity it reports back rather than improvising.
+
+**Trust mechanics.** The blueprint is the human-readable trust gate. If the architect misunderstood the requirement, the user catches it in the blueprint before any sub-step is built wrong. Per-milestone validation prevents error accumulation across long builds. The pattern is opt-in — for trivial single-step tasks, direct dispatch remains correct; for non-trivial multi-step builds, the two-phase structure pays back the small upfront cost.
+
+**Reference agents:** see `agents/domain-examples/` for any shipped implementations of this pattern.
+
 ## Enforcement Summary
 
 Every enforcement rule has at least two enforcement layers (prompt + hook). Critical rules have three or more:
@@ -188,12 +215,19 @@ governance-log.jsonl ← all enforcement events (blocks, denials, warnings, pass
 
 All hooks are stateless -- they read from stdin (JSON payload from Claude Code), parse the session transcript (JSONL), and write to stdout. No database, no server, no persistent process. The governance log is the only shared state, append-only.
 
+## Compaction Snapshot Framing
+
+When Claude Code compacts a long session, the SessionStart hook can persist a snapshot of pre-compaction state for the post-compaction continuation. To prevent the snapshot from being read as authoritative current state (a real failure mode where post-compaction sessions made decisions citing stale frame-targets, project IDs, or file paths), every persisted snapshot is wrapped with an explicit `HISTORICAL REFERENCE ONLY (PRE-COMPACTION SNAPSHOT)` preamble and a closing reminder to verify against the live system before acting on the snapshot's facts. The framing reframes the snapshot as a pointer set (this is what was being worked on) rather than a fact set (this is what is true now). No hook-code change — content-only wrap at the snapshot generation site.
+
 ## Component Counts
 
 | Component | Count | Location |
 |-----------|-------|----------|
-| Active hooks (default config) | 12 | `hooks/` |
-| Optional/disabled hooks | 4 | `hooks/disabled/` |
+| Active enforcement hooks (default config) | 17 | `hooks/` |
+| Shared hook library | 1 (`sidecar_loader.py`) | `hooks/` |
+| Deferred stub | 1 (`context-fill-log.py`) | `hooks/` |
+| Optional/disabled hook scripts | 4 (3 Python + 1 PowerShell) | `hooks/disabled/` |
 | Governance agents | 29 | `agents/governance/` |
 | Core skills | 12 | `skills/core/` |
-| Domain example skills | 19 | `skills/domain-examples/` (Apify, n8n) |
+| Vault management skills | 5 | `skills/vault/` |
+| Domain example skills | 19 | `skills/domain-examples/` (12 Apify + 7 n8n) |

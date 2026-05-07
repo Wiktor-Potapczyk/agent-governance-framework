@@ -14,7 +14,7 @@ The framework operationalizes three research-backed principles: classify before 
 
 ## Architecture
 
-The framework operates across five layers, with 18 active Python hooks:
+The framework operates across five layers, with 17 active enforcement hooks (plus one shared library and one deferred stub):
 
 | Layer | What it does | Hook events |
 |---|---|---|
@@ -34,7 +34,7 @@ For a detailed technical walkthrough of the architecture, see [docs/architecture
 framework-repo/
 ├── agents/
 │   ├── governance/          # 29 specialist agents (research team, architect, QA, planning, etc.)
-│   └── domain-examples/     # Example domain-specific agents
+│   └── domain-examples/     # Placeholder for project-specific agent examples
 ├── hooks/
 │   ├── user-prompt-submit.py        # Context bar + classifier enforcement on every message
 │   ├── skill-routing-check.py       # PreToolUse: validates skill matches classifier TYPE
@@ -48,6 +48,9 @@ framework-repo/
 │   ├── process-step-check.py        # Stop: L1 exit gate -- blocks missing SCOPE or QA REPORT
 │   ├── dark-zone-check.py           # Stop: monitors unsupported citations and reasoning gaps
 │   ├── work-verification-check.py   # Stop: blocks lazy QA and premature user escalation
+│   ├── epistemic-check.py           # Stop: Haiku-evaluated overconfidence/rationalization gate
+│   ├── session-start-log.py         # SessionStart: governance-log session-boundary marker
+│   ├── sidecar_loader.py            # (library) post-compaction dispatch-contract loader
 │   └── disabled/                    # Optional/experimental hooks
 ├── skills/
 │   ├── core/                # 12 governance skills (task-classifier, process-*, verify, ensemble, pm, etc.)
@@ -55,7 +58,7 @@ framework-repo/
 │   └── domain-examples/     # 19 domain skills across Apify and n8n
 ├── settings/
 │   ├── settings.json.example        # Global hook registration template
-│   └── settings.local.json.example  # Project-level override (includes all 12 hooks)
+│   └── settings.local.json.example  # Project-level override (registers 12 default hooks; remaining 5 active hooks are opt-in)
 ├── docs/                    # Architecture reference and customization guides
 ├── LICENSE.txt
 └── INSTALL.md
@@ -68,6 +71,16 @@ See [INSTALL.md](INSTALL.md) for step-by-step setup instructions.
 ## Customization
 
 See [docs/customization.md](docs/customization.md) for guidance on adapting the framework to your domain: adding agents, writing process skills, adjusting hook enforcement thresholds, and disabling components you do not need.
+
+## Skill Format
+
+Core and vault skills follow a standardized 3-section format:
+
+- **Use-when** — when to invoke this skill
+- **Do-NOT-use-when** — boundaries (with skip-rules referencing equivalent skills)
+- **Gotchas** — common failure modes specific to this skill
+
+The format makes skill-routing decisions auditable from the SKILL.md alone — a model can read the three sections and decide whether to invoke without loading the full skill body. New skills should follow this format; see any of the `skills/core/process-*/SKILL.md` files for examples.
 
 ## Research
 

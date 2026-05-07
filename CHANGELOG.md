@@ -1,5 +1,66 @@
 # Changelog
 
+## 2026-05-07 — ADOPT-2 Skill Retrofit + Two-Phase Orchestration + Classifier Calibration
+
+This release closes the ADOPT-2 skill-format adoption deferred in the 2026-04-21 sprint (per that release's "Deferred" note), ships a generalizable two-phase agent orchestration pattern with human gate, recalibrates the classifier for explicit imperatives, hardens compaction-snapshot framing, retracts an aspirational claim about decay-scoring infrastructure, and reconciles cross-document inventory drift across README/architecture/INSTALL/hooks-README.
+
+### Skills — ADOPT-2 retrofit complete (19/19)
+
+All 19 vault-owned core + vault-management skills updated to the standardized 3-section format:
+
+- **Use-when** — when to invoke this skill
+- **Do-NOT-use-when** — boundaries, with skip-rules referencing equivalent skills
+- **Gotchas** — common failure modes specific to this skill (not boilerplate)
+
+Format derived from architect-reviewer feedback during the pilot (`save`, `architect-loop`); architect-flagged anti-boilerplate constraints applied across the scale-out (no copy-paste rationales — each skill's Gotchas reflect its actual failure modes). Two pre-existing strict-YAML errors discovered and fixed during pentest: `ensemble/SKILL.md` and `verify/SKILL.md` had unquoted `MECHANISM: Ensemble` / `MECHANISM: CoVe` substrings that PyYAML `safe_load` rejected (Claude Code's runtime parser is lenient and skills loaded fine, but strict YAML tooling broke). Fix: quoted descriptions and replaced internal `MECHANISM:` colons with space-separated `MECHANISM `.
+
+### Classifier — Step 3a Explicit Imperative Fast Path
+
+Empirical observation: the classifier over-classified small explicit fixes (`rename X to Y`, `move X to Y`, `fix typo`, `delete unused X`, `add line W`, `rerun X`) as Analysis, triggering the full process skill + QA + PM dispatch chain on one-line edits. Governance-log analysis showed disproportionate ceremony cost on this task class.
+
+**New Step 3a (precedes Step 3 Quick Check):** if the prompt matches an Explicit Imperative pattern, the burden of proof flips — default to Quick. Auto-escalate only if a depth signal is also present (composed depth ask, hypothesis preamble, "are you sure?" pattern, ambiguous target needing investigation).
+
+This does not weaken Step 3's burden of proof for general ambiguity — it explicitly recognizes a class where ambiguity does NOT exist (the imperative names target and action precisely). Documented in `docs/architecture.md` Layer 0; the corresponding `skills/core/task-classifier/SKILL.md` content update is deferred to the next increment.
+
+### Compaction snapshots — HISTORICAL REFERENCE framing
+
+Compaction snapshots that survive into post-compaction sessions (via SessionStart `<persisted-output>`) were being read as authoritative current state. Caught after several sessions made decisions citing stale frame-targets, project IDs, or file paths.
+
+**Fix:** SessionStart now wraps every persisted snapshot with an explicit `HISTORICAL REFERENCE ONLY (PRE-COMPACTION SNAPSHOT)` preamble and a closing reminder to verify against the live system. Frames the snapshot as a pointer set (this is what was being worked on) rather than a fact set (this is what is true now). No hook-code change — content-only wrap at the snapshot generation site. Documented in `docs/architecture.md`.
+
+### Two-phase agent orchestration — generic pattern documented
+
+For agent work where discovery/design and implementation must be separated by a human review gate (originally implemented for n8n workflow building), the framework now codifies a two-phase pattern in `docs/architecture.md`:
+
+- **Phase 1 — Architect agent** owns discovery, template selection, design decisions, validation planning. Produces a `.md` blueprint with milestones (3-5 sub-steps each) and per-milestone validation checkpoints. Architect makes ZERO implementation moves.
+- **Human gate** — blueprint frontmatter `status:` is `#pending-human-review` until the user flips it to `#approved` (verbal approval flips the field via Edit; manual flip also accepted).
+- **Phase 2 — Builder agent** reads blueprint, refuses to run if `status` is anything other than `#approved`, implements EXACTLY per blueprint milestone-by-milestone, validates after every 3-5 sub-steps, STOPS and reports on any blueprint gap or validation failure.
+
+Trust loop: the blueprint is human-readable in ≤30 seconds. If the architect misunderstood, the user catches it before any sub-step is built wrong. Per-milestone validation prevents error accumulation across long builds. The pattern is opt-in — for trivial single-step tasks, direct dispatch remains correct.
+
+### Retraction — score-memory.py decay-scoring claim
+
+The 2026-04-13 release referenced `score-memory.py` as a scheduled task for decay-based memory retirement. Empirical audit 2026-05-07: the script never existed in the repo or vault. The claim was aspirational and propagated across multiple cited locations. Decision: RETIRE rather than BUILD — there is no active dependency that requires the script, and the lifecycle-status memory schema fields (`status`, `superseded_by`, `last_accessed`) shipped 2026-04-21 supersede the original decay-scoring intent with a more deterministic mechanism. The 2026-04-13 entry's B3 line (line 124 below) was previously corrected with a parenthetical retraction; this release captures the position formally.
+
+### Documentation drift — reconciled
+
+Cross-document inventory drift discovered and fixed:
+
+- `hooks/README.md` table referenced 3 files that do not exist in the repo (`check_forbidden_tokens.py`, `agent-registry-check.py`, `token-breakdown.py`) and omitted 3 active files (`context-fill-log.py` as a stub note, `session-start-log.py`, `epistemic-check.py`). Fixed.
+- Component counts disagreed across `README.md`, `docs/architecture.md`, `INSTALL.md`, `hooks/README.md` (5 mismatches: agent count claimed as 25/29, hook count claimed as 12/18, etc.). Reconciled to filesystem-verified canonical values: 17 active enforcement hooks + 1 shared library (`sidecar_loader.py`) + 1 deferred stub (`context-fill-log.py`) + 4 disabled hook scripts (3 Python + 1 PowerShell); 29 governance agents in `agents/governance/` (one duplicate at `agents/pm-orchestrator.md` — see findings below); 12 core + 5 vault + 19 domain-examples skills.
+
+### Documented findings (not fixed in this release)
+
+- `agents/pm-orchestrator.md` is duplicated at `agents/governance/pm-orchestrator.md` — single canonical location not yet decided.
+- `skills/save/` exists at `skills/` top level and at `skills/vault/save/` — likely a stray duplicate of the vault skill.
+- `agents/domain-examples/` is empty — placeholder for future domain-example agent additions; INSTALL.md and README.md updated to describe it accurately.
+- `hooks/disabled/` contains older copies of `agent-dispatch-check.py` and `epistemic-check.py` whose live counterparts also exist at `hooks/` — clarify-or-remove decision deferred.
+
+### Deferred (next increment)
+
+- Skill-content updates for Step 3a (`skills/core/task-classifier/SKILL.md`) and ADOPT-2 format propagation to framework-repo's own `skills/core/process-*/SKILL.md` files — content drift is a separate concern from doc drift addressed here.
+- Shipping `n8n-workflow-architect.md` + `n8n-workflow-builder.md` as `agents/domain-examples/n8n/` reference implementations of the two-phase orchestration pattern.
+
 ## 2026-04-21 — Workflow Discipline + Adoption Sprint
 
 ### New CRITICAL RULEs
@@ -121,7 +182,7 @@ Comprehensive alignment analysis (8 routes, 14 findings) revealed that hooks enf
 
 ### Phase 4: Independent Fixes
 
-- **B3 fix:** Scheduled tasks (`daily-memory-update`, `weekly-memory-update`) corrected to reference actual `score-memory.py` path
+- **B3 fix:** Scheduled tasks (`daily-memory-update`, `weekly-memory-update`) corrected to reference actual hook script paths (note: the `score-memory.py` reference was retracted 2026-05-07 — the script never existed; decay-scoring claim retired as aspirational; see project research notes for details)
 - **M4 fix:** 4 process skill docs corrected from "caught by the Stop hook" to "logged by the Stop hook — soft enforcement"
 - **M6 fix:** `governance-log.py` no longer skips blocked turns; logs with `blocked_turn: true` field
 

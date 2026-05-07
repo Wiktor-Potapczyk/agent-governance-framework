@@ -1,6 +1,6 @@
 # Hook Registry
 
-This framework uses 18 active hooks across 6 event types. Two additional hooks are disabled — see `disabled/README.md` for why.
+This framework uses 17 active enforcement hooks across 6 event types, plus one shared library (`sidecar_loader.py`) imported by `dispatch-compliance-check.py`, plus one stub (`context-fill-log.py`) reserved for a deferred monitoring iteration (do not register — see file's module docstring). Four additional hook scripts (3 Python + 1 PowerShell) are disabled — see `disabled/README.md` for why.
 
 ## Active Hooks
 
@@ -19,11 +19,10 @@ This framework uses 18 active hooks across 6 event types. Two additional hooks a
 | dark-zone-check.py | Stop | (all) | Monitoring only — detects citation patterns and scores severity; never blocks | No |
 | agent-dispatch-check.py | PreToolUse | Agent | Advisory governance — logs agent dispatches, registry-exempts process-* skill dispatches, and warns on off-contract dispatches without blocking | No (warns only) |
 | memory-dedup-check.py | PreToolUse | Write | Detects near-duplicate memory entries and surfaces an advisory warning when a candidate write overlaps significantly with an existing memory file | No (additionalContext advisory) |
-| check_forbidden_tokens.py | PreToolUse | Write\|Edit | Blocks writes containing forbidden strings (credential patterns, repo-specific NDA terms) to prevent secret and PII leakage into public artifacts | Yes |
 | memory-schema-check.py | PostToolUse | Write\|Edit | Validates memory frontmatter after writes (required fields: name, description, type, confidence, last_verified, expires); logs schema violations | No (logs only) |
-| agent-registry-check.py | SubagentStart | (all) | Advisory: when a general-purpose agent is dispatched, suggests specialist agents whose keywords match the task. Injects suggestion as additionalContext | No (additionalContext) |
+| epistemic-check.py | Stop | (all) | Sends Claude's response to Haiku for external evaluation of overconfidence. Adapted from the Trail of Bits anti-rationalization pattern. Blocks when the Haiku evaluator returns a block verdict | Yes |
+| session-start-log.py | SessionStart | (all) | Writes a `session_start` event to `governance-log.jsonl` so analytics scripts can detect session boundaries cleanly instead of inferring from first classification entry | No (logging only) |
 | work-verification-check.py | Stop | (all) | L1 exit gate — blocks QA/pentest reports filed with zero execution tool uses; also catches inline QA/PENTEST REPORT blocks filed without invoking the corresponding process skill | Yes |
-| token-breakdown.py | Stop | (all) | Logging only — records per-session token usage breakdown by subagent/tool for cost monitoring dashboards | No |
 
 ## How Hooks Work
 
