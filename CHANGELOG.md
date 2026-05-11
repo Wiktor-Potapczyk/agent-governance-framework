@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-05-12 — H-4 v1.3 polish + code-simplifier agent
+
+Ports two artifacts from the source workspace:
+
+### `hooks/task-plan-auto-sync.py` — v1.2 → v1.3
+
+Refactor + diagnostic-label clarification bundle. No behavioral change on the regex-only path (`H4_ENABLE_HAIKU=0` default). When the Haiku fallback is enabled:
+
+- **Outcome labels:** `outcome="error"` now indicates non-zero subprocess exit (was `miss`); `outcome="interrupted"` now indicates user Ctrl-C during subprocess (was `miss`). Full enum: `hit | miss | error | timeout | invalid_output | cli_absent | interrupted`.
+- **Write-path refactor:** the dedup → undo → apply → verify → record SYNCED sequence (previously duplicated across Haiku and regex branches in `main()`) is now a single helper `_execute_sync(match, assistant_text, source_label)`. Both call sites collapse to one line. SYNCED log lines now emit `SYNCED (regex)` / `SYNCED (haiku)` for attribution.
+- **HAIKU_SINK rotation (LOW-1):** sink at `.claude/hooks/aggregates/h4-haiku-fallback.jsonl` rotates at 1 MB OR 30 days mtime age. Rotated archive name: `h4-haiku-fallback.jsonl.YYYY-MM-DD.<pid>` (PID suffix prevents same-date parallel-rotation collisions). Best-effort: any rotation exception is logged and swallowed; append never fails due to rotation.
+- **QA-block-aware excerpt slicing (LOW-2):** Haiku fallback excerpt previously took `assistant_text[:EXCERPT_MAX]` (head 1500 chars), which could miss the QA REPORT block if it appeared past char 1500. Now prefers `extract_qa_block(assistant_text)` and falls back to head-slice only if no QA REPORT marker is found.
+- **Selftest production-JSONL isolation (MED-4):** all `T-SM-HAIKU-MOCK-*` sub-tests run inside `_mock.patch(f"{__name__}._write_haiku_sink")` so no selftest entry can leak to the production JSONL sink. The `T-SM-HAIKU-MOCK-ISOLATION` sub-test asserts pre/post HAIKU_SINK byte count equality.
+
+Selftest grew 15 → 19 cases (new: `T-SM-HAIKU-MOCK-E` for error outcome, `T-SM-HAIKU-MOCK-ISOLATION`, `T-SM-HAIKU-ROTATE`, `T-SM-HAIKU-EXCERPT-QA`). All 19 PASS.
+
+### `agents/code-simplifier.md` — new (inspired-by Daisy Hollman)
+
+Mechanical-tidiness specialist for write-stage cleanup AFTER substantive edits. Scope is **explicitly NOT architecture/SOLID/security** — those belong to `architect-review`. Scope IS: formatting consistency, dead code, leftover debug, naming consistency after rename, expression-syntax cleanup. On-demand only (no auto-trigger) to keep usage cost predictable.
+
+Five refinement principles: preserve functionality / apply project standards / enhance clarity / maintain balance (don't over-simplify into cleverness) / focus scope (only touch what the current session touched).
+
+Output format is diff-proposal (`File:` / `Why:` / `Before:` / `After:` blocks). Does not write to disk unless dispatching agent explicitly says "apply." If architectural smells are found, agent flags `OUT OF SCOPE — route to architect-review:` and stops.
+
+Inspired-by attribution: `anthropics/claude-code/plugins/pr-review-toolkit/agents/code-simplifier.md` (Daisy Hollman, Anthropic). This port is re-skinned for generic project artifact classes — not a verbatim port.
+
+### Not ported
+
+`hooks/proactivity-check.py` (vault-personal). The hook detects idle-wait verdicts in assistant text and cross-references reversible open task_plan items, but its core detection regexes are hardcoded to a specific user-name marker pattern (`WIKTOR_GATE_MARKERS`). Porting requires genericization to a user-configurable name template (e.g., env-var `H_USER_NAME` + templated regex generation) — meaningful work that wasn't in scope for this turn. Filed as backlog for a future framework distribution increment.
+
+---
+
 ## 2026-05-11 — Knowledge Base Wiki adoption + n8n patterns extension + CLAUDE.md doctrine sync
 
 This release ports the Karpathy LLM-Wiki Architecture pattern from the source project into the framework as an OPTIONAL adoption track, adds the n8n REPO-INTEL operational patterns + revises Two-Phase Orchestration to autonomy-first, codifies the Explicit Imperative fast path inline in `CLAUDE.md` (previously deferred from 2026-05-07), and adds Inbox Rule 6 for Ingest as a conditional rule that pairs with the new wiki track.

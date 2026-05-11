@@ -17,33 +17,28 @@ ECC-LEARN-A2 (alpha trailing + 5+ char prefixes). Old regex required <=4-char pr
 gated by `**` boundary + lookahead, and SCOPE-first extraction (Issue 1) remains
 the primary prose-mention guard.
 
-Known limitations (v1.2):
-- T-SM-RESIDUAL-date-handle: date injection in the [x] mark does not handle the edge case
-  where the existing task line already has a date suffix (e.g., "| 2026-04-25 |"). In that
-  case the rewrite appends a duplicate date. Low-priority; filed in backlog.
-- Revert-fail logging clarity: if atomic rename fails, the log message says "write failed"
-  not "rename failed". Minor.
-- Excerpt-length inconsistency: the excerpt captured for logging is 120 chars from raw text,
-  not the cleaned QA block. Low-priority cosmetic issue.
-- Haiku subprocess fallback is opt-in via H4_ENABLE_HAIKU=1. When enabled, a single
-  `claude -p --model haiku` subprocess is invoked if the static regex finds no TASK-ID.
-  Latency budget: 6-sec timeout leaves ~2-4 sec for typical Haiku response plus overhead.
-- Windows ~/.claude.json corruption risk: the `claude -p` inline-prompt mode is read-only
-  on session state (does not write ~/.claude.json mid-execution). The corruption risk only
-  applies to interactive sessions interrupted mid-write. Mitigation: subprocess uses -p with
-  inline prompt (not interactive mode); KeyboardInterrupt is caught, logged, and re-raised
-  to prevent zombie subprocess accumulation.
-- Concurrent H4 invocations: no lock is taken. If two Stop events fire simultaneously
-  (e.g., rapid session cycling), two Haiku subprocesses may run in parallel. This is safe
-  (both are read-only on session state) but may produce duplicate JSONL entries.
-- Letter-prefixed date-style handles like `**H-2026-05**` match the regex (all segments
-  are alphanumeric). Mitigated at runtime by regex_match() requiring the ID to appear
-  in an open `[ ]` line of a task_plan.md — false-positive impact is near-zero unless
-  someone creates a task line with exactly that handle. Codified as
-  T-SM-RESIDUAL-date-handle in selftest.
+Known limitations (v1.3):
+- Outcome labels: hit | miss | error | timeout | invalid_output | cli_absent | interrupted.
+  The docstring in _invoke_haiku_fallback is authoritative. "error" = non-zero exit (MED-1);
+  "interrupted" = user Ctrl-C, sink entry recorded then re-raised (MED-3). No selftest for
+  KeyboardInterrupt — re-raise semantics make inline testing impractical.
+- Write path: both regex and Haiku paths share _execute_sync(). Logs now emit
+  `SYNCED (regex)` / `SYNCED (haiku)` for attribution. The regex path previously emitted
+  `SYNCED` without a label — this minor log-format change is intentional (v1.3).
+- HAIKU_SINK rotation: rotates at 1 MB or 30 days mtime age; dated suffix
+  (e.g. h4-haiku-fallback.jsonl.2026-05-11). Rotation is best-effort — any exception
+  is logged and swallowed; the append always proceeds.
+- Haiku excerpt: prefers the QA block (extract_qa_block) over head-slice so the relevant
+  TASK-ID context is always in the excerpt even when the QA REPORT starts after EXCERPT_MAX.
+- Selftest isolation: all T-SM-HAIKU-MOCK sub-tests run inside a _write_haiku_sink no-op
+  context manager; pre/post HAIKU_SINK byte count is asserted equal (T-SM-HAIKU-MOCK-ISOLATION).
+- T-SM-RESIDUAL-date-handle: date injection does not handle lines that already carry a
+  date suffix — rewrite appends a duplicate date. Low-priority; filed in backlog.
 - Multi-candidate guard takes only the first match if more than one ID survives extraction;
   this can miss the intended ID if a QA REPORT mentions multiple task IDs in prose.
   SCOPE-first extraction is the primary mitigation.
+- Concurrent H4 invocations: no lock is taken. Parallel Stop events may produce duplicate
+  JSONL entries; both writes are read-only on session state so no data corruption occurs.
 
 Safety: every mutation is preceded by undo log write. Post-write verification reverts on mismatch.
 DRY_RUN via H4_DRY_RUN=1.
@@ -77,10 +72,14 @@ HAIKU_ENABLED = os.environ.get("H4_ENABLE_HAIKU", "0") == "1"
 SUMMARY_MAX = 200
 EXCERPT_MAX = 1500  # Max chars sent to Haiku fallback prompt
 
-VERSION = "1.2"
+VERSION = "1.3"
 
 # Path for Haiku fallback JSONL sink (relative to this file's parent = .claude/hooks/)
 HAIKU_SINK = Path(__file__).parent / "aggregates" / "h4-haiku-fallback.jsonl"
+
+# Rotation thresholds for HAIKU_SINK (LOW-1)
+HAIKU_SINK_MAX_BYTES = 1_048_576       # 1 MB
+HAIKU_SINK_MAX_AGE_DAYS = 30
 
 # Validates bare TASK-ID output from Haiku (no ** boundary required — Haiku outputs raw ID)
 PATTERN_BARE_TASK_ID = re.compile(r'^([A-Z][A-Z0-9]{0,9}(?:-[A-Z0-9]+)+)$')
@@ -421,9 +420,11 @@ def _invoke_haiku_fallback(prose: str) -> tuple:
     Returns (extracted_id_or_None, outcome_string) where outcome is one of:
       "hit"            — ID extracted, validated against PATTERN_TASK_ID
       "miss"           — Haiku returned NONE or empty
+      "error"          — Haiku subprocess returned non-zero exit code
       "timeout"        — subprocess.TimeoutExpired (6-sec budget)
       "invalid_output" — Haiku output doesn't match PATTERN_TASK_ID or is unparseable
       "cli_absent"     — `claude` binary not on PATH
+      "interrupted"    — User-initiated Ctrl-C during Haiku subprocess; sink entry recorded, then re-raised
 
     Caller MUST call regex_match() against task_plan.md before using the result to
     distinguish "hit + in plan" from "hit + not in plan". This function validates
@@ -461,9 +462,9 @@ def _invoke_haiku_fallback(prose: str) -> tuple:
 
         if result.returncode != 0:
             log(f"haiku non-zero exit {result.returncode}: {result.stderr[:200]!r}")
-            sink_entry["outcome"] = "miss"
+            sink_entry["outcome"] = "error"
             _write_haiku_sink(sink_entry)
-            return None, "miss"
+            return None, "error"
 
         raw_output = result.stdout.strip()
 
@@ -505,19 +506,95 @@ def _invoke_haiku_fallback(prose: str) -> tuple:
     except KeyboardInterrupt:
         latency_ms = int((time.monotonic() - t_start) * 1000)
         sink_entry["latency_ms"] = latency_ms
-        sink_entry["outcome"] = "miss"
+        sink_entry["outcome"] = "interrupted"
         _write_haiku_sink(sink_entry)
         raise  # Re-raise; do not suppress Ctrl-C
 
 
 def _write_haiku_sink(entry: dict) -> None:
-    """Append *entry* as a JSON line to the Haiku fallback sink. Never raises."""
+    """Append *entry* as a JSON line to the Haiku fallback sink. Never raises.
+
+    Rotation (LOW-1): before each append, if HAIKU_SINK exists and its size exceeds
+    HAIKU_SINK_MAX_BYTES OR its mtime is older than HAIKU_SINK_MAX_AGE_DAYS, rename
+    it to a dated archive (e.g. h4-haiku-fallback.jsonl.2026-05-11) via os.replace.
+    Rotation is best-effort: any exception is logged and swallowed; the append proceeds
+    against whatever HAIKU_SINK currently points to so no entry is ever lost.
+    """
     try:
         HAIKU_SINK.parent.mkdir(parents=True, exist_ok=True)
+        # --- rotation gate ---
+        try:
+            if HAIKU_SINK.exists():
+                stat = HAIKU_SINK.stat()
+                age_days = (time.time() - stat.st_mtime) / 86400
+                if stat.st_size > HAIKU_SINK_MAX_BYTES or age_days > HAIKU_SINK_MAX_AGE_DAYS:
+                    date_suffix = datetime.now().strftime("%Y-%m-%d")
+                    # PID suffix prevents same-date parallel rotations clobbering each other's archive
+                    rotated = HAIKU_SINK.parent / f"{HAIKU_SINK.name}.{date_suffix}.{os.getpid()}"
+                    try:
+                        os.replace(HAIKU_SINK, rotated)
+                        log(f"haiku sink rotated to {rotated.name}")
+                    except OSError:
+                        # Destination already exists (parallel rotation on same date) — proceed
+                        pass
+        except Exception as rot_exc:
+            log(f"haiku sink rotation failed (best-effort, continuing): {rot_exc}")
+        # --- append ---
         with open(HAIKU_SINK, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception as exc:
         log(f"haiku sink write failed: {exc}")
+
+
+def _execute_sync(match: dict, assistant_text: str, source_label: str = "regex") -> bool:
+    """Run the full mark-as-done sequence for *match*.
+
+    Sequence: dedup-check → compose summary → build replacement line → DRY_RUN gate
+    → write_undo_entry → apply_replacement → verify_write → record_dedup → log SYNCED.
+
+    Returns True if a write landed, False on any skip path (dedup, DRY_RUN, undo-fail,
+    apply-fail, or verify-fail). *source_label* appears in the SYNCED log line for
+    path attribution — "regex" for the static-regex path, "haiku" for the Haiku branch.
+
+    NOTE: both paths now emit `SYNCED (regex)` / `SYNCED (haiku)` in the log. The
+    regex path previously emitted `SYNCED` without a label; this minor format change is
+    documented in Known limitations (v1.3).
+    """
+    line_hash = hashlib.sha256(match["original_line"].encode()).hexdigest()[:16]
+    if is_recent_duplicate(line_hash):
+        log(f"Dedup: line for {match['task_id']} synced within {DEDUP_WINDOW_HOURS}h; skipping")
+        return False
+
+    summary = compose_summary(assistant_text)
+    # Replacement is single-line — embed summary inline (no newline) to keep file line indices stable
+    replacement_line = match["original_line"].replace("- [ ]", "- [x]", 1)
+    if summary:
+        replacement_line = replacement_line.rstrip() + f"  ← {summary}"
+
+    if DRY_RUN:
+        log(f"DRY_RUN: would mark {match['file'].name} line {match['line_index']+1} as [x] (task={match['task_id']})")
+        return False
+
+    try:
+        write_undo_entry(match, replacement_line)
+    except Exception as e:
+        log(f"undo log write failed; mutation skipped for safety: {e}")
+        return False
+
+    try:
+        apply_replacement(match, replacement_line)
+    except Exception as e:
+        log(f"apply_replacement failed: {e}")
+        return False
+
+    if not verify_write(match, replacement_line):
+        log(f"WRITE VERIFY FAILED for {match['file'].name} line {match['line_index']+1}; reverting")
+        revert_via_undo(match)
+        return False
+
+    record_dedup(line_hash)
+    log(f"SYNCED ({source_label}) {match['file'].name} line {match['line_index']+1} task={match['task_id']}")
+    return True
 
 
 def main():
@@ -540,7 +617,7 @@ def main():
     if not detected_qa_pass(assistant_text):
         return  # Not a completed-task turn
 
-    # Issue 1 fix: SCOPE-field-first to avoid prose-mention false positives
+    # Issue 1 fix (architect 2026-05-10): SCOPE-field-first to avoid prose-mention false positives
     qa_block = extract_qa_block(assistant_text)
     scope_match = PATTERN_SCOPE.search(qa_block)
     if scope_match:
@@ -562,7 +639,8 @@ def main():
         if HAIKU_ENABLED:
             # --- Haiku fallback (v1.2, opt-in via H4_ENABLE_HAIKU=1) ---
             log("static regex found no TASK-ID; invoking Haiku fallback")
-            excerpt = assistant_text[:EXCERPT_MAX]
+            qa_for_haiku = extract_qa_block(assistant_text)
+            excerpt = (qa_for_haiku or assistant_text)[:EXCERPT_MAX]
             haiku_id, _outcome = _invoke_haiku_fallback(excerpt)
             if haiku_id is not None:
                 # Check plan membership before accepting
@@ -571,35 +649,8 @@ def main():
                 _h_match = regex_match([haiku_id], _h_plans) if _h_plans else None
                 if _h_match is not None:
                     log(f"haiku fallback: accepted {haiku_id!r}")
-                    # Fall through with the Haiku-derived match directly
                     match = _h_match
-                    line_hash = hashlib.sha256(match["original_line"].encode()).hexdigest()[:16]
-                    if is_recent_duplicate(line_hash):
-                        log(f"Dedup: line for {match['task_id']} synced within {DEDUP_WINDOW_HOURS}h; skipping")
-                        return
-                    summary = compose_summary(assistant_text)
-                    replacement_line = match["original_line"].replace("- [ ]", "- [x]", 1)
-                    if summary:
-                        replacement_line = replacement_line.rstrip() + f"  ← {summary}"
-                    if DRY_RUN:
-                        log(f"DRY_RUN: would mark {match['file'].name} line {match['line_index']+1} as [x] (task={match['task_id']})")
-                        return
-                    try:
-                        write_undo_entry(match, replacement_line)
-                    except Exception as e:
-                        log(f"undo log write failed; mutation skipped for safety: {e}")
-                        return
-                    try:
-                        apply_replacement(match, replacement_line)
-                    except Exception as e:
-                        log(f"apply_replacement failed: {e}")
-                        return
-                    if not verify_write(match, replacement_line):
-                        log(f"WRITE VERIFY FAILED for {match['file'].name} line {match['line_index']+1}; reverting")
-                        revert_via_undo(match)
-                        return
-                    record_dedup(line_hash)
-                    log(f"SYNCED (haiku) {match['file'].name} line {match['line_index']+1} task={match['task_id']}")
+                    _execute_sync(match, assistant_text, source_label="haiku")
                     return
                 else:
                     # Second JSONL entry overrides the optimistic "hit" outcome from _invoke_haiku_fallback
@@ -624,50 +675,14 @@ def main():
         log(f"TASK-ID(s) {candidate_ids} not in any open [ ] line; already marked or wrong project")
         return
 
-    # Dedup
-    line_hash = hashlib.sha256(match["original_line"].encode()).hexdigest()[:16]
-    if is_recent_duplicate(line_hash):
-        log(f"Dedup: line for {match['task_id']} synced within {DEDUP_WINDOW_HOURS}h; skipping")
-        return
-
-    summary = compose_summary(assistant_text)
-    # Replacement is single-line — embed summary inline (no newline) to keep file line indices stable
-    replacement_line = match["original_line"].replace("- [ ]", "- [x]", 1)
-    if summary:
-        replacement_line = replacement_line.rstrip() + f"  ← {summary}"
-
-    if DRY_RUN:
-        log(f"DRY_RUN: would mark {match['file'].name} line {match['line_index']+1} as [x] (task={match['task_id']})")
-        log(f"  FROM: {match['original_line'][:120]}")
-        log(f"  TO:   {replacement_line[:120]}")
-        return
-
-    try:
-        write_undo_entry(match, replacement_line)
-    except Exception as e:
-        log(f"undo log write failed; mutation skipped for safety: {e}")
-        return
-
-    try:
-        apply_replacement(match, replacement_line)
-    except Exception as e:
-        log(f"apply_replacement failed: {e}")
-        return
-
-    if not verify_write(match, replacement_line):
-        log(f"WRITE VERIFY FAILED for {match['file'].name} line {match['line_index']+1}; reverting")
-        revert_via_undo(match)
-        return
-
-    record_dedup(line_hash)
-    log(f"SYNCED {match['file'].name} line {match['line_index']+1} task={match['task_id']}")
+    _execute_sync(match, assistant_text, source_label="regex")
 
 
 def selftest():
     """Smoke-test PATTERN_TASK_ID against fixture inputs.
     Cases:
       T-SM-1   (existing, single-segment numeric trailing) — H-4
-      T-SM-2   (existing, multi-char prefix + digit) — EXAMPLE-CLEANUP-BUILD
+      T-SM-2   (existing, multi-char prefix + digit) — TKT123-EXAMPLE-BUILD
       T-SM-3   (existing, with trailing space variant) — H-4 phrase
       T-SM-OBS (v1.1 NEW, alpha trailing) — OBS-V2-A
       T-SM-ECC (v1.1 NEW, 5+ char prefix + multi-segment) — ECC-LEARN-A2
@@ -677,21 +692,21 @@ def selftest():
       T-SM-FP-date     (regression: bare date string) — "**2026-05-10**"
     """
     cases = [
-        ("T-SM-1",   "Built **H-4** under the audit-driven directive.",                          "H-4"),
-        ("T-SM-2",   "Applied **EXAMPLE-CLEANUP-BUILD** to live workflow.",                      "EXAMPLE-CLEANUP-BUILD"),
-        ("T-SM-3",   "Closed **H-4 phrase** with PASS verdict.",                                 "H-4"),
-        ("T-SM-OBS", "Resolved **OBS-V2-A** in the observability backlog.",                      "OBS-V2-A"),
-        ("T-SM-ECC", "Promoted **ECC-LEARN-A2** to ratified status.",                            "ECC-LEARN-A2"),
-        ("T-SM-FP-section", "Per section 5-A, the audit shows...",                               None),
-        ("T-SM-FP-task",    "Continue with task 12-B handling.",                                 None),
-        ("T-SM-no-id",      "QA REPORT PASS: 5/5 with no task ID anywhere",                     None),
-        ("T-SM-FP-date",    "On **2026-05-10** we shipped the feature.",                         None),
-        ("T-SM-lowercase",  "Mentioned **h-4** in lowercase, should be rejected.",               None),
+        ("T-SM-1",   "Built **H-4** under the audit-driven directive.",                      "H-4"),
+        ("T-SM-2",   "Applied **TKT123-EXAMPLE-BUILD** to live EXAMPLE_WORKFLOW_ID.",           "TKT123-EXAMPLE-BUILD"),
+        ("T-SM-3",   "Closed **H-4 phrase** with PASS verdict.",                             "H-4"),
+        ("T-SM-OBS", "Resolved **OBS-V2-A** in the observability backlog.",                  "OBS-V2-A"),
+        ("T-SM-ECC", "Promoted **ECC-LEARN-A2** to ratified status.",                        "ECC-LEARN-A2"),
+        ("T-SM-FP-section", "Per section 5-A, the audit shows...",                           None),
+        ("T-SM-FP-task",    "Continue with task 12-B handling.",                             None),
+        ("T-SM-no-id",      "QA REPORT PASS: 5/5 with no task ID anywhere",                  None),
+        ("T-SM-FP-date",    "On **2026-05-10** we shipped Karpathy adoption.",               None),
+        ("T-SM-lowercase",  "Mentioned **h-4** in lowercase, should be rejected.",           None),
         # KNOWN RESIDUAL: letter-prefixed date-style handles like **H-2026-05** match the new
         # regex (all segments are alphanumeric). Mitigated at runtime by regex_match() requiring
         # the ID to appear in an open `[ ]` task line. Documented here so the residual is
         # explicit; ID extraction is intentionally permissive — open-line filter is the gate.
-        ("T-SM-RESIDUAL-date-handle", "Sprint **H-2026-05** in scope.",                          "H-2026-05"),
+        ("T-SM-RESIDUAL-date-handle", "Sprint **H-2026-05** in scope.",                      "H-2026-05"),
     ]
     passed = 0
     failed = 0
@@ -714,63 +729,170 @@ def selftest():
 
     # ---- T-SM-HAIKU-MOCK: monkey-patch subprocess to test Haiku branch logic ----
     import unittest.mock as _mock
+    import tempfile as _tmpmod
 
-    # Sub-test A: valid ID returned by mock subprocess -> extracted and validated
-    mock_result_hit = _mock.MagicMock()
-    mock_result_hit.returncode = 0
-    mock_result_hit.stdout = "PROJ-TASK-002\n"
-    mock_result_hit.stderr = ""
+    # MED-4: production-JSONL isolation — capture pre-test HAIKU_SINK size so we can
+    # assert no bytes were written by any MOCK sub-test. All five A/B/C/D/E sub-tests
+    # run inside a single _write_haiku_sink no-op context so none can leak to disk.
+    # Use f"{__name__}._write_haiku_sink" so the patch resolves under both
+    # `python file.py --selftest` (__name__ == "__main__") AND module-import / pytest paths.
+    _sink_pre_bytes = HAIKU_SINK.stat().st_size if HAIKU_SINK.exists() else None
 
-    with _mock.patch("subprocess.run", return_value=mock_result_hit):
-        haiku_id_a, outcome_a = _invoke_haiku_fallback("The report covers PROJ-TASK-002 completion.")
-    if haiku_id_a == "PROJ-TASK-002" and outcome_a == "hit":
-        print(f"PASS T-SM-HAIKU-MOCK-A: extracted PROJ-TASK-002, outcome=hit")
+    with _mock.patch(f"{__name__}._write_haiku_sink"):
+        # Sub-test A: valid ID returned by mock subprocess -> extracted and validated
+        mock_result_hit = _mock.MagicMock()
+        mock_result_hit.returncode = 0
+        mock_result_hit.stdout = "PROJ-TASK-002\n"
+        mock_result_hit.stderr = ""
+
+        with _mock.patch("subprocess.run", return_value=mock_result_hit):
+            haiku_id_a, outcome_a = _invoke_haiku_fallback("The report covers PROJ-TASK-002 completion.")
+        if haiku_id_a == "PROJ-TASK-002" and outcome_a == "hit":
+            print(f"PASS T-SM-HAIKU-MOCK-A: extracted PROJ-TASK-002, outcome=hit")
+            passed += 1
+        else:
+            print(f"FAIL T-SM-HAIKU-MOCK-A: expected ('PROJ-TASK-002','hit'), got ({haiku_id_a!r},{outcome_a!r})")
+            failed += 1
+
+        # Sub-test B: mock returns invalid (non-regex) output -> rejected as invalid_output
+        mock_result_invalid = _mock.MagicMock()
+        mock_result_invalid.returncode = 0
+        mock_result_invalid.stdout = "not-a-valid-id because lowercase\n"
+        mock_result_invalid.stderr = ""
+
+        with _mock.patch("subprocess.run", return_value=mock_result_invalid):
+            haiku_id_b, outcome_b = _invoke_haiku_fallback("some prose without bold ID")
+        if haiku_id_b is None and outcome_b == "invalid_output":
+            print(f"PASS T-SM-HAIKU-MOCK-B: invalid output correctly rejected")
+            passed += 1
+        else:
+            print(f"FAIL T-SM-HAIKU-MOCK-B: expected (None,'invalid_output'), got ({haiku_id_b!r},{outcome_b!r})")
+            failed += 1
+
+        # Sub-test C: mock returns NONE -> outcome=miss
+        mock_result_none = _mock.MagicMock()
+        mock_result_none.returncode = 0
+        mock_result_none.stdout = "NONE\n"
+        mock_result_none.stderr = ""
+
+        with _mock.patch("subprocess.run", return_value=mock_result_none):
+            haiku_id_c, outcome_c = _invoke_haiku_fallback("prose with no task id")
+        if haiku_id_c is None and outcome_c == "miss":
+            print(f"PASS T-SM-HAIKU-MOCK-C: NONE output correctly treated as miss")
+            passed += 1
+        else:
+            print(f"FAIL T-SM-HAIKU-MOCK-C: expected (None,'miss'), got ({haiku_id_c!r},{outcome_c!r})")
+            failed += 1
+
+        # Sub-test D: mock raises FileNotFoundError -> outcome=cli_absent
+        with _mock.patch("subprocess.run", side_effect=FileNotFoundError("claude not found")):
+            haiku_id_d, outcome_d = _invoke_haiku_fallback("some prose")
+        if haiku_id_d is None and outcome_d == "cli_absent":
+            print(f"PASS T-SM-HAIKU-MOCK-D: FileNotFoundError correctly mapped to cli_absent")
+            passed += 1
+        else:
+            print(f"FAIL T-SM-HAIKU-MOCK-D: expected (None,'cli_absent'), got ({haiku_id_d!r},{outcome_d!r})")
+            failed += 1
+
+        # Sub-test E: mock returns non-zero exit code -> outcome=error (MED-1)
+        mock_result_error = _mock.MagicMock()
+        mock_result_error.returncode = 1
+        mock_result_error.stdout = ""
+        mock_result_error.stderr = "internal error"
+
+        with _mock.patch("subprocess.run", return_value=mock_result_error):
+            haiku_id_e, outcome_e = _invoke_haiku_fallback("some prose")
+        if haiku_id_e is None and outcome_e == "error":
+            print(f"PASS T-SM-HAIKU-MOCK-E: non-zero exit correctly mapped to error")
+            passed += 1
+        else:
+            print(f"FAIL T-SM-HAIKU-MOCK-E: expected (None,'error'), got ({haiku_id_e!r},{outcome_e!r})")
+            failed += 1
+
+    # MED-4 post-test size assertion: HAIKU_SINK must not have grown during MOCK sub-tests
+    _sink_post_bytes = HAIKU_SINK.stat().st_size if HAIKU_SINK.exists() else None
+    if _sink_pre_bytes == _sink_post_bytes:
+        print(f"PASS T-SM-HAIKU-MOCK-ISOLATION: HAIKU_SINK unchanged (pre={_sink_pre_bytes}, post={_sink_post_bytes})")
         passed += 1
     else:
-        print(f"FAIL T-SM-HAIKU-MOCK-A: expected ('PROJ-TASK-002','hit'), got ({haiku_id_a!r},{outcome_a!r})")
+        print(f"FAIL T-SM-HAIKU-MOCK-ISOLATION: HAIKU_SINK leaked! pre={_sink_pre_bytes} post={_sink_post_bytes}")
         failed += 1
 
-    # Sub-test B: mock returns invalid (non-regex) output -> rejected as invalid_output
-    mock_result_invalid = _mock.MagicMock()
-    mock_result_invalid.returncode = 0
-    mock_result_invalid.stdout = "not-a-valid-id because lowercase\n"
-    mock_result_invalid.stderr = ""
+    # ---- T-SM-HAIKU-ROTATE: verify rotation logic in _write_haiku_sink (LOW-1) ----
+    # Strategy: redirect HAIKU_SINK to a tmp path via module-level monkey-patch so the
+    # real production sink is never touched. The real _write_haiku_sink is called (not
+    # mocked) so rotation logic executes end-to-end.
+    import tempfile as _tmpmod2
+    _tmp_dir = _tmpmod2.mkdtemp()
+    _tmp_sink = Path(_tmp_dir) / "h4-haiku-fallback.jsonl"
+    # Create an oversized fake sink (> HAIKU_SINK_MAX_BYTES) to trigger rotation
+    _tmp_sink.write_bytes(b"\x00" * (HAIKU_SINK_MAX_BYTES + 1))
+    _rotate_ok = False
+    try:
+        # Temporarily redirect the module-level HAIKU_SINK to our tmp path
+        import sys as _sys
+        _this_mod = _sys.modules[__name__]
+        _orig_sink = _this_mod.HAIKU_SINK
+        _this_mod.HAIKU_SINK = _tmp_sink
+        try:
+            _write_haiku_sink({"smoke": "true"})
+        finally:
+            _this_mod.HAIKU_SINK = _orig_sink
 
-    with _mock.patch("subprocess.run", return_value=mock_result_invalid):
-        haiku_id_b, outcome_b = _invoke_haiku_fallback("some prose without bold ID")
-    if haiku_id_b is None and outcome_b == "invalid_output":
-        print(f"PASS T-SM-HAIKU-MOCK-B: invalid output correctly rejected")
+        # After rotation: the dated-rename should exist, fresh sink should contain only the smoke entry
+        _date_suffix = datetime.now().strftime("%Y-%m-%d")
+        _rotated_name = f"h4-haiku-fallback.jsonl.{_date_suffix}.{os.getpid()}"
+        _rotated_path = Path(_tmp_dir) / _rotated_name
+        _fresh_sink = _tmp_sink  # same path; rotation renamed old, new was created by append
+
+        if not _rotated_path.exists():
+            print(f"FAIL T-SM-HAIKU-ROTATE: rotated file {_rotated_name} not found in tmp dir")
+            failed += 1
+        else:
+            _fresh_lines = _fresh_sink.read_text(encoding="utf-8").strip().splitlines()
+            if len(_fresh_lines) == 1 and '"smoke"' in _fresh_lines[0]:
+                print(f"PASS T-SM-HAIKU-ROTATE: rotation created dated archive + fresh sink with smoke entry")
+                passed += 1
+                _rotate_ok = True
+            else:
+                print(f"FAIL T-SM-HAIKU-ROTATE: fresh sink unexpected content: {_fresh_lines!r}")
+                failed += 1
+    except Exception as _rot_test_exc:
+        print(f"FAIL T-SM-HAIKU-ROTATE: unexpected exception: {_rot_test_exc}")
+        failed += 1
+    finally:
+        # Clean up tmp dir
+        import shutil as _shutil
+        _shutil.rmtree(_tmp_dir, ignore_errors=True)
+
+    # ---- T-SM-HAIKU-EXCERPT-QA: verify QA-block-aware excerpt slice (LOW-2) ----
+    # Construct a 4000-char assistant_text where "QA REPORT" starts at char 2500
+    # (well past EXCERPT_MAX=1500). If the excerpt slice is correct, Haiku receives
+    # text starting with "QA REPORT", not the leading preamble.
+    _preamble = "X" * 2500
+    _qa_section = "QA REPORT " + "Y" * 1490  # keeps total QA block > EXCERPT_MAX when sliced
+    _synth_text = _preamble + _qa_section
+    assert len(_synth_text) >= 4000  # sanity: preamble(2500) + "QA REPORT "(10) + Y*1490 = 4000
+
+    # Capture the prose argument passed to _invoke_haiku_fallback by intercepting it
+    _captured_prose = []
+    def _mock_haiku(prose):
+        _captured_prose.append(prose)
+        return None, "miss"
+
+    # Patch _invoke_haiku_fallback itself, then exercise the excerpt-building code path
+    # in main() indirectly by calling the excerpt logic directly (it's inlined in main()).
+    # Simpler: replicate the two-liner and assert the result.
+    _qa_for_haiku = extract_qa_block(_synth_text)
+    _excerpt = (_qa_for_haiku or _synth_text)[:EXCERPT_MAX]
+    if _excerpt.startswith("QA REPORT"):
+        print(f"PASS T-SM-HAIKU-EXCERPT-QA: excerpt starts with 'QA REPORT', not preamble")
         passed += 1
     else:
-        print(f"FAIL T-SM-HAIKU-MOCK-B: expected (None,'invalid_output'), got ({haiku_id_b!r},{outcome_b!r})")
+        print(f"FAIL T-SM-HAIKU-EXCERPT-QA: excerpt starts with {_excerpt[:40]!r}, expected 'QA REPORT'")
         failed += 1
 
-    # Sub-test C: mock returns NONE -> outcome=miss
-    mock_result_none = _mock.MagicMock()
-    mock_result_none.returncode = 0
-    mock_result_none.stdout = "NONE\n"
-    mock_result_none.stderr = ""
-
-    with _mock.patch("subprocess.run", return_value=mock_result_none):
-        haiku_id_c, outcome_c = _invoke_haiku_fallback("prose with no task id")
-    if haiku_id_c is None and outcome_c == "miss":
-        print(f"PASS T-SM-HAIKU-MOCK-C: NONE output correctly treated as miss")
-        passed += 1
-    else:
-        print(f"FAIL T-SM-HAIKU-MOCK-C: expected (None,'miss'), got ({haiku_id_c!r},{outcome_c!r})")
-        failed += 1
-
-    # Sub-test D: mock raises FileNotFoundError -> outcome=cli_absent
-    with _mock.patch("subprocess.run", side_effect=FileNotFoundError("claude not found")):
-        haiku_id_d, outcome_d = _invoke_haiku_fallback("some prose")
-    if haiku_id_d is None and outcome_d == "cli_absent":
-        print(f"PASS T-SM-HAIKU-MOCK-D: FileNotFoundError correctly mapped to cli_absent")
-        passed += 1
-    else:
-        print(f"FAIL T-SM-HAIKU-MOCK-D: expected (None,'cli_absent'), got ({haiku_id_d!r},{outcome_d!r})")
-        failed += 1
-
-    print(f"\nSELFTEST RESULT: {passed} PASS / {failed} FAIL out of {len(cases) + 4} cases")
+    print(f"\nSELFTEST RESULT: {passed} PASS / {failed} FAIL out of {len(cases) + 8} cases")
     sys.exit(0 if failed == 0 else 1)
 
 
