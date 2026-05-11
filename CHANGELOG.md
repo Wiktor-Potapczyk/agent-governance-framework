@@ -28,7 +28,7 @@ Inspired-by attribution: `anthropics/claude-code/plugins/pr-review-toolkit/agent
 
 ### Not ported
 
-`hooks/proactivity-check.py` (vault-personal). The hook detects idle-wait verdicts in assistant text and cross-references reversible open task_plan items, but its core detection regexes are hardcoded to a specific user-name marker pattern (`WIKTOR_GATE_MARKERS`). Porting requires genericization to a user-configurable name template (e.g., env-var `H_USER_NAME` + templated regex generation) — meaningful work that wasn't in scope for this turn. Filed as backlog for a future framework distribution increment.
+A vault-personal Stop hook that detects idle-wait verdicts in assistant text and cross-references reversible open task_plan items, but its core detection regexes are hardcoded to a specific user-name marker pattern. Porting requires genericization to a user-configurable name template (e.g., env-var `H_USER_NAME` + templated regex generation) — meaningful work that wasn't in scope for this turn. Filed as backlog for a future framework distribution increment.
 
 ---
 
