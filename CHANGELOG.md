@@ -1,5 +1,42 @@
 # Changelog
 
+## 2026-05-11 — Knowledge Base Wiki adoption + n8n patterns extension + CLAUDE.md doctrine sync
+
+This release ports the Karpathy LLM-Wiki Architecture pattern from the source project into the framework as an OPTIONAL adoption track, adds the n8n REPO-INTEL operational patterns + revises Two-Phase Orchestration to autonomy-first, codifies the Explicit Imperative fast path inline in `CLAUDE.md` (previously deferred from 2026-05-07), and adds Inbox Rule 6 for Ingest as a conditional rule that pairs with the new wiki track.
+
+### Knowledge Base Wiki (OPTIONAL adoption)
+
+New section in `CLAUDE.md` documenting the Karpathy LLM-Wiki pattern — three layers (raw/wiki/schema), three operations (Ingest/Query/Lint), and utility files (`Resources/KB/index.md`, `log.md` at workspace root). Adoption is OPTIONAL because it requires user setup (qmd MCP or equivalent search engine, `process-ingest`/`process-lint` skills, source-citation schema). Adopting it converts a "vague dumpster" of unread inbox notes into a structured, citation-backed knowledge layer.
+
+### Wiki Layer Invariants (OPTIONAL — pairs with Knowledge Base Wiki)
+
+New section in `CLAUDE.md` documenting the three enforcement layers that protect wiki integrity against LLM fabrication: skill-level hard gate in `process-ingest` (SHA-256 source binding before write); hook-level write check via `wiki-citation-check.py` (verifies citation paths exist + SHA matches at every write); lint-level periodic check via `process-lint` Pass A. Plus bootstrap-mode threshold: new wiki pages start `wiki_status: bootstrap`, user ratifies them, ≥10 ratified entries unlocks full LLM-authorship.
+
+### n8n Workflow Patterns (OPTIONAL — for n8n users)
+
+New section consolidating the upstream n8n discipline:
+
+- **Core (ROMUALD-LEARN-R3):** Spiral Method (3-5 nodes per increment), validation sandwich, `update_partial_workflow` over `update_full_workflow`, `get_node_essentials()` over `get_node_info()`, webhook lifecycle gate, live workflow > cached file.
+- **Operational (REPO-INTEL extension):** `patchNodeField` for single-field edits, IF/Switch `addConnection` branch parameter requirement, Code node `pairedItem` for non-1:1 outputs, SplitInBatches inverted output naming, cross-iteration accumulation via `$getWorkflowStaticData('global').accumulator`, `n8n_autofix_workflow` preview-first, `__rl` `cachedResultName` requirement, AI agent sub-workflow security P1-P5.
+
+### Two-Phase Orchestration — revised (autonomy-first)
+
+Supersedes the 2026-05-07 mandatory-human-gate version. Phase 1.5 (Conditional Human Gate) is now only fires if the blueprint contains explicit `FLAG:` lines or the architect cannot classify entry conditions for Phase 2's autonomous loop. Default: NO human gate at design-time. Mandatory human gate now lives at Phase 3 (Promotion Gate) — before re-enabling destructive output nodes AND before flipping a workflow to `active: true`. Rationale: Czlonkowski's autonomous webhook QA loop (POST test payload → read execution → diagnose → patch via `patchNodeField` → re-trigger, iteration cap 10) closes the catch-misunderstanding function the prior mandatory blueprint review provided. HITL frequency was a goal failure under the prior design; HITL belongs at irreversible-action boundaries, not every phase transition.
+
+### CLAUDE.md — Explicit Imperative fast path codified inline
+
+The 2026-05-07 changelog noted: "the corresponding `skills/core/task-classifier/SKILL.md` content update is deferred to the next increment." Partially landed here: the `CLAUDE.md` CRITICAL RULE: Task Classification section now describes the Step 3a fast path inline. The full `task-classifier/SKILL.md` content edit remains in backlog.
+
+### Inbox Rule 6 (Ingest, conditional)
+
+Inbox Processing Rules grow from 5 to 6. Rule 6 ("Ingest") fires after classify+route per rules 1-5, invokes `process-ingest`. Auto-triggered by `inbox-auto-ingest.py` hook on Inbox/ writes when the Knowledge Base Wiki track is adopted. Marked OPTIONAL so users without the wiki track can skip it.
+
+### Distribution rationale
+
+These additions are all OPTIONAL adoption tracks — they don't change framework behavior for users who don't adopt them. The framework's core (Working Philosophy, CRITICAL RULEs, Process skills, QA tiers) is unchanged. Users opting in get a path from "inbox dump" to "structured knowledge base", and n8n users get the upstream discipline that the source project derived empirically.
+
+---
+
 ## 2026-05-07 — ADOPT-2 Skill Retrofit + Two-Phase Orchestration + Classifier Calibration
 
 This release closes the ADOPT-2 skill-format adoption deferred in the 2026-04-21 sprint (per that release's "Deferred" note), ships a generalizable two-phase agent orchestration pattern with human gate, recalibrates the classifier for explicit imperatives, hardens compaction-snapshot framing, retracts an aspirational claim about decay-scoring infrastructure, and reconciles cross-document inventory drift across README/architecture/INSTALL/hooks-README.

@@ -34,6 +34,7 @@ Classify each note as:
 3. **Meeting note** — Add date, attendees, actions, move to relevant Project
 4. **Research** — Tag #research, move to Resources/ or relevant Project
 5. **Personal** — Move to Areas/Personal/
+6. **Ingest (OPTIONAL — only if you adopt the Knowledge Base Wiki section below)** — After classify+route per rules 1-5, invoke `process-ingest` skill to update wiki pages and the operation log. Auto-fires via `inbox-auto-ingest.py` hook on Inbox/ writes when configured.
 
 ## Conventions
 
@@ -89,6 +90,8 @@ After classification, invoke the corresponding process skill:
 - Planning → `process-planning`
 - Quick → respond inline
 - Compound → `process-analysis` (Decomposition mode) — breaks into sub-tasks with TYPE + dependencies
+
+**Explicit Imperative fast path:** small explicit imperatives — "rename X to Y", "move X to Y", "fix typo in X", "delete the unused X", "add line W to file V", "rerun X" — flip the burden of proof and default to **Quick**. Escalate only if a depth signal is also present (compound analysis ask, prior hypothesis, "are you sure?" pattern, ambiguous target needing investigation). Rationale: classifier ceremony on a one-line edit is overhead; small explicit fixes need a fast path. See `task-classifier` skill Step 3a.
 
 ## CRITICAL RULE: Task Plan Alignment
 
@@ -200,6 +203,81 @@ This applies to: code, prompts, configs, files — anything.
 - One line per inbox action: filename, classification, destination.
 - Never delete notes — move to Archives/ instead.
 - After modifying the workspace, update relevant index files and wiki-links.
+
+## Knowledge Base Wiki (OPTIONAL)
+
+Inspired by Andrej Karpathy's [LLM-Wiki gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f). Adopt this when you want a structured, citation-backed knowledge layer over raw notes — instead of a "vague dumpster" of unread documents.
+
+### Three layers + three operations + utility files
+
+| Layer | Contains | Ownership |
+|---|---|---|
+| **raw/** | Immutable curated sources: `Inbox/`, `Clippings/`, `Daily Notes/`, project-specific source data, untagged `Notes/` | User or external; never LLM-edited |
+| **wiki/** | LLM-generated synthesized pages tagged `#wiki` (e.g., `Resources/KB/` or `Notes/` with `#wiki`) | LLM-owned; user reviews + ratifies |
+| **schema** | Behavioral spec — `CLAUDE.md`, `.claude/skills/`, `.claude/agents/`, `.claude/hooks/` | Co-evolved user + LLM |
+
+**Three operations:**
+- **Ingest** (`process-ingest` skill, auto-fires on Inbox/ writes via `inbox-auto-ingest.py`): raw doc → search wiki → write summary page with `source:` citation → update 3-10 related wiki pages → update `Resources/KB/index.md` → append entry to `log.md` at workspace root.
+- **Query** (v2 — not implemented in default ship): read wiki, synthesize answer with citations, optionally file answer back as new wiki page.
+- **Lint** (`process-lint` skill): periodic health check — `source:` citation validation, orphan wiki pages, index gaps, log continuity, stale pages.
+
+### Source citation requirement
+
+Every wiki page (file tagged `#wiki`) MUST carry a `source:` frontmatter field — array of objects pointing to the raw-layer documents the page synthesizes:
+
+```yaml
+source:
+  - path: "Clippings/some-article.md"     # workspace-relative path to raw doc
+    type: clipping                          # clipping | work-artifact | daily-note | external | inbox-item
+    anchor: "## Section Title"              # optional heading within source
+    sha256: "a1b2c3d4..."                   # SHA-256 of source bytes at ingest time (crypto truth binding)
+    ingested_at: "2026-05-10T20:30:00Z"
+```
+
+## Wiki Layer Invariants (OPTIONAL — pairs with Knowledge Base Wiki above)
+
+Three enforcement layers protect wiki integrity against LLM fabrication (a documented risk: LLMs can write plausible summaries with hallucinated citations). Each layer catches a different failure mode:
+
+1. **Skill-level hard gate (`process-ingest` Step-4):** skill computes SHA of raw source bytes via Read tool BEFORE writing wiki page; commits hash to `source:` field. If supporting text not found → halts with `CITATION_NOT_FOUND` rather than synthesizing.
+2. **Hook-level write check (`wiki-citation-check.py` PostToolUse Write):** on every Write to a `#wiki`-tagged file: verifies `source:` field present + non-empty + each `path` exists on disk + recomputes SHA and compares to committed `sha256`. Mismatch → blocks write with `SOURCE_DRIFT`.
+3. **Lint-level periodic check (`process-lint` Pass A):** periodic re-verification of all wiki pages: file existence + hash match + anchor heading + noun-overlap content match. Findings: `ORPHAN_CITATION`, `MISSING_ANCHOR`, `WEAK_CITATION`, `MISSING_SOURCE`, `SOURCE_DRIFT`.
+
+**Bootstrap mode (`wiki_status: bootstrap`):** new `#wiki` pages start as `bootstrap`. User reviews and promotes to `wiki_status: ratified`. When ≥10 ratified entries exist, `process-ingest` unlocks full LLM-authorship mode. Until then: each new wiki page is bootstrap-marked and surfaces for user review.
+
+## n8n Workflow Patterns (OPTIONAL — for n8n users)
+
+If you build n8n workflows via the n8n-mcp server, apply these patterns. They're derived from Romuald Czlonkowski's open-source `n8n-skills` plugin (also author of n8n-mcp) plus upstream usage analytics.
+
+### Core discipline (ROMUALD-LEARN-R3)
+
+- **Spiral Method (3–5 nodes per increment).** Never replace whole workflows; never edit more than 3–5 nodes between validations. After each segment: call `n8n_validate_workflow`.
+- **Validation sandwich.** `validate_minimal` (pre-change baseline) → apply changes → `validate_full` (post-change).
+- **Use `n8n_update_partial_workflow`, not `n8n_update_full_workflow`.** Diff-based update saves 80–90% tokens (upstream stats: 38,287 uses at 99.0% success).
+- **Use `get_node_essentials()` over `get_node_info()`.** Token-economical. Escalate only when essentials don't expose a needed field.
+- **Webhook lifecycle gate.** Webhook-bearing workflows need one test execution before activation; you cannot test a webhook on an inactive workflow.
+- **Live workflow > cached file.** Always fetch the workflow JSON from the live system before analyzing or modifying.
+
+### Operational patterns (REPO-INTEL extension)
+
+- **`patchNodeField`** is the preferred op for single-field edits inside Code/JSCode/expression nodes. Strict mode: errors on miss or multi-match. 80%+ token savings vs full-node replacement.
+- **IF/Switch `addConnection` requires `branch:"true"|"false"`.** Missing branch silently routes to wrong output — no error.
+- **Code node new outputs require `pairedItem: {item: i}`.** When a Code/Function node creates non-1:1 outputs, each output item must include `pairedItem`. Missing → silent downstream Set failures.
+- **SplitInBatches output naming is INVERTED.** `main[0]` = "done" (post-loop), `main[1]` = "each batch" (per-iteration). Always add Limit 1 after the "done" output.
+- **Cross-iteration accumulation: NEVER `$('NodeInLoop').all()` after the loop — silent data loss.** Use `$getWorkflowStaticData('global').accumulator` pattern.
+- **`n8n_autofix_workflow` BEFORE manual fixes.** Run with default `applyFixes: false` to preview auto-fixable errors.
+- **`__rl` resourceLocator MUST include `cachedResultName`.** Missing this = UI shows "Choose..." silently.
+- **AI agent sub-workflow security (P1-P5).** For any workflow with LangChain/AI agent + HTTP/MCP/Serper tools: P1 Send-and-Wait gate before destructive output, P2 read-only DB credentials, P3 negative constraints in agent system prompt, P4 ai_outputParser structured output, P5 tool call logging.
+
+### Two-Phase Orchestration
+
+Every non-trivial n8n workflow build runs Architect → Builder + autonomous QA loop:
+
+- **Phase 1 — Architect (`n8n-workflow-architect`):** owns ALL discovery, template selection, node selection, error-handling design, validation planning. Produces a `.md` blueprint with milestones (3-5 nodes each) and validation checkpoints. Makes ZERO implementation moves. Blueprint MUST include a `## Guidelines Compliance Matrix` walking every codified pattern above.
+- **Phase 1.5 — Conditional Human Gate (only fires if blueprint contains explicit `FLAG:` lines OR architect cannot classify entry conditions for Phase 2's autonomous loop).** Default: NO human gate at design-time.
+- **Phase 2 — Builder + Autonomous QA Loop (`n8n-workflow-builder`):** implements per blueprint using `n8n_update_partial_workflow`, validating after every 3-5 nodes. For webhook-triggered (or pinnable-trigger) workflows with destructive nodes disabled, the loop runs: POST test payload → read execution → diagnose failed node → patch via `patchNodeField` → re-trigger → repeat until status=success. Iteration cap: 10. Termination: green status, OR cap hit, OR same error twice on same node (deadlock).
+- **Phase 3 — Promotion Gate (the only mandatory human gate):** before re-enabling destructive output nodes (Send Email, Send Slack, write-to-DB) AND before flipping the workflow to `active: true` in production, surface to user: blueprint + final loop state + which destructive nodes will be re-enabled.
+
+**When the autonomous loop CANNOT run** (fall back to manual Builder + per-pass user verification): workflow has no webhook/pinnable trigger; real external state required with no pinned-first available; success criterion is subjective (content quality, agent reasoning quality); loop hits deadlock.
 
 ## Tool & Environment Quirks
 
