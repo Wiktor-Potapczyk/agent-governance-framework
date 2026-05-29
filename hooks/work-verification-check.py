@@ -24,6 +24,53 @@ import re
 
 READ_BYTES = 204800  # 200KB window
 
+# Keywords that indicate a behavioral claim — i.e. "the artifact DOES something"
+# rather than "the file EXISTS" or "the config IS present". When a QA/pentest report
+# is filed with only Read/Grep tool usage and the work-item text contains one of
+# these verbs, a WARN is emitted to stderr (non-blocking).
+BEHAVIORAL_CLAIM_KEYWORDS = {
+    "fires", "triggers", "sends", "executes", "runs",
+}
+
+# --- CHECK 4 (SA-4 file-existence): Write-claim language patterns ---
+# Sprint A Item 1 (PRD AC1.1-1.4): detect fabrications where an agent claims to
+# have Written a file but neither (a) actually used Write/Edit/MultiEdit on that
+# path in this turn, NOR (b) the file pre-exists on disk. Q9 (PRD §9) resolved
+# the detection mechanism: Write-tool-trace absence + path-existence check +
+# tool_result-block parsing (to catch sub-agent claims, not just main session).
+# Q8 (PRD §9) resolved the framing: "ergonomic automation" of ls -la, not a
+# safety-critical gap closure — so prefer false-negative (miss some) over
+# false-positive (block legitimate work).
+WRITE_CLAIM_PATTERNS = [
+    # Past-tense Write claims with explicit path-shape token (./path, /path, path/file, file.ext)
+    # Path token: \S+/\S+ OR \S+\.[a-zA-Z]+ (extension)
+    r'\b(?:wrote(?:\s+the\s+\w+)?|saved(?:\s+the\s+\w+)?|created(?:\s+the\s+\w+)?|written|stored)\s+(?:it\s+)?(?:to|at|in)\s+[`"\']?(\S+\.\w+|\S+/\S+)',
+    # "File saved at /path", "file created at path/file.ext"
+    r'\b(?:file|report|note|spec|document)\s+(?:saved|written|created|stored)\s+(?:to|at|in)\s+[`"\']?(\S+\.\w+|\S+/\S+)',
+    # "I have written ... to /path"
+    r'\b(?:I\s+(?:have\s+)?(?:wrote|saved|created|written|stored)|now\s+(?:wrote|saved|created|written))\s+(?:.{0,80}?)\s+(?:to|at|in)\s+[`"\']?(\S+\.\w+|\S+/\S+)',
+]
+# Failure-language guard (adversarial CR #1) — if Write-claim is within this many
+# chars of failure language, treat as legitimate failure report, not a fabrication.
+FAILURE_LANGUAGE_WINDOW_CHARS = 100
+FAILURE_LANGUAGE_PATTERNS = [
+    r'\b(?:failed|error|could\s+not|couldn\'t|tried\s+to|attempted\s+to|blocked|denied|refused)\b',
+]
+# Vault-root for path-existence resolution. Hook fires from .claude/hooks/, so
+# vault root is two levels up.
+VAULT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Note: broader verbs (creates, returns, works, updates) deliberately excluded —
+# they appear in legitimate static-analysis QA claims that Read can verify
+# (e.g., "verified the function returns a string"). Architect-reviewer
+# 2026-05-25 flagged false-positive risk; tightened to strong-behavioral verbs only.
+
+# Observability v2: shared event-emit helper (silent on import failure)
+try:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from _event_emit import emit_event  # type: ignore
+except Exception:  # pragma: no cover
+    emit_event = None  # type: ignore
+
 
 def main():
     payload_text = sys.stdin.read()
@@ -160,11 +207,24 @@ def main():
                 )
                 print(json.dumps({"decision": "block", "reason": reason}))
                 return
-            # Read/Grep used but no Bash/MCP — softer warning for non-execution QA
-            # This is acceptable for claims like "file exists" or "config is registered"
-            # but not for "hook blocks correctly" or "workflow runs"
-            # Log it but don't block
-            pass
+            # Read/Grep used but no Bash/MCP — softer warning for non-execution QA.
+            # Detects behavioral-claim QA filed with Read-only tool use:
+            # if the work-item text contains a verb from BEHAVIORAL_CLAIM_KEYWORDS
+            # (e.g. "fires", "runs", "triggers"), the claim asserts runtime behavior
+            # that Read/Grep cannot verify — emit WARN to stderr (non-blocking).
+            # Non-behavioral items (existence checks, config presence) pass silently.
+            work_text_lower = full_text.lower()
+            matched_keyword = next(
+                (kw for kw in BEHAVIORAL_CLAIM_KEYWORDS if kw in work_text_lower),
+                None,
+            )
+            if matched_keyword is not None:
+                print(
+                    f"WARN: behavioral claim without execution tool — found keyword "
+                    f"'{matched_keyword}' in work item; consider running Bash/MCP to "
+                    f"actually exercise the artifact, not just read it.",
+                    file=sys.stderr,
+                )
 
     # --- CHECK 1b: QA/Pentest Report Inline Without Skill Invocation (HARD) ---
     # H5 fix (2026-04-18): The original CHECK 1 above only fires when the process
@@ -224,6 +284,183 @@ def main():
                 pass
             return
 
+    # --- CHECK 4 (SA-4 file-existence / fabrication detection): ---
+    # PRD Item 1 (Sprint A) — detect agent claims of "I wrote/saved/created X"
+    # where path X was NOT actually written via Write/Edit/MultiEdit tool_use in
+    # this turn AND does NOT exist on disk. Per Q9 (PRD §9): combine Write-trace
+    # absence + path-existence + tool_result block parsing (catches sub-agent
+    # fabrications, not just main-session). Per Q8: ergonomic automation framing —
+    # prefer false-negative (miss some) over false-positive (block legitimate).
+    #
+    # Walks the same last-turn window already collected above. Also rescans for
+    # tool_result blocks (sub-agent output) because the existing loop only
+    # processes entry.type == "assistant" blocks.
+    actually_written = set()
+    # First pass: gather Write/Edit/MultiEdit file_paths from main-session tool_use
+    for i in range(last_user_idx + 1, len(lines)):
+        line = lines[i].strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if entry.get("type") != "assistant":
+            continue
+        for block in entry.get("message", {}).get("content", []):
+            if block.get("type") != "tool_use":
+                continue
+            name = block.get("name", "")
+            if name in ("Write", "Edit", "MultiEdit"):
+                inp = block.get("input", {})
+                if isinstance(inp, str):
+                    try:
+                        inp = json.loads(inp)
+                    except (json.JSONDecodeError, TypeError):
+                        inp = {}
+                p = inp.get("file_path")
+                if p:
+                    actually_written.add(p)
+                    # also normalize trailing path component for fuzzy match
+                    actually_written.add(os.path.basename(p))
+
+    # Second pass: collect text from both assistant blocks AND tool_result blocks
+    # (sub-agent output appears as tool_result in main-session transcript).
+    # IMPORTANT: tool_result blocks are wrapped in user-type entries — the
+    # last_user_idx logic above stops walking at the LAST user-type entry, which
+    # in transcripts with sub-agent dispatches IS the tool_result wrapper itself.
+    # So we re-find the "last real user message" by looking for user entries
+    # whose content is a STRING (not a list of tool_result blocks).
+    real_last_user_idx = -1
+    for i in range(len(lines) - 1, -1, -1):
+        line = lines[i].strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+            if entry.get("type") == "user":
+                content = entry.get("message", {}).get("content")
+                # Real user message: content is a plain string OR a list with a
+                # "text" block (not "tool_result"). tool_result wrappers have
+                # content = [{"type": "tool_result", ...}].
+                if isinstance(content, str):
+                    real_last_user_idx = i
+                    break
+                if isinstance(content, list):
+                    has_text = any(
+                        isinstance(b, dict) and b.get("type") == "text"
+                        for b in content
+                    )
+                    has_only_tool_result = all(
+                        isinstance(b, dict) and b.get("type") == "tool_result"
+                        for b in content
+                    ) if content else False
+                    if has_text and not has_only_tool_result:
+                        real_last_user_idx = i
+                        break
+        except json.JSONDecodeError:
+            continue
+    if real_last_user_idx < 0:
+        real_last_user_idx = last_user_idx  # fallback to original
+
+    candidate_texts = []
+    candidate_texts.append(full_text)  # already-collected assistant text
+    for i in range(real_last_user_idx + 1, len(lines)):
+        line = lines[i].strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        # tool_result blocks are wrapped in user-type entries
+        if entry.get("type") not in ("user", "assistant"):
+            continue
+        for block in entry.get("message", {}).get("content", []):
+            if block.get("type") == "tool_result":
+                content = block.get("content")
+                if isinstance(content, str):
+                    candidate_texts.append(content)
+                elif isinstance(content, list):
+                    for sub in content:
+                        if isinstance(sub, dict) and sub.get("type") == "text":
+                            candidate_texts.append(sub.get("text", ""))
+
+    # Scan candidate texts for Write-claim patterns; check each claimed path.
+    fabrications = []  # list of (claimed_path, source_snippet)
+    for text in candidate_texts:
+        if not text:
+            continue
+        for pattern in WRITE_CLAIM_PATTERNS:
+            for m in re.finditer(pattern, text, re.IGNORECASE):
+                claimed = m.group(1).strip("`\"'.,;:)]}")
+                # Failure-language guard — skip if claim is near "failed/error/tried/etc"
+                start = max(0, m.start() - FAILURE_LANGUAGE_WINDOW_CHARS)
+                end = min(len(text), m.end() + FAILURE_LANGUAGE_WINDOW_CHARS)
+                window = text[start:end]
+                is_failure = any(
+                    re.search(fp, window, re.IGNORECASE)
+                    for fp in FAILURE_LANGUAGE_PATTERNS
+                )
+                if is_failure:
+                    continue
+                # Skip if path was actually written this turn (by basename OR full)
+                if claimed in actually_written or os.path.basename(claimed) in actually_written:
+                    continue
+                # Resolve relative paths against vault root
+                if not os.path.isabs(claimed):
+                    abs_path = os.path.join(VAULT_ROOT, claimed)
+                else:
+                    abs_path = claimed
+                # Path-existence check
+                if os.path.exists(abs_path):
+                    continue
+                # Fabrication detected
+                snippet = text[max(0, m.start() - 60):min(len(text), m.end() + 60)]
+                fabrications.append((claimed, snippet.strip()))
+
+    if fabrications:
+        # Deduplicate by claimed path
+        seen = set()
+        unique_fabrications = []
+        for claim, snip in fabrications:
+            if claim in seen:
+                continue
+            seen.add(claim)
+            unique_fabrications.append((claim, snip))
+            if len(unique_fabrications) >= 5:
+                break
+        # Log to governance + warn (non-blocking per Q8 ergonomic framing).
+        # If user wants block, this is the swap point: replace WARN block with the
+        # `print(json.dumps({"decision": "block", "reason": ...})); return` pattern.
+        try:
+            from datetime import datetime
+            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+            session_id_f = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+            for claim, snip in unique_fabrications:
+                entry = json.dumps({
+                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "event": "fabrication_detected",
+                    "hook": "work-verification-check",
+                    "session": session_id_f,
+                    "check": "file-existence-check",
+                    "claimed_path": claim,
+                    "actual_exists": False,
+                    "snippet": snip[:200],
+                    "schema": 2,
+                })
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(entry + "\n")
+        except Exception:
+            pass
+        warn_msg = (
+            f"FABRICATION_DETECTED: {len(unique_fabrications)} Write-claim(s) found "
+            f"without matching Write trace OR path on disk:\n"
+            + "\n".join(f"  - {c}" for c, _ in unique_fabrications)
+            + "\n(Logged to governance-log.jsonl. Non-blocking per ergonomic framing.)"
+        )
+        print(warn_msg, file=sys.stderr)
+
     # --- CHECK 2: Premature Escalation (HARD) ---
     # Detect: response asks user for help/decision with minimal tool usage
     escalation_patterns = [
@@ -279,6 +516,95 @@ def main():
             warn_emitted = True
         except Exception:
             pass
+
+    # --- Observability v2: event 19 session_end (heartbeat) ---
+    # Emitted on every Stop. Aggregators should take the MAX(ts) row per session
+    # as the effective session end. Fields: turn_count (assistant messages in
+    # transcript tail), approx_tokens (file_size / 4), duration_sec (from earliest
+    # session_start entry in governance-log for this session, if findable).
+    if emit_event is not None:
+        try:
+            session_id_h = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+            turn_count = 0
+            for _line in lines:
+                _line = _line.strip()
+                if not _line:
+                    continue
+                try:
+                    _e = json.loads(_line)
+                    if _e.get("type") == "assistant":
+                        turn_count += 1
+                except json.JSONDecodeError:
+                    continue
+            approx_tokens = int(file_size / 4) if file_size else 0
+
+            # Duration estimate: look up session_start for this session in governance-log
+            duration_sec = None
+            try:
+                log_path_d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+                start_ts = None
+                with open(log_path_d, "r", encoding="utf-8", errors="replace") as _lf:
+                    for _row in _lf:
+                        _row = _row.strip()
+                        if not _row:
+                            continue
+                        try:
+                            _re = json.loads(_row)
+                        except json.JSONDecodeError:
+                            continue
+                        if _re.get("event") == "session_start" and _re.get("session") == session_id_h:
+                            start_ts = _re.get("ts")
+                            break
+                if start_ts:
+                    from datetime import datetime as _dt
+                    try:
+                        sdt = _dt.strptime(start_ts, "%Y-%m-%d %H:%M:%S")
+                        duration_sec = int((_dt.now() - sdt).total_seconds())
+                    except Exception:
+                        duration_sec = None
+            except Exception:
+                duration_sec = None
+
+            emit_event(
+                event="session_end",
+                hook="work-verification-check",
+                session=session_id_h,
+                extra={
+                    "turn_count": turn_count,
+                    "approx_tokens": approx_tokens,
+                    "duration_sec": duration_sec,
+                    "heartbeat": True,
+                },
+            )
+        except Exception:
+            pass
+
+    # --- Observability v2: event 26 qa_fail_reported ---
+    # Fires when a QA REPORT block contains at least one FAIL: line with a non-empty
+    # (non-"none") claim. Independent of block/pass decision — pure telemetry.
+    if has_qa_report and emit_event is not None:
+        fail_lines = []
+        for m in re.finditer(r'(?:^|\n)\s*FAIL:\s*([^\n]+)', full_text, re.IGNORECASE):
+            claim = m.group(1).strip()
+            low = claim.lower().rstrip(".,;:")
+            if low and low not in {"none", "n/a", "na", "-"}:
+                fail_lines.append(claim[:200])
+        if fail_lines:
+            try:
+                session_id_e = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+                emit_event(
+                    event="qa_fail_reported",
+                    hook="work-verification-check",
+                    session=session_id_e,
+                    extra={
+                        "fail_count": len(fail_lines),
+                        "fails": fail_lines[:5],  # cap to 5 to avoid bloat
+                        "via_process_qa": has_process_qa,
+                        "via_process_pentest": has_process_pentest,
+                    },
+                )
+            except Exception:
+                pass
 
     # --- Log pass for monitoring ---
     # Skip if warn was already emitted this turn (prevents double-counting)

@@ -106,7 +106,29 @@
             "command": "python3 \"{{VAULT_ROOT}}/.claude/scripts/check_forbidden_tokens.py\""
           }
         ]
-      }
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/reviewer-scope-violation-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/config-protection.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/mcp-circuit-breaker.py\""
+          }
+        ]
+      },
     ],
     "PostToolUse": [
       {
@@ -126,7 +148,25 @@
             "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/memory-schema-check.py\""
           }
         ]
-      }
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/tag-variant-check.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/mcp-circuit-breaker-record.py\""
+          }
+        ]
+      },
     ],
     "SubagentStart": [
       {
@@ -138,6 +178,10 @@
           {
             "type": "command",
             "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/agent-registry-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/subagent-scope-check.py\""
           }
         ]
       }
@@ -148,6 +192,10 @@
           {
             "type": "command",
             "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/subagent-quality-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/subagent-scope-check.py\""
           }
         ]
       }
@@ -182,6 +230,10 @@
           {
             "type": "command",
             "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/token-breakdown.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/read-before-edit-check.py\""
           }
         ]
       }

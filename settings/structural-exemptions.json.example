@@ -1,0 +1,11 @@
+{
+  "_doc": "Vault structural-exemptions registry. Consulted by /vault-maintain + tag-variant-check + similar lint passes to avoid flagging files/tags whose unusual state is INTENTIONAL.",
+  "_doctrine": "See [generic-reference] + [generic-reference] + [generic-reference]. Whenever a flag-and-fix pattern surfaces an intentional artifact as a 'cleanup candidate', add an entry here so the next scan doesn't re-surface it.",
+  "_added": "2026-05-26",
+  "_format_version": 1,
+  "empty_mocs": [],
+  "single_use_tags_intentional": [],
+  "low_signal_clippings_not_for_ingest": [],
+  "volatile_paths_unsuitable_as_source": [],
+  "case_doublets_in_docs_acceptable": []
+}

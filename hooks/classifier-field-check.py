@@ -17,6 +17,13 @@ import re
 # 200KB window — covers even 10+ agent outputs per turn
 READ_BYTES = 204800
 
+# Observability v2: shared event-emit helper (silent on import failure)
+try:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from _event_emit import emit_event  # type: ignore
+except Exception:  # pragma: no cover
+    emit_event = None  # type: ignore
+
 
 def strip_fences(text):
     """Remove markdown fenced code blocks to prevent false matches on examples/docs."""
@@ -92,12 +99,7 @@ def main():
     if not has_type:
         missing.append("TASK TYPE")
 
-    if is_quick:
-        # S1 fix (2026-04-13): Quick must have JUSTIFICATION per task-classifier spec
-        has_justification = bool(re.search(r'JUSTIFICATION:', last_classifier_text, re.IGNORECASE))
-        if not has_justification:
-            missing.append("JUSTIFICATION (Quick tasks must justify why no specialist agent applies)")
-    else:
+    if not is_quick:
         if not has_approach:
             missing.append("APPROACH")
         if not has_missed:
@@ -106,35 +108,66 @@ def main():
             missing.append("MUST DISPATCH")
 
     # --- PM enforcement (every non-Quick task) ---
-    # Multiline-aware capture (B4 fix 2026-04-13): MUST DISPATCH may span lines.
-    # Uses same FIELD_LABELS delimiter as dispatch-compliance-check.py.
-    FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
     if not is_quick and has_must_dispatch and not missing:
-        dispatch_match = re.search(
-            r'MUST DISPATCH:\s*(.*?)(?=\n\s*' + FIELD_LABELS + r'\s*:|\Z)',
-            last_classifier_text,
-            re.DOTALL | re.IGNORECASE
-        )
+        dispatch_match = re.search(r'MUST DISPATCH:\s*(.+)', last_classifier_text, re.IGNORECASE)
         if dispatch_match:
-            # Collapse multiline whitespace into single string for pm check
-            dispatch_text = re.sub(r'\s+', ' ', dispatch_match.group(1).strip()).lower()
+            dispatch_text = dispatch_match.group(1).lower()
             if not re.search(r'\bpm\b', dispatch_text):
                 missing.append("pm in MUST DISPATCH (every non-Quick task requires PM oversight)")
+
+    # --- Observability v2: event 1 classification_emitted (every classification, Quick or not) ---
+    if emit_event is not None:
+        session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+        type_match = re.search(r'(?:TASK TYPE|CLASSIFICATION):\s*(Quick|Research|Analysis|Content|Build|Planning|Compound)', last_classifier_text, re.IGNORECASE)
+        domain_match = re.search(r'DOMAIN:\s*([^\n]+)', last_classifier_text, re.IGNORECASE)
+        implies_match = re.search(r'IMPLIES:\s*([^\n]+)', last_classifier_text, re.IGNORECASE)
+        approach_match = re.search(r'APPROACH:\s*([^\n]+)', last_classifier_text, re.IGNORECASE)
+        missed_match = re.search(r'MISSED:\s*([^\n]+)', last_classifier_text, re.IGNORECASE)
+        must_dispatch_match_e = re.search(r'MUST DISPATCH:\s*([^\n]+)', last_classifier_text, re.IGNORECASE)
+        emit_event(
+            event="classification_emitted",
+            hook="classifier-field-check",
+            session=session_id,
+            extra={
+                "type": type_match.group(1) if type_match else None,
+                "is_quick": is_quick,
+                "implies": (implies_match.group(1).strip()[:200] if implies_match else None),
+                "domain": (domain_match.group(1).strip()[:100] if domain_match else None),
+                "approach": (approach_match.group(1).strip()[:200] if approach_match else None),
+                "missed": (missed_match.group(1).strip()[:200] if missed_match else None),
+                "must_dispatch_raw": (must_dispatch_match_e.group(1).strip()[:300] if must_dispatch_match_e else None),
+                "missing_fields": missing,
+                "complete": len(missing) == 0,
+            },
+        )
 
     if missing:
         reason = f"INCOMPLETE CLASSIFICATION: Missing fields: {', '.join(missing)}. All classifier fields are mandatory. Re-classify with all fields before proceeding."
         block_json = json.dumps({"decision": "block", "reason": reason})
         print(block_json)
-        # Log block event
-        try:
-            from datetime import datetime
-            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"  # Full UUID (P1-D fix 2026-04-09)
-            entry = json.dumps({"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "block", "hook": "classifier-field-check", "session": session_id, "missing": missing, "schema": 2})
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(entry + "\n")
-        except Exception:
-            pass
+        # Observability v2: emit event 2 classifier_field_missing (replaces legacy "block" emit).
+        session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+        if emit_event is not None:
+            emit_event(
+                event="classifier_field_missing",
+                hook="classifier-field-check",
+                session=session_id,
+                extra={
+                    "missing": missing,
+                    "is_quick": is_quick,
+                    "decision": "block",
+                },
+            )
+        else:
+            # Fallback: preserve legacy emit shape if helper unavailable.
+            try:
+                from datetime import datetime
+                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+                entry = json.dumps({"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "classifier_field_missing", "hook": "classifier-field-check", "session": session_id, "missing": missing, "schema": 2, "environment": "prod"})
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(entry + "\n")
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

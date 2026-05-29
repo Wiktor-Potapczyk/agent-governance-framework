@@ -103,6 +103,16 @@ def main():
     if payload.get("stop_hook_active"):
         return
 
+    # effort.level — Week-19 2026 hook-payload field. Telemetry only; recorded
+    # so the analytics layer can correlate effort tier with dispatch compliance,
+    # Quick-classification rate, and token usage. Absent on pre-Week-19 payloads.
+    effort = payload.get("effort")
+    effort_level = (
+        str(effort.get("level"))
+        if isinstance(effort, dict) and effort.get("level") is not None
+        else None
+    )
+
     transcript_path = payload.get("transcript_path")
     if not transcript_path or not os.path.exists(transcript_path):
         return
@@ -124,6 +134,7 @@ def main():
     last_implies = None
     agents_dispatched = []
     skills_invoked = []
+    wiki_queried = False  # W-V1 Phase 1 (2026-05-26): mcp__qmd__query tool_use detection
 
     for line in lines:
         line = line.strip()
@@ -192,6 +203,13 @@ def main():
                 elif name == "Skill":
                     skill = inp.get("skill") or "unknown"
                     skills_invoked.append(skill)
+                elif name.startswith("mcp__qmd__"):
+                    # W-V1 Phase 1 (2026-05-26): any qmd MCP tool call counts as a
+                    # wiki/memory consult. Includes query (hybrid search), get,
+                    # multi_get, status. Collection (agr-kb vs memory) is inside
+                    # inp["collection"] but we count both as "consulted retrieval";
+                    # downstream analysis can disaggregate.
+                    wiki_queried = True
 
     # Only log if we found a classification this turn
     if not last_type:
@@ -203,15 +221,19 @@ def main():
     log_entry = {
         "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "schema": 2,  # P1-E: schema version field (2026-04-09)
+        "event": "turn_summary",  # 2026-05-08 — schema consistency fix; was bare row producing dashboard `legacy_classification` fallback
+        "hook": "governance-log",
         "session": session_id,  # Full UUID (P1-D fix 2026-04-09)
         "type": last_type,
+        "effort_level": effort_level,  # Week-19 effort.level telemetry (P1-E+, 2026-05-22)
         "implies": last_implies,
         "domain": last_domain,
         "must_dispatch": last_must_dispatch,
-        "agents": agents_dispatched,
-        "skills": skills_invoked,
+        "agents": agents_dispatched,  # Agent tool invocations (subagent_type values from Agent calls this turn)
+        "skills": skills_invoked,    # Skill tool invocations (skill names from Skill calls this turn)
         "agent_count": len(agents_dispatched),
         "skill_count": len(skills_invoked),
+        "wiki_queried": wiki_queried,  # W-V1 Phase 1 (2026-05-26): qmd MCP consultation this turn
     }
 
     try:
