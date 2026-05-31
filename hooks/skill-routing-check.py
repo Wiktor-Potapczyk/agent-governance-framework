@@ -47,6 +47,14 @@ def main():
     except json.JSONDecodeError:
         return
 
+    try:
+        import os as _gho, sys as _ghs
+        _ghs.path.insert(0, _gho.path.dirname(_gho.path.abspath(__file__)))
+        from _governance_logger import log_fire
+        log_fire("skill-routing-check")
+    except Exception:
+        pass
+
     # Get the skill being invoked
     tool_input = payload.get("tool_input", {})
     if isinstance(tool_input, str):

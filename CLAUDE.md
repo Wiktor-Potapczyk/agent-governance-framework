@@ -228,11 +228,13 @@ Every wiki page (file tagged `#wiki`) MUST carry a `source:` frontmatter field �
 ```yaml
 source:
   - path: "Clippings/some-article.md"     # workspace-relative path to raw doc
-    type: clipping                          # clipping | work-artifact | daily-note | external | inbox-item
+    type: clipping                          # clipping | work-artifact | daily-note | external | inbox-item | generated
     anchor: "## Section Title"              # optional heading within source
     sha256: "a1b2c3d4..."                   # SHA-256 of source bytes at ingest time (crypto truth binding)
     ingested_at: "2026-05-10T20:30:00Z"
 ```
+
+**`type: generated` exemption:** sources whose `type` is `generated` (e.g., auto-generated registry files, script output dumps) are live data that changes on every regeneration. The `wiki-citation-check.py` hook verifies path existence for these entries but intentionally skips the SHA-256 truth gate — pinning a hash to a volatile generated file causes perpetual `SOURCE_DRIFT` false positives. Use `type: generated` only for sources that are regenerated programmatically, not for human-authored documents.
 
 ## Wiki Layer Invariants (OPTIONAL — pairs with Knowledge Base Wiki above)
 

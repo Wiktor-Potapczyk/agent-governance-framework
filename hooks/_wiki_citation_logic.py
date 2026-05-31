@@ -226,6 +226,13 @@ def validate_source_entries(
             has_blocking = True
             continue
 
+        # Auto-generated sources (script outputs, e.g. registry.json) are LIVE DATA,
+        # not immutable curated sources. SHA-pinning them yields perpetual false
+        # SOURCE_DRIFT on every regeneration. Path-existence is enforced above;
+        # the SHA truth-gate is intentionally skipped for type: generated.
+        if entry.get("type") == "generated":
+            continue
+
         committed_hash = entry.get("sha256", "")
         if committed_hash:
             try:

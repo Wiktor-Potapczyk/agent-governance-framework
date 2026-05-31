@@ -47,6 +47,8 @@ python -c "import hashlib; print(hashlib.sha256(open(r'PATH','rb').read()).hexdi
 
 Record this hash. It will be committed to the wiki page's `source:` field. This is the cryptographic commitment to "the source contained this exact byte stream when I wrote this claim."
 
+**Exception — `type: generated`:** if the source is an auto-generated file (a script output such as `registry.json`), set `type: generated` in the `source:` entry and OMIT the `sha256` field. SHA-pinning a regenerated file produces perpetual false `SOURCE_DRIFT` on every regeneration; all enforcement layers skip the SHA gate for `type: generated` sources while still verifying path existence. See CLAUDE.md `type: generated` exemption.
+
 ### Step 3 — Search wiki for related pages
 
 If qmd MCP server is loaded (check via tool listing for `qmd` server):
@@ -87,7 +89,7 @@ status: "#active"
 wiki_status: bootstrap   # all v1 pages start bootstrap; owner promotes to ratified
 source:
   - path: "Clippings/some-article.md"
-    type: clipping        # clipping | work-artifact | daily-note | external | inbox-item
+    type: clipping        # clipping | work-artifact | daily-note | external | inbox-item | generated
     anchor: "## Section Title"
     sha256: "<hash from Step 2>"
     ingested_at: "<ISO 8601 timestamp>"

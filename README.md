@@ -14,7 +14,7 @@ The framework operationalizes three research-backed principles: classify before 
 
 ## Architecture
 
-The framework operates across five layers, with 17 active enforcement hooks (plus one shared library and one deferred stub):
+The framework operates across five layers, with 28 active enforcement hooks (plus two shared libraries):
 
 | Layer | What it does | Hook events |
 |---|---|---|

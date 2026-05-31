@@ -94,6 +94,14 @@ def main():
     except Exception:
         return
 
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from _governance_logger import log_fire
+        log_fire("agent-registry-check",
+                 detail=payload.get("subagent_type", payload.get("agent_type", "")))
+    except Exception:
+        pass
+
     agent_type = payload.get("subagent_type", payload.get("agent_type", "")).lower()
     agent_id = payload.get("agent_id", "unknown")
 

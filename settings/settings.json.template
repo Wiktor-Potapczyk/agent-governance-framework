@@ -51,12 +51,30 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/session-start-log.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/session-start-orientation.py\""
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/user-prompt-submit.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/user-prompt-state-inject.py\""
           }
         ]
       }
@@ -167,6 +185,27 @@
           }
         ]
       },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/wiki-citation-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/inbox-auto-ingest.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/checkpoint.py\""
+          }
+        ]
+      },
     ],
     "SubagentStart": [
       {
@@ -182,6 +221,10 @@
           {
             "type": "command",
             "command": "python \"{{VAULT_ROOT}}/.claude/hooks/subagent-scope-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/bias-guard.py\""
           }
         ]
       }
@@ -234,6 +277,28 @@
           {
             "type": "command",
             "command": "python \"{{VAULT_ROOT}}/.claude/hooks/read-before-edit-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/epistemic-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/verifier-gate-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/task-plan-auto-sync.py\""
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/pre-compact.py\""
           }
         ]
       }

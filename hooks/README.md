@@ -1,6 +1,6 @@
 # Hook Registry
 
-This framework uses 17 active enforcement hooks across 6 event types, plus one shared library (`sidecar_loader.py`) imported by `dispatch-compliance-check.py`, plus one stub (`context-fill-log.py`) reserved for a deferred monitoring iteration (do not register — see file's module docstring). Four additional hook scripts (3 Python + 1 PowerShell) are disabled — see `disabled/README.md` for why.
+This framework uses 28 active enforcement hooks across 8 event types, plus two shared libraries (`sidecar_loader.py` and `_governance_logger.py`). The deferred stub `context-fill-log.py` has been moved to `_archived/hooks/` (it was never registered and its module docstring says "DO NOT REGISTER"). Four additional hook scripts (3 Python + 1 PowerShell) are disabled — see `disabled/README.md` for why.
 
 ## Active Hooks
 
@@ -23,6 +23,17 @@ This framework uses 17 active enforcement hooks across 6 event types, plus one s
 | epistemic-check.py | Stop | (all) | Sends Claude's response to Haiku for external evaluation of overconfidence. Adapted from the Trail of Bits anti-rationalization pattern. Blocks when the Haiku evaluator returns a block verdict | Yes |
 | session-start-log.py | SessionStart | (all) | Writes a `session_start` event to `governance-log.jsonl` so analytics scripts can detect session boundaries cleanly instead of inferring from first classification entry | No (logging only) |
 | work-verification-check.py | Stop | (all) | L1 exit gate — blocks QA/pentest reports filed with zero execution tool uses; also catches inline QA/PENTEST REPORT blocks filed without invoking the corresponding process skill | Yes |
+| epistemic-check.py | Stop | (all) | Sends Claude's response to Haiku for external evaluation of overconfidence. Adapted from the Trail of Bits anti-rationalization pattern. Blocks when the Haiku evaluator returns a block verdict | Yes |
+| verifier-gate-check.py | Stop | (all) | Enforces the contract of the `verification-gated-research` skill: if that skill was invoked, blocks completion until a separate verifier agent was dispatched | Yes |
+| task-plan-auto-sync.py | Stop | (all) | On Stop events with an OVERALL PASS QA REPORT, locates the matching open task_plan.md item and marks it `[x]` with a summary line | No (logging + edit) |
+| session-start-log.py | SessionStart | (all) | Writes a `session_start` event to `governance-log.jsonl` so analytics scripts can detect session boundaries cleanly | No (logging only) |
+| session-start-orientation.py | SessionStart | (all) | Reads the active project's STATE.md and open task_plan.md items; emits a plain-English orientation summary as additionalContext | No (additionalContext) |
+| wiki-citation-check.py | PostToolUse | Write\|Edit | M2 Layer 2 fabrication mitigation — validates that any Write to a wiki-layer file carries a valid `source:` field with SHA-256 hash matching the cited source file | No (advisory in v1) |
+| inbox-auto-ingest.py | PostToolUse | Write\|Edit | Auto-trigger for the Karpathy LLM-Wiki ingest operation — when a file is written or edited in `Inbox/`, emits additionalContext signaling that `process-ingest` should run | No (additionalContext) |
+| checkpoint.py | PostToolUse | (all) | Periodic save checkpoint reminder — fires when >30 minutes have elapsed since the last STATE.md save reminder | No (additionalContext) |
+| user-prompt-state-inject.py | UserPromptSubmit | (all) | Throttled re-orientation reminder for long-running sessions — re-injects active project STATE.md context when >30 min elapsed or STATE.md changed | No (additionalContext) |
+| bias-guard.py | SubagentStart | (all) | Injects the Blind Analysis Rule reminder into evaluator agents to prevent anchoring on delegating-session hypotheses | No (additionalContext) |
+| pre-compact.py | PreCompact | (all) | Comprehensive state save before compaction — writes a recovery file containing STATE.md content, open task plans, and recent transcript context | No (state save) |
 
 ## How Hooks Work
 

@@ -1,5 +1,68 @@
 # Changelog
 
+## 2026-05-31 — Governance self-logging instrument + type:generated source exemption + doc/template sync
+
+### `hooks/_governance_logger.py` — new shared helper (E1 silent-zero fix)
+
+`governance-log.py` (Stop hook) records Agent/Skill tool_use and turn classifications but is blind to hook firings — registered, actively-firing hooks showed 0 events in utilization audits ("silent-zero" finding). This module gives any hook a one-line way to append its own firing record to `hook-activity.jsonl`.
+
+Failure-tolerance: `log_fire` never raises. Instrumentation failure silently no-ops and never crashes the host hook.
+
+### `log_fire` wired into 5 hooks
+
+The adoption snippet (try/except around import + `log_fire("<hook-name>")`) inserted into:
+
+- `classifier-field-check.py` — after `stop_hook_active` guard
+- `dispatch-compliance-check.py` — after `stop_hook_active` guard
+- `work-verification-check.py` — after `stop_hook_active` guard
+- `skill-routing-check.py` — after payload parse, before tool_input read
+- `agent-registry-check.py` — after payload parse, before agent_type extract
+
+All 6 modified files pass `python -m py_compile`.
+
+### `type: generated` source exemption
+
+Auto-generated sources (script outputs such as `registry.json`) are live data that changes on every regeneration. SHA-pinning them causes perpetual false `SOURCE_DRIFT`. The exemption skips the SHA truth-gate for `source[]` entries where `type: generated` while still enforcing path existence.
+
+**Three surfaces updated:**
+
+- `hooks/_wiki_citation_logic.py` — `validate_source_entries` skips hash check when `entry.get("type") == "generated"`
+- `CLAUDE.md` — `type: generated` added to the `type:` enum in the wiki source-citation schema, with doctrine paragraph explaining the exemption
+- `skills/vault/process-ingest/SKILL.md` — Step 2 SHA computation adds "Exception — type: generated" note; `type` enum in the Step 5 frontmatter template extended
+- `skills/vault/process-lint/SKILL.md` — Pass A SHA hash check step adds skip note for `type: generated` entries
+
+### `context-fill-log.py` archived
+
+The file's own module docstring says "DO NOT REGISTER THIS HOOK" and it is a no-op stub. Moved to `_archived/hooks/context-fill-log.py` (new directory). References in CHANGELOG/architecture/hooks README are doc-only and preserved.
+
+### `settings/settings.json.template` — 11 new hook registrations
+
+Hooks that existed in `hooks/` but were missing from the template are now registered:
+
+| Hook | Event | Notes |
+|------|-------|-------|
+| `session-start-log.py` | SessionStart | Session boundary marker for analytics |
+| `session-start-orientation.py` | SessionStart | Active project STATE.md orientation |
+| `user-prompt-state-inject.py` | UserPromptSubmit | Throttled re-orientation on long sessions |
+| `wiki-citation-check.py` | PostToolUse Write\|Edit | M2 Layer 2 wiki citation validation |
+| `inbox-auto-ingest.py` | PostToolUse Write\|Edit | LLM-Wiki ingest auto-trigger on Inbox writes |
+| `checkpoint.py` | PostToolUse (all) | Periodic save checkpoint reminder |
+| `bias-guard.py` | SubagentStart | Blind Analysis Rule injection for evaluator agents |
+| `epistemic-check.py` | Stop | Haiku-evaluated overconfidence gate |
+| `verifier-gate-check.py` | Stop | verification-gated-research skill contract enforcement |
+| `task-plan-auto-sync.py` | Stop | QA PASS → task_plan.md auto-mark-done |
+| `pre-compact.py` | PreCompact | State save before compaction (new PreCompact section) |
+
+`weekly-usage.py` not registered — depends on the `claude_monitor` third-party package; opt-in for users who install that dependency.
+
+### Documentation sync
+
+- `README.md` — hook count updated from 17 to 28
+- `docs/architecture.md` — Component Counts table updated (28 active hooks, 2 shared libraries, stub moved to archived)
+- `hooks/README.md` — summary line updated (28 hooks, 8 event types), rows added for all 11 new hooks
+
+---
+
 ## 2026-05-12 — H-4 v1.3 polish + code-simplifier agent
 
 Ports two artifacts from the source workspace:

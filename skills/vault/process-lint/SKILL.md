@@ -46,7 +46,7 @@ For each entry in `source:` array:
 
 1. **File existence:** Check `source[].path` resolves to existing file. Missing → `ORPHAN_CITATION` (error).
 
-2. **SHA hash match (M2 Layer 3):** If `sha256` field present, recompute SHA of current file bytes. Compare to committed hash. Mismatch → `SOURCE_DRIFT` (warning — source has changed since ingest, but wiki page may still be valid for original content).
+2. **SHA hash match (M2 Layer 3):** If `sha256` field present, recompute SHA of current file bytes. Compare to committed hash. Mismatch → `SOURCE_DRIFT` (warning — source has changed since ingest, but wiki page may still be valid for original content). **Skip this check entirely when `source[].type` is `generated`** — auto-generated sources (script outputs like `registry.json`) intentionally omit or change `sha256`; SHA-pinning them causes perpetual false drift. Path-existence (step 1) still applies. See CLAUDE.md `type: generated` exemption.
 
 3. **Anchor heading check:** If `anchor` field present, Read the source file. Find the heading. Missing → `MISSING_ANCHOR` (warning).
 

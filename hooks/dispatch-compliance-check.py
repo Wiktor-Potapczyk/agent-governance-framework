@@ -110,6 +110,14 @@ def main():
     if payload.get("stop_hook_active"):
         return
 
+    try:
+        import os as _gho, sys as _ghs
+        _ghs.path.insert(0, _gho.path.dirname(_gho.path.abspath(__file__)))
+        from _governance_logger import log_fire
+        log_fire("dispatch-compliance-check")
+    except Exception:
+        pass
+
     transcript_path = payload.get("transcript_path")
     if not transcript_path or not os.path.exists(transcript_path):
         return

@@ -223,9 +223,9 @@ When Claude Code compacts a long session, the SessionStart hook can persist a sn
 
 | Component | Count | Location |
 |-----------|-------|----------|
-| Active enforcement hooks (default config) | 17 | `hooks/` |
-| Shared hook library | 1 (`sidecar_loader.py`) | `hooks/` |
-| Deferred stub | 1 (`context-fill-log.py`) | `hooks/` |
+| Active enforcement hooks (default config) | 28 | `hooks/` |
+| Shared hook libraries | 2 (`sidecar_loader.py`, `_governance_logger.py`) | `hooks/` |
+| Archived stub | 1 (`context-fill-log.py`) | `_archived/hooks/` |
 | Optional/disabled hook scripts | 4 (3 Python + 1 PowerShell) | `hooks/disabled/` |
 | Governance agents | 29 | `agents/governance/` |
 | Core skills | 12 | `skills/core/` |
