@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-01 — `type: schema-doctrine` source exemption + citation-parser fix
+
+Follow-up to the 2026-05-31 `type: generated` exemption. The SHA-256 citation binding (anti-fabrication) breaks not only for script-generated files but also for **hand-edited doctrine** files revised more than weekly (e.g. a governance constitution) — the pinned hash drifts on every edit. But unlike generated output, hand-edited doctrine is genuinely *mis-citable*, so a blanket SHA-skip would be an escape hatch. The resolution: a stricter exemption that drops the volatile whole-file hash but enforces cited-anchor existence.
+
+### `hooks/_wiki_citation_logic.py`
+
+- **New `type: schema-doctrine` handling in `validate_source_entries`:** skips the whole-file SHA drift-gate, but REQUIRES (a) `path` existence AND (b) the cited `anchor` heading to literally exist in the source file. Missing `anchor` field → `MISSING_ANCHOR` (blocking); anchor heading absent → `ORPHAN_ANCHOR` (blocking). Stricter than `type: generated` (path-only), because doctrine is mis-citable where deterministic script output is not. Anchor-existence is a cheap fabrication check that whole-file hashing never provided.
+- **`parse_source_field` two-bug fix (latent in both the hook and any lint reusing it):** (1) the source-block collector dropped list items sitting at **zero indent** (only items indented under `source:` were collected); (2) the entry parser could not read the YAML **inline-flow** form `- {path: X, type: Y, anchor: Z}` — only the block-list form. A page using inline-flow therefore parsed as sourceless → false `MISSING_SOURCE`. Both forms now parse; values containing colons (timestamps) survive.
+- Knowledge-base utility/catalog basenames (`README.md`, `tag-registry.md`, `dataview-queries.md`) added to `EXCLUDE_FILES` — navigational catalogs are not syntheses of raw docs, so a `source:` citation is meaningless for them (same class as `index.md`).
+
+### `hooks/test_wiki_citation_logic.py` — new test suite (46 tests)
+
+Added to the framework's hook test set (the citation logic was previously untested in-repo). Covers the inline-flow parser, block-list parity, and the full `type: schema-doctrine` matrix (existing anchor clean, stale-sha ignored, fabricated anchor → `ORPHAN_ANCHOR`, missing anchor → `MISSING_ANCHOR`, missing file → `ORPHAN_CITATION`).
+
+### Docs/template
+
+- `CLAUDE.md` — added `schema-doctrine` to the source `type` enum, a `type: schema-doctrine` exemption paragraph, and updated Wiki Layer Invariants #2/#3 (anchor enforcement + both source-form parsing + `ORPHAN_ANCHOR` finding).
+- `skills/vault/process-ingest/SKILL.md` + `skills/vault/process-lint/SKILL.md` — documented the `schema-doctrine` exception alongside `generated`.
+
 ## 2026-05-31 — Governance self-logging instrument + type:generated source exemption + doc/template sync
 
 ### `hooks/_governance_logger.py` — new shared helper (E1 silent-zero fix)

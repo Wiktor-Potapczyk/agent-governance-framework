@@ -49,6 +49,8 @@ Record this hash. It will be committed to the wiki page's `source:` field. This 
 
 **Exception — `type: generated`:** if the source is an auto-generated file (a script output such as `registry.json`), set `type: generated` in the `source:` entry and OMIT the `sha256` field. SHA-pinning a regenerated file produces perpetual false `SOURCE_DRIFT` on every regeneration; all enforcement layers skip the SHA gate for `type: generated` sources while still verifying path existence. See CLAUDE.md `type: generated` exemption.
 
+**Exception — `type: schema-doctrine`:** if the source is a *hand-edited doctrine* file revised more than ~weekly (e.g. a governance constitution), set `type: schema-doctrine`, OMIT `sha256`, and ALWAYS include `anchor` (the cited heading). The SHA gate is skipped (the file is too volatile to pin) but enforcement REQUIRES the `anchor` heading to exist in the source — stricter than `type: generated` because hand-edited doctrine is mis-citable. See CLAUDE.md `type: schema-doctrine` exemption.
+
 ### Step 3 — Search wiki for related pages
 
 If qmd MCP server is loaded (check via tool listing for `qmd` server):
@@ -89,7 +91,7 @@ status: "#active"
 wiki_status: bootstrap   # all v1 pages start bootstrap; owner promotes to ratified
 source:
   - path: "Clippings/some-article.md"
-    type: clipping        # clipping | work-artifact | daily-note | external | inbox-item | generated
+    type: clipping        # clipping | work-artifact | daily-note | external | inbox-item | generated | schema-doctrine
     anchor: "## Section Title"
     sha256: "<hash from Step 2>"
     ingested_at: "<ISO 8601 timestamp>"

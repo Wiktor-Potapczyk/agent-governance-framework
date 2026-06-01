@@ -27,6 +27,11 @@ WIKI_BY_TAG_PREFIXES = (
 EXCLUDE_FILES = frozenset({
     "index.md", "INDEX.md",
     "MEMORY.md", "STATE.md", "CLAUDE.md", "PROJECT.md",
+    # Knowledge-base utility / catalog pages: navigational catalogs / registries,
+    # NOT syntheses of raw docs, so a source: citation is meaningless for them —
+    # same class as index.md. Exempting by basename is consistent with the entries
+    # above (also bare-basename, global). Adjust this set to your own catalog pages.
+    "README.md", "tag-registry.md", "dataview-queries.md",
 })
 
 
@@ -121,8 +126,38 @@ def has_wiki_tag(content: str) -> bool:
     return False
 
 
+def _parse_flow_mapping(s: str) -> dict:
+    """Parse a YAML flow-mapping '{k: v, k: v}' into a dict.
+
+    Minimal parser: splits on top-level commas, then 'key: value' on the FIRST
+    colon (so timestamp values like '2026-05-10T21:42:04Z' survive). Strips one
+    layer of surrounding quotes from values. Does NOT handle commas inside
+    quoted values or nested braces — vault source entries never contain them.
+    """
+    inner = s.strip()
+    if inner.startswith("{"):
+        inner = inner[1:]
+    if inner.endswith("}"):
+        inner = inner[:-1]
+    result: dict = {}
+    for part in inner.split(","):
+        part = part.strip()
+        if not part or ":" not in part:
+            continue
+        key, val = part.split(":", 1)
+        key = key.strip()
+        val = val.strip().strip('"').strip("'")
+        if key:
+            result[key] = val
+    return result
+
+
 def parse_source_field(content: str) -> Optional[list[dict]]:
     """Extract source: array from frontmatter. Returns list of dicts or None.
+
+    Handles BOTH YAML list forms:
+    - Block-list:  `- path: X` then `  type: Y` on following indented lines
+    - Inline-flow: `- {path: X, type: Y, anchor: Z}`
 
     Returns None if frontmatter is malformed (no opening or closing ---).
     Returns [] if frontmatter exists but has no source: field.
@@ -149,6 +184,12 @@ def parse_source_field(content: str) -> Optional[list[dict]]:
             if indent is None and this_indent > 0:
                 indent = this_indent
             if this_indent == 0 and stripped:
+                # A zero-indent list item ('- ...') is still part of the source
+                # block (valid YAML: list items may sit at the parent's indent).
+                # Only a zero-indent NON-list line is the next top-level key.
+                if stripped.startswith("-"):
+                    source_lines.append(line)
+                    continue
                 in_source = False
                 continue
             source_lines.append(line)
@@ -164,12 +205,21 @@ def parse_source_field(content: str) -> Optional[list[dict]]:
         if m:
             if current:
                 entries.append(current)
-            current = {}
-            field_match = re.match(r"^(\w+)\s*:\s*(.+)$", m.group(1))
-            if field_match:
-                key = field_match.group(1).strip()
-                val = field_match.group(2).strip().strip('"').strip("'")
-                current[key] = val
+                current = {}
+            item = m.group(1).strip()
+            if item.startswith("{"):
+                # Inline-flow form: '- {path: X, type: Y, anchor: Z}'
+                entry = _parse_flow_mapping(item)
+                if entry:
+                    entries.append(entry)
+                current = {}
+            else:
+                current = {}
+                field_match = re.match(r"^(\w+)\s*:\s*(.+)$", item)
+                if field_match:
+                    key = field_match.group(1).strip()
+                    val = field_match.group(2).strip().strip('"').strip("'")
+                    current[key] = val
         else:
             field_match = re.match(r"^(\w+)\s*:\s*(.+)$", stripped)
             if field_match:
@@ -228,9 +278,56 @@ def validate_source_entries(
 
         # Auto-generated sources (script outputs, e.g. registry.json) are LIVE DATA,
         # not immutable curated sources. SHA-pinning them yields perpetual false
-        # SOURCE_DRIFT on every regeneration. Path-existence is enforced above;
-        # the SHA truth-gate is intentionally skipped for type: generated.
+        # SOURCE_DRIFT on every regeneration (ensemble decision 2026-05-30; see
+        # finding_volatile_files_unsuitable_as_source). Path-existence is enforced
+        # above; the SHA truth-gate is intentionally skipped for type: generated.
         if entry.get("type") == "generated":
+            continue
+
+        # Volatile hand-edited doctrine sources (e.g. CLAUDE.md, churn >1/wk —
+        # finding_volatile_files_unsuitable_as_source) cannot be SHA-pinned
+        # without perpetual false SOURCE_DRIFT, but UNLIKE deterministic script
+        # output they ARE mis-citable. So this is STRICTER than type: generated:
+        # skip the whole-file SHA gate, but REQUIRE the cited anchor heading to
+        # exist in the source — a cheap fabrication check whole-file hashing
+        # never provided. Semantic "still-supported" stays with process-lint
+        # Pass A noun-overlap (WEAK_CITATION). (2026-06-01 ensemble decision.)
+        if entry.get("type") == "schema-doctrine":
+            anchor = entry.get("anchor", "")
+            if not anchor:
+                findings.append({
+                    "code": "MISSING_ANCHOR",
+                    "severity": "error",
+                    "message": (
+                        f"source[{i}] type: schema-doctrine requires an "
+                        f"anchor field (the cited heading)"
+                    ),
+                })
+                has_blocking = True
+                continue
+            try:
+                text = full_path.read_text(encoding="utf-8", errors="replace")
+            except OSError as e:
+                findings.append({
+                    "code": "HASH_COMPUTE_FAIL",
+                    "severity": "warning",
+                    "message": f"source[{i}].path read failed: {e}",
+                })
+                continue
+            anchor_text = anchor.lstrip("#").strip()
+            heading_re = re.compile(
+                r"^#{1,6}\s+.*" + re.escape(anchor_text), re.MULTILINE
+            )
+            if not heading_re.search(text):
+                findings.append({
+                    "code": "ORPHAN_ANCHOR",
+                    "severity": "error",
+                    "message": (
+                        f"source[{i}].anchor '{anchor}' heading not found in "
+                        f"'{path_str}' — possible fabricated citation"
+                    ),
+                })
+                has_blocking = True
             continue
 
         committed_hash = entry.get("sha256", "")

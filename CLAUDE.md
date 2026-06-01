@@ -228,7 +228,7 @@ Every wiki page (file tagged `#wiki`) MUST carry a `source:` frontmatter field �
 ```yaml
 source:
   - path: "Clippings/some-article.md"     # workspace-relative path to raw doc
-    type: clipping                          # clipping | work-artifact | daily-note | external | inbox-item | generated
+    type: clipping                          # clipping | work-artifact | daily-note | external | inbox-item | generated | schema-doctrine
     anchor: "## Section Title"              # optional heading within source
     sha256: "a1b2c3d4..."                   # SHA-256 of source bytes at ingest time (crypto truth binding)
     ingested_at: "2026-05-10T20:30:00Z"
@@ -236,13 +236,15 @@ source:
 
 **`type: generated` exemption:** sources whose `type` is `generated` (e.g., auto-generated registry files, script output dumps) are live data that changes on every regeneration. The `wiki-citation-check.py` hook verifies path existence for these entries but intentionally skips the SHA-256 truth gate — pinning a hash to a volatile generated file causes perpetual `SOURCE_DRIFT` false positives. Use `type: generated` only for sources that are regenerated programmatically, not for human-authored documents.
 
+**`type: schema-doctrine` exemption:** sources whose `type` is `schema-doctrine` are *hand-edited doctrine* files (e.g. a constitution / governance doc that is revised frequently — more than once a week — but is authored, not script-generated). They cannot be SHA-pinned without perpetual false `SOURCE_DRIFT`, but UNLIKE generated output they ARE mis-citable, so the exemption is **stricter than `type: generated`**: the hook skips the whole-file SHA gate but REQUIRES both (a) the `path` to exist and (b) the cited `anchor` heading to literally exist in the source file. A missing `anchor` field → `MISSING_ANCHOR`; an anchor whose heading is absent → `ORPHAN_ANCHOR` (both blocking). Anchor-existence is a cheap fabrication check that whole-file hashing never actually provided; the semantic "does the section still support the claim" question stays with the periodic lint's noun-overlap check (`WEAK_CITATION`). Rationale: blanket SHA-exemption for a mis-citable doc is an escape hatch — anything could be relabeled to dodge the gate; anchor-existence closes that without re-introducing drift.
+
 ## Wiki Layer Invariants (OPTIONAL — pairs with Knowledge Base Wiki above)
 
 Three enforcement layers protect wiki integrity against LLM fabrication (a documented risk: LLMs can write plausible summaries with hallucinated citations). Each layer catches a different failure mode:
 
 1. **Skill-level hard gate (`process-ingest` Step-4):** skill computes SHA of raw source bytes via Read tool BEFORE writing wiki page; commits hash to `source:` field. If supporting text not found → halts with `CITATION_NOT_FOUND` rather than synthesizing.
-2. **Hook-level write check (`wiki-citation-check.py` PostToolUse Write):** on every Write to a `#wiki`-tagged file: verifies `source:` field present + non-empty + each `path` exists on disk + recomputes SHA and compares to committed `sha256`. Mismatch → blocks write with `SOURCE_DRIFT`.
-3. **Lint-level periodic check (`process-lint` Pass A):** periodic re-verification of all wiki pages: file existence + hash match + anchor heading + noun-overlap content match. Findings: `ORPHAN_CITATION`, `MISSING_ANCHOR`, `WEAK_CITATION`, `MISSING_SOURCE`, `SOURCE_DRIFT`.
+2. **Hook-level write check (`wiki-citation-check.py` PostToolUse Write):** on every Write to a `#wiki`-tagged file: verifies `source:` field present + non-empty + each `path` exists on disk + recomputes SHA and compares to committed `sha256`. Mismatch → blocks write with `SOURCE_DRIFT`. For `type: generated` the SHA gate is skipped (path-existence only); for `type: schema-doctrine` the SHA gate is skipped but the cited `anchor` heading must exist (`MISSING_ANCHOR` / `ORPHAN_ANCHOR`). Both block-list (`- path:` / `  type:`) and inline-flow (`- {path: X, type: Y}`) source forms are parsed.
+3. **Lint-level periodic check (`process-lint` Pass A):** periodic re-verification of all wiki pages: file existence + hash match + anchor heading + noun-overlap content match. Findings: `ORPHAN_CITATION`, `ORPHAN_ANCHOR`, `MISSING_ANCHOR`, `WEAK_CITATION`, `MISSING_SOURCE`, `SOURCE_DRIFT`.
 
 **Bootstrap mode (`wiki_status: bootstrap`):** new `#wiki` pages start as `bootstrap`. User reviews and promotes to `wiki_status: ratified`. When ≥10 ratified entries exist, `process-ingest` unlocks full LLM-authorship mode. Until then: each new wiki page is bootstrap-marked and surfaces for user review.
 

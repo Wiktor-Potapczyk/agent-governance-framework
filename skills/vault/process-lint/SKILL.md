@@ -46,9 +46,9 @@ For each entry in `source:` array:
 
 1. **File existence:** Check `source[].path` resolves to existing file. Missing → `ORPHAN_CITATION` (error).
 
-2. **SHA hash match (M2 Layer 3):** If `sha256` field present, recompute SHA of current file bytes. Compare to committed hash. Mismatch → `SOURCE_DRIFT` (warning — source has changed since ingest, but wiki page may still be valid for original content). **Skip this check entirely when `source[].type` is `generated`** — auto-generated sources (script outputs like `registry.json`) intentionally omit or change `sha256`; SHA-pinning them causes perpetual false drift. Path-existence (step 1) still applies. See CLAUDE.md `type: generated` exemption.
+2. **SHA hash match (M2 Layer 3):** If `sha256` field present, recompute SHA of current file bytes. Compare to committed hash. Mismatch → `SOURCE_DRIFT` (warning — source has changed since ingest, but wiki page may still be valid for original content). **Skip this check entirely when `source[].type` is `generated`** — auto-generated sources (script outputs like `registry.json`) intentionally omit or change `sha256`; SHA-pinning them causes perpetual false drift. Path-existence (step 1) still applies. See CLAUDE.md `type: generated` exemption. **Also skip for `source[].type` is `schema-doctrine`** (hand-edited volatile doctrine) — but for these the `anchor` heading is MANDATORY and its existence is enforced (step 3): missing field → `MISSING_ANCHOR`, heading absent → `ORPHAN_ANCHOR` (both blocking). See CLAUDE.md `type: schema-doctrine` exemption.
 
-3. **Anchor heading check:** If `anchor` field present, Read the source file. Find the heading. Missing → `MISSING_ANCHOR` (warning).
+3. **Anchor heading check:** If `anchor` field present, Read the source file. Find the heading. Absent → `MISSING_ANCHOR` (severity **warning**) for ordinary entries. For `type: schema-doctrine` the `anchor` is MANDATORY and enforcement is stricter (severity **error**, blocking): a missing `anchor` field → `MISSING_ANCHOR`; an `anchor` field whose heading is not found in the source → `ORPHAN_ANCHOR`.
 
 4. **Content overlap check:** Extract section text under anchor (or first 500 chars if no anchor). Compare to wiki page's first paragraph (the summary). Check ≥1 shared key noun (proper noun, lowercase 4+ char common noun). Match → `CITATION_VALID`. No match → `WEAK_CITATION` (warning — citation file exists but content doesn't visibly support claim).
 
@@ -110,7 +110,7 @@ findings_by_severity:
 
 Body sections:
 - `## Summary` — counts per finding code, KPI verdict, top 5 most-cited sources
-- `## Errors` — ORPHAN_CITATION, MISSING_SOURCE (ratified pages only), INDEX_GAP — table with file + finding + suggested fix
+- `## Errors` — ORPHAN_CITATION, ORPHAN_ANCHOR (schema-doctrine), MISSING_ANCHOR (schema-doctrine), MISSING_SOURCE (ratified pages only), INDEX_GAP — table with file + finding + suggested fix
 - `## Warnings` — SOURCE_DRIFT, MISSING_ANCHOR, WEAK_CITATION, INDEX_ORPHAN, MISSING_SOURCE (bootstrap), UNLOGGED_PAGE
 - `## Advisories` — STALE_PAGE
 - `## Findings by file` — alphabetical list with all findings per file
@@ -153,7 +153,7 @@ End with a short summary line + path to full report:
 LINT REPORT
 Total wiki pages: <count>
 citation_resolve_rate: <%>
-Errors: <count> (ORPHAN_CITATION, MISSING_SOURCE-ratified, INDEX_GAP)
+Errors: <count> (ORPHAN_CITATION, ORPHAN_ANCHOR, MISSING_ANCHOR-schema-doctrine, MISSING_SOURCE-ratified, INDEX_GAP)
 Warnings: <count>
 Advisories: <count>
 Report: <path>
