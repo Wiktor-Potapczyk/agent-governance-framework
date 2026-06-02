@@ -1,6 +1,6 @@
 # Hook Registry
 
-This framework uses 28 active enforcement hooks across 8 event types, plus two shared libraries (`sidecar_loader.py` and `_governance_logger.py`). The deferred stub `context-fill-log.py` has been moved to `_archived/hooks/` (it was never registered and its module docstring says "DO NOT REGISTER"). Four additional hook scripts (3 Python + 1 PowerShell) are disabled — see `disabled/README.md` for why.
+This framework uses 28 active enforcement hooks across 8 event types, plus four shared libraries (`sidecar_loader.py`, `_governance_logger.py`, `_wiki_citation_logic.py`, `_subagent_quality_logic.py`). Two further hooks ship **opt-in** — present but not registered in the default config: `prose-slop-check.py` and `registry-staleness-check.py` (listed at the foot of the table). The deferred stub `context-fill-log.py` has been moved to `_archived/hooks/` (it was never registered and its module docstring says "DO NOT REGISTER"). Four additional hook scripts (3 Python + 1 PowerShell) are disabled — see `disabled/README.md` for why.
 
 ## Active Hooks
 
@@ -11,7 +11,7 @@ This framework uses 28 active enforcement hooks across 8 event types, plus two s
 | bash-safety-guard.py | PreToolUse | Bash | Blocks dangerous shell commands (rm -rf, force-push, sudo, credential exposure patterns) | Yes |
 | skill-step-reminder.py | PostToolUse | Skill | After a process skill loads, injects mandatory step reminders so the model does not skip required steps | No |
 | subagent-governance.py | SubagentStart | (all) | Injects behavioral guidance into every spawned subagent: cite evidence, use multiple perspectives, apply blind analysis rule | No (additionalContext) |
-| subagent-quality-check.py | SubagentStop | (all) | L2 exit gate — checks subagent output for: empty response (<5 chars), error/refusal (<100 chars + refusal keywords), wall-of-text (>500 chars with no structure) | Yes (on failure) |
+| subagent-quality-check.py | SubagentStop | (all) | L2 exit gate — checks subagent output for: empty response (<5 chars); error/refusal (short + refusal keyword, **exempted when a result-signal token co-occurs** so a short negative finding passes); missing structure (long output with no list/heading markup **and** no `Label: value` lines or known REPORT header) | Yes (on failure) |
 | classifier-field-check.py | Stop | (all) | L1 exit gate — verifies all required classifier fields are present when task-classifier was invoked; self-logs blocks | Yes |
 | dispatch-compliance-check.py | Stop | (all) | Verifies that items declared in MUST DISPATCH were actually dispatched during the session; self-logs blocks | Yes |
 | governance-log.py | Stop | (all) | Logging only — writes JSONL governance record including IMPLIES text extracted from classifier output | No |
@@ -34,6 +34,8 @@ This framework uses 28 active enforcement hooks across 8 event types, plus two s
 | user-prompt-state-inject.py | UserPromptSubmit | (all) | Throttled re-orientation reminder for long-running sessions — re-injects active project STATE.md context when >30 min elapsed or STATE.md changed | No (additionalContext) |
 | bias-guard.py | SubagentStart | (all) | Injects the Blind Analysis Rule reminder into evaluator agents to prevent anchoring on delegating-session hypotheses | No (additionalContext) |
 | pre-compact.py | PreCompact | (all) | Comprehensive state save before compaction — writes a recovery file containing STATE.md content, open task plans, and recent transcript context | No (state save) |
+| prose-slop-check.py | PostToolUse | Write\|Edit | **Opt-in (not default-registered)** — flags LLM-slop vocabulary (delve, tapestry, multifaceted, furthermore, foster…) in generated prose; corpus-calibrated to 0 false-positives; scoped to prose, not code | No (warns only) |
+| registry-staleness-check.py | SessionStart | (all) | **Opt-in (not default-registered)** — warns when `registry.json` is older than a threshold, naming the regen command; silent when fresh | No (additionalContext) |
 
 ## How Hooks Work
 

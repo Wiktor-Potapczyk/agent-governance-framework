@@ -14,7 +14,7 @@ The framework operationalizes three research-backed principles: classify before 
 
 ## Architecture
 
-The framework operates across five layers, with 28 active enforcement hooks (plus two shared libraries):
+The framework operates across five layers, with 28 active enforcement hooks (plus four shared libraries):
 
 | Layer | What it does | Hook events |
 |---|---|---|
@@ -50,10 +50,12 @@ framework-repo/
 │   ├── work-verification-check.py   # Stop: blocks lazy QA and premature user escalation
 │   ├── epistemic-check.py           # Stop: Haiku-evaluated overconfidence/rationalization gate
 │   ├── session-start-log.py         # SessionStart: governance-log session-boundary marker
+│   ├── registry-staleness-check.py  # SessionStart: warns when the registry is stale (opt-in)
+│   ├── prose-slop-check.py          # PostToolUse: flags LLM-slop vocabulary in generated prose (opt-in)
 │   ├── sidecar_loader.py            # (library) post-compaction dispatch-contract loader
 │   └── disabled/                    # Optional/experimental hooks
 ├── skills/
-│   ├── core/                # 12 governance skills (task-classifier, process-*, verify, ensemble, pm, etc.)
+│   ├── core/                # 15 governance skills (task-classifier, process-*, db-migration-plan, process-postmortem, verify, ensemble, pm, etc.)
 │   ├── vault/               # 5 knowledge-management skills (save, inbox, standup, etc.)
 │   └── domain-examples/     # 19 domain skills across Apify and n8n
 ├── settings/
