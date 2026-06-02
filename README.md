@@ -56,7 +56,7 @@ framework-repo/
 │   └── disabled/                    # Optional/experimental hooks
 ├── skills/
 │   ├── core/                # 15 governance skills (task-classifier, process-*, db-migration-plan, process-postmortem, verify, ensemble, pm, etc.)
-│   ├── vault/               # 5 knowledge-management skills (save, inbox, standup, etc.)
+│   ├── vault/               # 7 knowledge-management skills (save, inbox, standup, process-ingest, process-lint, etc.)
 │   └── domain-examples/     # 19 domain skills across Apify and n8n
 ├── settings/
 │   ├── settings.json.example        # Global hook registration template

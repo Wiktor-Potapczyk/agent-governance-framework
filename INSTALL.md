@@ -49,7 +49,7 @@ mkdir -p /your/project/.claude/skills
 cp -r skills/core/* /your/project/.claude/skills/
 ```
 
-Core skills include: `task-classifier`, `process-research`, `process-analysis`, `process-build`, `process-planning`, `process-qa`, `process-pentest`, `verify`, `ensemble`, `architect-loop`, and `pm`.
+Core skills include: `task-classifier`, `process-research`, `process-analysis`, `process-build`, `process-planning`, `process-qa`, `process-pentest`, `process-postmortem`, `verify`, `verification-gated-research`, `ensemble`, `architect-loop`, `db-migration-plan`, `index`, and `pm`.
 
 ## 5. Configure Settings
 
@@ -157,8 +157,9 @@ The repository includes domain-specific agents and skills as worked examples. Th
 - Apify: 12 skills covering scraping, lead generation, market research, and more
 - n8n: 7 skills covering workflow patterns, node configuration, and code generation
 
-**Vault management skills** (5 total in `skills/vault/`):
+**Vault management skills** (7 total in `skills/vault/`):
 - `save`, `inbox`, `standup`, `daily`, `maintain` -- for knowledge-base management workflows
+- `process-ingest`, `process-lint` -- for the LLM-Wiki ingest and consistency-lint operations
 
 Copy any of these the same way as core skills:
 

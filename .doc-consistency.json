@@ -1,0 +1,73 @@
+{
+  "_comment": "doc-consistency manifest for the agent-governance-framework repo. Run: python <vault>/.claude/skills/doc-consistency/check_doc_consistency.py .doc-consistency.json . Skills live in directories, so skill counts glob '*/SKILL.md' (the checker counts files, not dirs). Counts that are not a clean file-glob (active enforcement hooks = default-config-registered subset; shared libraries where one doc spells the number as a word) are pinned as 'literal' to lock the digit-form assertions together; the word-form + named-file lists are reconciled semantically by the skill's Step 4. CHANGELOG historical entries are append-only records of past state and are intentionally NOT asserted here.",
+  "root": ".",
+  "checks": [
+    {
+      "id": "governance-agents-count",
+      "expect": { "count_files": { "dir": "agents/governance", "glob": "*.md" } },
+      "asserted_in": [
+        { "file": "docs/architecture.md", "pattern": "Governance agents \\| (\\d+)" },
+        { "file": "docs/architecture.md", "pattern": "(\\d+) governance agents across" },
+        { "file": "INSTALL.md", "pattern": "The (\\d+) governance agents cover" },
+        { "file": "README.md", "pattern": "(\\d+) specialist agents" }
+      ]
+    },
+    {
+      "id": "core-skills-count",
+      "expect": { "count_files": { "dir": "skills/core", "glob": "*/SKILL.md" } },
+      "asserted_in": [
+        { "file": "docs/architecture.md", "pattern": "Core skills \\| (\\d+)" },
+        { "file": "README.md", "pattern": "(\\d+) governance skills" }
+      ]
+    },
+    {
+      "id": "vault-skills-count",
+      "expect": { "count_files": { "dir": "skills/vault", "glob": "*/SKILL.md" } },
+      "asserted_in": [
+        { "file": "docs/architecture.md", "pattern": "Vault management skills \\| (\\d+)" },
+        { "file": "INSTALL.md", "pattern": "Vault management skills\\*\\* \\((\\d+) total" },
+        { "file": "README.md", "pattern": "(\\d+) knowledge-management skills" }
+      ]
+    },
+    {
+      "id": "apify-skills-count",
+      "expect": { "count_files": { "dir": "skills/domain-examples/apify", "glob": "*/SKILL.md" } },
+      "asserted_in": [
+        { "file": "docs/architecture.md", "pattern": "\\((\\d+) Apify" },
+        { "file": "INSTALL.md", "pattern": "Apify: (\\d+) skills" }
+      ]
+    },
+    {
+      "id": "n8n-skills-count",
+      "expect": { "count_files": { "dir": "skills/domain-examples/n8n", "glob": "*/SKILL.md" } },
+      "asserted_in": [
+        { "file": "docs/architecture.md", "pattern": "\\+ (\\d+) n8n\\)" },
+        { "file": "INSTALL.md", "pattern": "n8n: (\\d+) skills" }
+      ]
+    },
+    {
+      "id": "domain-skills-total",
+      "expect": { "count_files": { "dir": "skills/domain-examples", "glob": "*/*/SKILL.md" } },
+      "asserted_in": [
+        { "file": "docs/architecture.md", "pattern": "Domain example skills \\| (\\d+)" },
+        { "file": "README.md", "pattern": "(\\d+) domain skills" },
+        { "file": "INSTALL.md", "pattern": "\\((\\d+) total in `skills/domain-examples" }
+      ]
+    },
+    {
+      "id": "active-enforcement-hooks",
+      "expect": { "literal": "28" },
+      "asserted_in": [
+        { "file": "docs/architecture.md", "pattern": "Active enforcement hooks \\(default config\\) \\| (\\d+)" },
+        { "file": "hooks/README.md", "pattern": "uses (\\d+) active enforcement hooks" }
+      ]
+    },
+    {
+      "id": "shared-hook-libraries",
+      "expect": { "literal": "4" },
+      "asserted_in": [
+        { "file": "docs/architecture.md", "pattern": "Shared hook libraries \\| (\\d+)" }
+      ]
+    }
+  ]
+}
