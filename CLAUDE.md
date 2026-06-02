@@ -61,6 +61,8 @@ The next step being obvious is not a reason to skip this review.
 
 **Ralph Loop:** use `architect-loop` when a task requires isolation from anchored context, exhausting source materials independently, or comparing options with fresh perspective. Not every uncertainty needs a Ralph Loop — suggest it when the classifier Step 4 criteria apply.
 
+**Loop-tool selection:** native `/goal` is the DEFAULT for simple condition-gated loops ("work until tests pass / queue empty / status=success") — a fresh independent evaluator model (removes ralph-loop's self-anchoring), native `--resume` persistence, and spend tracking. `ralph-loop` is superseded for that pattern, but NOT for research-heavy or context-rot-sensitive loops: `/goal` accumulates full conversation context across turns, so for overnight investigation / multi-phase analysis / verification-gated builds, keep `architect-loop` + `verification-gated-research` (orchestrator → fresh-sub-agent delegation). Native dynamic workflows (`/workflows`) — reach for deterministic fan-out across many independent sub-agents in one script (decompose→parallel→synthesize, migrations, broad audits) where you want the conclusion, not the per-agent dumps; step-recall/resume survives compaction. Decision: condition-gated → `/goal`; context-rot-sensitive research → `architect-loop`/`verification-gated-research`; many-independent-units → `/workflows`; session-state maintenance → `/loop`.
+
 **Context discipline:** don't trash your own context with inline work. Delegate to specialist agents. Every complex task done inline is a bias risk.
 
 **Exhaust before asking.** Before escalating to the user — before ANY question that asks for help, permission, or a decision — verify you have tried:
@@ -121,6 +123,8 @@ QA is Popperian falsification. It proves absence of *found* bugs, not absence of
 **Tier 2 — Per-increment pentest** (`process-pentest`): When all increment tasks complete. Adversarial execution — actively try to break the integrated output. Produces PENTEST REPORT with findings + Untested Surface list. Main session executes tests directly (not a read-only agent).
 
 **Tier 3 — Per-milestone eval** (promptfoo or equivalent): Human-triggered. YAML assertion suites test prompts/components directly. Tier 2 findings inform which test cases to write.
+
+**Declarative-first for Build:** When a Build task has a checkable outcome, write the check *before* the implementation — the failing test/assertion is the spec. "Make X work" becomes "here is the test X must pass." Reduces the implement-then-rationalize bias the abandoned-TDD pattern documents.
 
 **Composition rule:** Tier N is prerequisite for Tier N+1. Missing Tier 1 on any task means the increment's pentest is incomplete.
 
@@ -197,6 +201,8 @@ When inspecting a workflow, execution, or codebase and spotting something that l
 - "Working as designed" is always a possibility — don't assume you know better
 
 This applies to: code, prompts, configs, files — anything.
+
+**Dead-code sub-rule:** Remove orphans *your own edit* created (an import you stopped using, a helper only the deleted code called). Do NOT delete pre-existing dead code you merely noticed — flag it in your report and let the user decide. Your edit's footprint is yours to clean; the codebase's history is not.
 
 ## Agent Rules
 

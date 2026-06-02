@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-06-02 — Enforcement boundary-test harness + C5 structural gate + slop linter + 2 skills
+
+A governance-hardening batch: closes the over-application root-cause workstream (BLOCK hooks blocking valid output) and the structural-gate family, plus two new process skills and a write-stage prose linter.
+
+### Hooks
+
+- **`hooks/prose-slop-check.py` (new) + `test_prose_slop_check.py`:** PostToolUse Write|Edit linter that flags LLM-slop vocabulary (delve / tapestry / multifaceted / furthermore / foster …) in generated prose. WARN-only (never blocks); calibrated against a corpus to 0 false-positives. Scoped to wiki/work prose, not code.
+- **`hooks/subagent-quality-check.py` (fix) + `hooks/_subagent_quality_logic.py` (extracted) + `test_subagent_quality_check.py`:** fixed two over-application bugs found by the boundary harness — CHECK 2 no longer blocks a short *negative finding* that contains a refusal keyword ("I cannot reproduce the bug; it works on main." is a result, not a refusal) when a result-signal token co-occurs; CHECK 3 now accepts `Label: value` report blocks and known REPORT headers (QA/PENTEST/PM CHECKPOINT) as a structure type, so an unfenced report from a sub-agent passes. Detection logic extracted to a shared, test-covered helper.
+- **`hooks/registry-staleness-check.py` (new):** SessionStart advisory — warns (non-blocking) when `registry.json` is older than a threshold, naming the regen command. Silent when fresh.
+
+### Scripts
+
+- **`scripts/structural_gates.py` (new) + `hooks/test_structural_gates_c5.py`:** the C1–C5 structural-gate family. C5 (new this batch) verifies every dispatch name in the compliance hooks resolves to a live registry agent/skill/alias/deprecation — guards the "agent silently dropped from the dispatch allow-list" regression class. WARN-class; FP-guarded against intentional phantoms.
+- **`scripts/run_boundary_tests.py` (new):** coverage reporter for the BLOCK-hook false-positive guards — every BLOCK-class hook must carry named `test_fp_*` guards proving it stays silent on valid-but-superficially-suspicious input. Reports 8/8 covered.
+- **`scripts/generate_registry.py` (new):** regenerates the agent/skill registry and now emits a plugins manifest (installed-plugin inventory + enabled-state) alongside agent/skill counts.
+
+### Skills
+
+- **`skills/core/db-migration-plan/` (new):** pre-migration planning skill — expand→migrate→contract sequencing, narrated index strategy, batched backfills, explicit rollback + point-of-no-return, verification checklist. Plans DDL; does not run it.
+- **`skills/core/process-postmortem/` (new):** post-failure root-cause skill — timeline → proven root cause → contributing factors → prevention items fed back into hooks/memory. Distinct from the pre-ship QA/pentest gates.
+
+### Docs/template
+
+- `CLAUDE.md` — added the **dead-code sub-rule** (clean only the orphans your own edit created), **declarative-first for Build** (write the check before the implementation), and a **loop-tool selection** block (`/goal` for condition-gated, `architect-loop`/`verification-gated-research` for context-rot-sensitive research, `/workflows` for many-independent-unit fan-out, `/loop` for session-state maintenance).
+
 ## 2026-06-01 — `type: schema-doctrine` source exemption + citation-parser fix
 
 Follow-up to the 2026-05-31 `type: generated` exemption. The SHA-256 citation binding (anti-fabrication) breaks not only for script-generated files but also for **hand-edited doctrine** files revised more than weekly (e.g. a governance constitution) — the pinned hash drifts on every edit. But unlike generated output, hand-edited doctrine is genuinely *mis-citable*, so a blanket SHA-skip would be an escape hatch. The resolution: a stricter exemption that drops the volatile whole-file hash but enforces cited-anchor existence.
