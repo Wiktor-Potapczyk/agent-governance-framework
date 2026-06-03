@@ -1,0 +1,31 @@
+{
+  "_comment": "Worked example for the doc-consistency skill, modelled on the agent-governance-framework (AGF) public repo. Place a real manifest as '.doc-consistency.json' at the repo root and run: python .claude/skills/doc-consistency/check_doc_consistency.py /path/to/.doc-consistency.json . 'root' is resolved relative to the manifest's own directory; set it to the repo root. Each check pins a cross-referenced value to an authoritative source ('expect') and lists every doc that asserts it ('asserted_in'). Each asserted_in 'pattern' is a Python regex with exactly ONE capture group = the value the doc claims. JSON has no comments, so this _comment key is simply ignored by the checker (it only reads 'root' and 'checks').",
+  "root": ".",
+  "checks": [
+    {
+      "id": "core-skills-count",
+      "expect": { "count_files": { "dir": "skills/core", "glob": "*" } },
+      "asserted_in": [
+        { "file": "README.md", "pattern": "(\\d+) core skills" },
+        { "file": "docs/architecture.md", "pattern": "Core skills\\s*\\|\\s*(\\d+)" },
+        { "file": "INSTALL.md", "pattern": "Core skills include[^.]*?\\((\\d+)" }
+      ]
+    },
+    {
+      "id": "shared-hook-libraries-count",
+      "expect": { "count_files": { "dir": "hooks", "glob": "_*.py" } },
+      "asserted_in": [
+        { "file": "README.md", "pattern": "(\\d+) shared (?:hook )?librar" },
+        { "file": "docs/architecture.md", "pattern": "Shared hook libraries\\s*\\|\\s*(\\d+)" }
+      ]
+    },
+    {
+      "id": "governance-agents-count",
+      "expect": { "count_files": { "dir": "agents/governance", "glob": "*.md" } },
+      "asserted_in": [
+        { "file": "README.md", "pattern": "(\\d+) governance agents" },
+        { "file": "INSTALL.md", "pattern": "The (\\d+) governance agents cover" }
+      ]
+    }
+  ]
+}
