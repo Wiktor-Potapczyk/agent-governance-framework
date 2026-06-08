@@ -49,7 +49,7 @@ mkdir -p /your/project/.claude/skills
 cp -r skills/core/* /your/project/.claude/skills/
 ```
 
-Core skills include: `task-classifier`, `process-research`, `process-analysis`, `process-build`, `process-planning`, `process-qa`, `process-pentest`, `process-postmortem`, `doc-consistency`, `verify`, `verification-gated-research`, `ensemble`, `architect-loop`, `db-migration-plan`, `index`, and `pm`.
+Core skills include: `task-classifier`, `process-research`, `process-analysis`, `process-build`, `process-planning`, `process-qa`, `process-pentest`, `process-postmortem`, `process-governance-mine`, `doc-consistency`, `verify`, `verification-gated-research`, `ensemble`, `architect-loop`, `db-migration-plan`, `index`, and `pm`.
 
 ## 5. Configure Settings
 

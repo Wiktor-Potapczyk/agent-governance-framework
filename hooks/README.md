@@ -1,6 +1,6 @@
 # Hook Registry
 
-This framework uses 28 active enforcement hooks across 8 event types, plus four shared libraries (`sidecar_loader.py`, `_governance_logger.py`, `_wiki_citation_logic.py`, `_subagent_quality_logic.py`). Two further hooks ship **opt-in** — present but not registered in the default config: `prose-slop-check.py` and `registry-staleness-check.py` (listed at the foot of the table). The deferred stub `context-fill-log.py` has been moved to `_archived/hooks/` (it was never registered and its module docstring says "DO NOT REGISTER"). Four additional hook scripts (3 Python + 1 PowerShell) are disabled — see `disabled/README.md` for why.
+This framework uses 28 active enforcement hooks across 8 event types, plus four shared libraries (`sidecar_loader.py`, `_governance_logger.py`, `_wiki_citation_logic.py`, `_subagent_quality_logic.py`). Two further hooks ship **opt-in** — present but not registered in the default config: `prose-slop-check.py` and `registry-staleness-check.py` (listed at the foot of the table). The deferred stub `context-fill-log.py` has been moved to `_archived/hooks/` (it was never registered and its module docstring says "DO NOT REGISTER"). Five additional hook scripts (4 Python + 1 PowerShell) live in `hooks/disabled/` — some disabled after an instructive failure, some shipping opt-in/unregistered (e.g. `routing-table-validation.py`) — see `disabled/README.md` for each.
 
 ## Active Hooks
 
@@ -36,6 +36,20 @@ This framework uses 28 active enforcement hooks across 8 event types, plus four 
 | pre-compact.py | PreCompact | (all) | Comprehensive state save before compaction — writes a recovery file containing STATE.md content, open task plans, and recent transcript context | No (state save) |
 | prose-slop-check.py | PostToolUse | Write\|Edit | **Opt-in (not default-registered)** — flags LLM-slop vocabulary (delve, tapestry, multifaceted, furthermore, foster…) in generated prose; corpus-calibrated to 0 false-positives; scoped to prose, not code | No (warns only) |
 | registry-staleness-check.py | SessionStart | (all) | **Opt-in (not default-registered)** — warns when `registry.json` is older than a threshold, naming the regen command; silent when fresh | No (additionalContext) |
+
+## Helper Scripts (not hooks)
+
+| Script | Purpose |
+|--------|---------|
+| `mine_governance.py` | Pure-stdlib governance-log failure miner — imported by the `process-governance-mine` skill. Scans `governance-log.jsonl` for recurring failure patterns keyed by (event_label, agent_type, hook, normalized_reason); returns flagged sig records sorted severity-high-first. Also runnable standalone via `python mine_governance.py`. Not a hook — never registered in settings. |
+
+## Opt-in / Unregistered Hooks
+
+These hooks ship in `hooks/disabled/` and are **not registered by default**. Copy to your active `hooks/` directory and add to `settings.json` / `settings.local.json` to arm.
+
+| Hook | Event | Purpose | Blocks? |
+|------|-------|---------|---------|
+| `routing-table-validation.py` | PreToolUse Edit\|Write\|MultiEdit | Denies edits to `CLAUDE.md` or any `SKILL.md` that introduce a broken dispatch-name reference — an agent name in a MUST DISPATCH line, `subagent_type:` field, or routing-table row that does not resolve in `registry.json`. Four-gate design: target-file check, dispatch-position detection, agent-name shape check, registry lookup. Fail-open on any parse error or unreadable registry. Add retired names to `DEPRECATED_ALLOWLIST` in the script to prevent false positives after renames. | Yes (on gate hit) |
 
 ## How Hooks Work
 

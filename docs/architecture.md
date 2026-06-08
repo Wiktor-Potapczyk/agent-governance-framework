@@ -226,8 +226,8 @@ When Claude Code compacts a long session, the SessionStart hook can persist a sn
 | Active enforcement hooks (default config) | 28 | `hooks/` |
 | Shared hook libraries | 4 (`sidecar_loader.py`, `_governance_logger.py`, `_wiki_citation_logic.py`, `_subagent_quality_logic.py`) | `hooks/` |
 | Archived stub | 1 (`context-fill-log.py`) | `_archived/hooks/` |
-| Optional/disabled hook scripts | 4 (3 Python + 1 PowerShell) | `hooks/disabled/` |
+| Optional/disabled hook scripts | 5 (4 Python + 1 PowerShell) | `hooks/disabled/` |
 | Governance agents | 29 | `agents/governance/` |
-| Core skills | 16 | `skills/core/` |
+| Core skills | 17 | `skills/core/` |
 | Vault management skills | 7 | `skills/vault/` |
 | Domain example skills | 19 | `skills/domain-examples/` (12 Apify + 7 n8n) |

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-06-08 — Governance-log miner skill + opt-in routing-table validation hook
+
+### Skills
+
+- **`skills/core/process-governance-mine/` (new):** Weekly retrospective skill that mines `governance-log.jsonl` for recurring failure patterns and emits a proposal artifact (`YYYY-MM-DD-governance-mine-proposals.md`). Proposal-only invariant: reads everything, writes exactly one content file. Complements `/hookify` (reactive, per-correction) with an aggregate view over a rolling 30-day window. High-severity gate C=3 (fabrication_detected, dark-zone with severity=high); normal gate C=10/D=3. Sig suppression via `miner-resolved.jsonl` ledger; regression detection automatic when a suppressed sig re-occurs above threshold. Core skill count: 16 → 17.
+
+### Hooks
+
+- **`hooks/mine_governance.py` (new helper) + `hooks/test_mine_governance.py` + `hooks/_test_fixtures/governance-log-sample.jsonl` + `hooks/_test_fixtures/miner-resolved-fixture.jsonl`:** Pure-stdlib miner implementation used by the `process-governance-mine` skill. Not an enforcement hook — never registered in settings. 39 tests covering recurrence gating, normalization, severity logic (D1 dark-zone per-record severity, D2 noise-event relabeling, D5 fraction-vs-path normalization), regression detection, suppression, and adversarial malformed-input robustness.
+- **`hooks/disabled/routing-table-validation.py` (new, opt-in) + `hooks/disabled/test_routing_table_validation.py`:** PreToolUse Edit|Write|MultiEdit hook that denies edits to `CLAUDE.md` or any `SKILL.md` introducing a broken dispatch-name reference. Four gates: (a) target-file class, (b) dispatch-position detection (MUST DISPATCH: lines, subagent_type: fields, routing-table rows), (c) agent-name shape, (d) registry lookup. Fail-open on any ambiguity. Ships **unregistered** in `hooks/disabled/` — copy to active hooks dir and register in settings to arm. `DEPRECATED_ALLOWLIST` is empty by default; add retired agent names there to prevent false positives after renames.
+
 ## 2026-06-02 — Enforcement boundary-test harness + C5 structural gate + slop linter + 2 skills
 
 A governance-hardening batch: closes the over-application root-cause workstream (BLOCK hooks blocking valid output) and the structural-gate family, plus two new process skills and a write-stage prose linter.

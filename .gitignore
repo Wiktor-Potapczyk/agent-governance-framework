@@ -12,3 +12,6 @@ __pycache__/
 hooks/governance-log.jsonl
 hooks/aggregates/
 hooks/_test_fixtures/
+
+# Runtime registry copy from test resolution — never publish vault inventory
+.claude/
