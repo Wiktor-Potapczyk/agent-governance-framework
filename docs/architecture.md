@@ -71,6 +71,8 @@ Forces task classification before any work begins. Every user message triggers c
 
 Routes classified tasks to typed process flows. Each process skill defines a step sequence that the model must follow.
 
+> **Direction — procedure-as-workflows (pilot, not yet adopted).** Layer 1 is currently *prose the model is asked to follow*, which inherits the same below-100% step-compliance every prose-instruction system has. The active architectural direction is to convert each process skill into a **deterministic workflow script** that makes the dispatch sequence happen *by construction* — routing-as-code, not execution-as-code (the script encodes which agents run, in what order, with what typed handoffs and gates; agents still reason freely inside each step). This collapses today's triplication (prose skill + machine-readable dispatch contract + enforcement hooks) into one executable source. The enabling capability has been empirically verified — a workflow's sub-agents have the full tool surface (shell, file-read, dynamic tool-loading, MCP) — and two worked conversion drafts exist (one routing-class, one execution-class). Adoption is gated on a human output-quality calibration baseline, because dispatch-by-construction makes "did we dispatch?" tautological and therefore useless as a success metric. Full write-up, the drafts, and the engine-proof finding live in the research repo (`procedure-layer-as-workflows`).
+
 **Hook chain:**
 
 | Hook | Event | Action | Type |

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-09 — Procedure-as-workflows direction documented in the architecture
+
+### Docs
+
+- **`docs/architecture.md` (Layer 1):** documented the active architectural direction to convert the procedure layer from prose-the-model-follows into **deterministic workflow scripts** (routing-as-code: the script encodes which agents run, in what order, with what typed handoffs and gates; agents reason freely inside steps). Notes the enabling capability — a workflow's sub-agents have the full tool surface (shell, file-read, dynamic tool-loading, MCP), empirically verified — and that two worked conversion drafts exist (one routing-class, one execution-class). Framed as **pilot/direction, not adopted**: adoption is gated on a human output-quality calibration baseline, because dispatch-by-construction makes "did we dispatch?" tautological and useless as a success metric. Full write-up + drafts live in the research repo (`procedure-layer-as-workflows`). No skill/hook/runtime change in this commit — documentation only.
+
 ## 2026-06-08 — Governance-log miner skill + opt-in routing-table validation hook
 
 ### Skills
