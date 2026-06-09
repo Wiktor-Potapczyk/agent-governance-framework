@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-09 — Documentation standard + setup inventory
+
+### Added
+
+- **`docs/documentation-standard.md` (new):** one followable documentation standard for the repository, derived from established industry frameworks (Diátaxis, arc42/C4, ADR/MADR, Keep a Changelog, standard-readme, docs-as-code) and adapted to a skill/hook/agent-heavy repo. Defines: Diátaxis mode-routing (§2), the per-artifact attributes-table reference schema that is the unit of Reference here since artifacts are configurable entities not functions (§3), the MADR decision-log with a single-authority rule that avoids competing "why" stores (§4), date-based changelog discipline (§5), the maintainability rules (§6), an honest enforcement picture — automated layers check consistency, completeness is the human Definition-of-Done gate (§7), and an add/change/remove/new-doc checklist (§8). Deliberately process doctrine, not a blocking hook.
+- **`docs/reference/setup-inventory.md` (new):** the reference catalogue of every artifact class — 29 governance + 2 domain-example + 2 top-level agents, 17 core + 7 vault + 19 domain-example skills, 40 production + 5 opt-in hooks — and how the repository is organized. Counts cite the `.doc-consistency.json` manifest as single source of truth.
+- **`README.md` Documentation section:** front-door links to the standard, the inventory, and the architecture, stating the "every functionality and every logical path" bar.
+
 ## 2026-06-09 — Procedure-as-workflows direction documented in the architecture
 
 ### Docs

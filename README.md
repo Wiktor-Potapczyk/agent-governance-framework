@@ -84,6 +84,16 @@ Core and vault skills follow a standardized 3-section format:
 
 The format makes skill-routing decisions auditable from the SKILL.md alone — a model can read the three sections and decide whether to invoke without loading the full skill body. New skills should follow this format; see any of the `skills/core/process-*/SKILL.md` files for examples.
 
+## Documentation
+
+This framework documents itself by a single, followable standard — derived from established industry practice (Diátaxis, ADR/MADR, Keep a Changelog, docs-as-code) and adapted to a repository whose artifacts are skills, hooks, and agent definitions rather than conventional code:
+
+- **[The Documentation Standard](docs/documentation-standard.md)** — Diátaxis mode-routing, the per-artifact attributes-table reference schema, the MADR decision-log single-authority rule, the maintainability rules, and the add/change/remove checklist that keeps the docs complete and current.
+- **[Setup Inventory](docs/reference/setup-inventory.md)** — the reference catalogue of every artifact class (agents, skills, hooks) and how the repository is organized.
+- **[Architecture](docs/architecture.md)** — the layer model and how the pieces fit.
+
+The standard's bar for "documented" is *every functionality and every logical path*, checked at publish time by the `doc-consistency` gate — not a surface mention.
+
 ## Research
 
 The theory behind this framework -- including the Exploration vs. Extraction prompting model, the Compound Task decomposition, the Popperian QA approach, and empirical compliance data -- is documented in the companion research repository:
