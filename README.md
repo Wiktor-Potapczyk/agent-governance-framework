@@ -89,6 +89,7 @@ This framework documents itself by a single, followable standard — derived fro
 
 - **[The Documentation Standard](docs/documentation-standard.md)** — Diátaxis mode-routing, the per-artifact attributes-table reference schema, the MADR decision-log single-authority rule, the maintainability rules, and the add/change/remove checklist that keeps the docs complete and current.
 - **[Setup Inventory](docs/reference/setup-inventory.md)** — the reference catalogue of every artifact class (agents, skills, hooks) and how the repository is organized.
+- **Per-artifact reference** — every artifact documented with the standard's attributes-table schema: **[Hooks Reference](docs/reference/hooks.md)** (event, matcher, action, inputs, side-effects, logical paths, failure mode — per hook), **[Agents Reference](docs/reference/agents.md)** (domain, tools, dispatch bindings, output contract — per agent), **[Skills Reference](docs/reference/skills.md)** (routing contract, dispatches, outputs, enforcing hook — per skill).
 - **[Architecture](docs/architecture.md)** — the layer model and how the pieces fit.
 
 The standard's bar for "documented" is *every functionality and every logical path*, checked at publish time by the `doc-consistency` gate — not a surface mention.

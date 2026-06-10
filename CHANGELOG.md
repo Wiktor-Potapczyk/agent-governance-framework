@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-10 — Per-artifact reference pages (hooks, agents, skills)
+
+### Added
+
+- **`docs/reference/hooks.md`:** every production hook documented with the standard's attributes-table schema — event, matcher, registration, action, inputs, side-effects, the per-branch logical-paths row (with `test_<hook>.py` cited as the authoritative branch set where one exists), and failure mode. 37 production hooks + the opt-in `disabled/` set.
+- **`docs/reference/agents.md`:** all 33 agent definitions documented — domain, tool surface, dispatch bindings (verified by searching the skills that route to each agent), model, input expectations, output contract, documented failure modes.
+- **`docs/reference/skills.md`:** 25 core/vault skills fully documented — routing contract (use-when / do-NOT-use-when), dispatch fan-out, outputs, and the enforcing hook (cited only where the hook's code actually covers that skill); 19 domain-example skills in a summary table.
+- **README + setup-inventory:** wired to the three new pages. This completes the documentation standard's §3 requirement: every artifact carries a uniform reference entry — "every functionality and every logical path," published.
+
+
 ## 2026-06-10 — Repo-wide flaw-audit fixes (settings template, hook docs, agent text artifacts)
 
 ### Fixed

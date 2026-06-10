@@ -1,6 +1,6 @@
 # Setup Inventory
 
-A reference catalogue of every artifact class in this framework — what is installed and how it is organized. This is a **Reference**-mode document (per the [Documentation Standard](../documentation-standard.md)). It is the zoomed-out map; per-artifact attributes tables live alongside their artifacts.
+A reference catalogue of every artifact class in this framework — what is installed and how it is organized. This is a **Reference**-mode document (per the [Documentation Standard](../documentation-standard.md)). It is the zoomed-out map; the per-artifact attributes tables live in [hooks.md](hooks.md), [agents.md](agents.md), and [skills.md](skills.md).
 
 > Counts here mirror the values pinned in `.doc-consistency.json` and asserted in `docs/architecture.md` / `README.md` / `INSTALL.md` — that manifest is the single source of truth; this page cites it, it does not re-derive it.
 
