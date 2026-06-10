@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-10 — Second verification pass: full reference coverage, 7 corrections
+
+### Fixed
+
+- **Second verification pass** over the previously-uncovered reference-page entries brings field-verification coverage to 100% (32/32 hooks, 32/32 agents, 25/25 skills). Seven corrections: `dark-zone-check.py` severity formula documented as `effective_citations = citations + files_written` (the "wikilinks" pattern claim removed — no such regex in code); `token-breakdown.py` `by_subagent` is a list, not a dict; `pre-compact.py` reads a 50KB tail, not 200KB; `user-prompt-submit.py` reads a 100KB tail, not 200KB (found by re-checking every tail-size claim, beyond the verifier's report); `epistemic-check.py` outputs row now includes its governance-log append on block verdicts; `competitive-analyst` handoff documents the research-analyst alternative. `skill-routing-check.py`'s 200KB claim was verified correct (READ_BYTES=204800) and deliberately left unchanged.
+
+
 ## 2026-06-10 — Reference-page verification pass: 8 corrections
 
 ### Fixed

@@ -397,7 +397,7 @@
 |---|---|
 | Domain | Apply competitive frameworks (SWOT, feature matrix, pricing grid, positioning map, Porter's Five Forces) to pre-gathered research data |
 | Tools | Read, Write, Edit, Grep, Glob, WebFetch, WebSearch |
-| Dispatched by | `task-classifier` (Competitive analysis domain row) — sequential handoff from research-orchestrator |
+| Dispatched by | `task-classifier` (Competitive analysis domain row) — sequential handoff from research-orchestrator or research-analyst |
 | Model | sonnet |
 | Inputs | Pre-gathered research data (researcher output, vault notes, briefing docs); analysis goal |
 | Output contract | Framework-applied analysis with confidence levels (High/Medium/Low); 3–5 ranked strategic recommendations; gap report if data insufficient; saved to `Projects/<name>/work/YYYY-MM-DD-competitive-analysis-<topic>.md` |

@@ -110,7 +110,7 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Matcher** | none |
 | **Registered in** | `settings/settings.json.template` |
 | **Action** | Reads transcript for token counts + model, builds a context bar and injects classifier enforcement reminder; escalates at ≥50% context utilization. |
-| **Inputs** | stdin JSON payload: `transcript_path`, `effort`. Reads transcript tail (200KB window) for token count and model fields. |
+| **Inputs** | stdin JSON payload: `transcript_path`, `effort`. Reads transcript tail (100KB window) for token count and model fields. |
 | **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `additionalContext` containing context bar (`CTX ▰▱▱ N% \| XK/YK \| model`) + classifier reminder text. At ≥50% adds `SAVE ENFORCEMENT` prefix. |
 | **Logical paths** | Skip if subagent invocation or trivial/low-effort prompt. Parse transcript tail → compute token ratio → build context bar → scan for depth signals (regex) → escalate classifier reminder if depth signals found → emit. No depth signals → standard reminder. Subagent/trivial → emit nothing. authoritative branch set: `test_user_prompt_submit.py` |
 | **Failure mode** | Fail-open: parse errors silently skipped; empty or no output on any exception. |
@@ -524,7 +524,7 @@ Note: `subagent-scope-check.py` also fires at SubagentStop — documented in the
 | **Action** | Monitors the ratio of agent dispatches to citation patterns in the response. Logs a dark-zone observability event with severity. Never blocks. |
 | **Inputs** | stdin JSON payload: `transcript_path`. Reads 200KB transcript tail. |
 | **Outputs / Side-effects** | Appends one dark-zone event record to governance-log.jsonl. No stdout. |
-| **Logical paths** | Count Agent dispatches in last turn. Count citation patterns (wikilinks, source references) in response text. Count file writes. Compute severity: ≥1 agent dispatch + zero citations → `high`. Citation ratio < 0.5 → `medium`. Adequate citations → `low`. Write dark-zone event with severity, counts. |
+| **Logical paths** | Count Agent dispatches in last turn. Count citation patterns (source references) in response text. Count file writes. Compute `effective_citations = citations + files_written`; severity: ≥1 agent dispatch + zero effective citations → `high`. Citation ratio < 0.5 → `medium`. Adequate citations → `low`. Write dark-zone event with severity, counts. |
 | **Failure mode** | Fail-open: all exceptions swallowed; never blocks. |
 | **Rationale** | Provides a signal for turns where agents were dispatched but the response cites no evidence — a pattern associated with fabricated inventory claims documented in `feedback_main_session_can_fabricate_inventory.md`. |
 
@@ -555,7 +555,7 @@ Note: `subagent-scope-check.py` also fires at SubagentStop — documented in the
 | **Registered in** | `settings/settings.json.template` |
 | **Action** | Aggregates token usage for the turn (main session + per-subagent) and emits a `token_breakdown` event. Telemetry only — never blocks. |
 | **Inputs** | stdin JSON payload: `transcript_path`. Reads transcript tail for `message.usage` fields and `toolUseResult.usage` fields (subagent). |
-| **Outputs / Side-effects** | Emits `token_breakdown` event via `_event_emit` helper. Fields: `turn_total_tokens`, `main_session`, `by_subagent` (dict), `tool_calls`, `skill_names`, `task_type`. No stdout to CC. |
+| **Outputs / Side-effects** | Emits `token_breakdown` event via `_event_emit` helper. Fields: `turn_total_tokens`, `main_session`, `by_subagent` (list — one entry per Agent tool call), `tool_calls`, `skill_names`, `task_type`. No stdout to CC. |
 | **Logical paths** | Parse transcript → find last assistant turn → sum input/output tokens from `message.usage` → iterate tool_result blocks for subagent usage (`toolUseResult.usage`) → all-zero total → skip emit. Non-zero → emit event. Transcript read error → skip. |
 | **Failure mode** | Fail-open: all exceptions swallowed; never blocks; silently skips if all-zero. |
 | **Rationale** | Provides per-turn token accounting for cost attribution and the cost-summary dashboard, including per-subagent breakdown that the CC UI does not expose. |
@@ -587,7 +587,7 @@ Note: `subagent-scope-check.py` also fires at SubagentStop — documented in the
 | **Registered in** | `settings/settings.json.template` |
 | **Action** | Spawns a `claude -p --model haiku` subprocess to evaluate the last response for overconfidence. Blocks if Haiku returns `{"decision": "block"}`. |
 | **Inputs** | stdin JSON payload: `transcript_path`, `stop_hook_active`. Reads last assistant message from transcript. |
-| **Outputs / Side-effects** | On Haiku block verdict: stdout `{"decision": "block", "reason": "..."}`. On pass or timeout: nothing. |
+| **Outputs / Side-effects** | On Haiku block verdict: stdout `{"decision": "block", "reason": "..."}`. On pass or timeout: nothing.; appends the block verdict as an event to `governance-log.jsonl` |
 | **Logical paths** | `stop_hook_active=True` → return. Extract last assistant message from transcript. Build evaluation prompt → spawn `claude -p --model haiku` subprocess with 15s timeout. Parse stdout → `{"decision": "block"}` → emit block. Any other response → pass. Timeout → fail-open (pass). Subprocess error → fail-open (pass). Parse error → fail-open (pass). |
 | **Failure mode** | Fail-open: all subprocess errors, timeouts, and parse failures → exit 0 without blocking. |
 | **Rationale** | Provides an external evaluator gate for epistemic honesty using a fresh model context. Note: the disabled/ version of this hook was found to never block in practice (see `hooks/disabled/README.md`); the registered version preserves the circuit but its real-world block rate is low. |
@@ -636,7 +636,7 @@ Note: `subagent-scope-check.py` also fires at SubagentStop — documented in the
 | **Matcher** | none |
 | **Registered in** | `settings/settings.json.template` |
 | **Action** | Before context compaction, writes a recovery snapshot file containing: STATE.md contents from all projects, active task_plan.md items, last 3 user messages, last classification, recently modified files. Resets checkpoint timer. |
-| **Inputs** | stdin JSON payload (PreCompact fields). Reads transcript tail (200KB). Reads all `Projects/*/STATE.md` and `Projects/*/task_plan.md` files. |
+| **Inputs** | stdin JSON payload (PreCompact fields). Reads transcript tail (50KB). Reads all `Projects/*/STATE.md` and `Projects/*/task_plan.md` files. |
 | **Outputs / Side-effects** | Writes `{{HOME}}/.claude/pre-compact-recovery.md`. Resets `{{HOME}}/.claude/last-checkpoint` to epoch. **Produces no stdout** — PreCompact does not accept `additionalContext`. |
 | **Logical paths** | Parse payload → read transcript tail → extract last 3 user messages → extract last classification block → list recently modified files → read all STATE.md files → extract In Progress / Shaped task_plan sections (cap) → write recovery file. Any individual read error → skip that section, continue. |
 | **Failure mode** | Fail-open: individual file read errors skipped; write failure logged to stderr; exit 0 always. |
