@@ -110,7 +110,7 @@ Controls how specialist agents are spawned, what context they receive, and what 
 | `subagent-quality-check.py` | SubagentStop | Blocks if agent output is empty, errored, or unstructured | Soft block |
 | `dispatch-compliance-check.py` | Stop | Verifies every item in MUST DISPATCH was actually invoked via Skill or Agent tool | Hard block |
 
-**Agent roster:** 29 governance agents across 5 categories: Core (blueprint-mode, debugger, architect-review, etc.), AI/Prompts (llm-architect, prompt-engineer), Research Team (orchestrator, analyst, technical-researcher, synthesizer, report-generator), Specialized (MCP, PostgreSQL, PowerShell, security), and Productivity (vault-keeper, content-marketer, competitive-analyst, workflow-orchestrator).
+**Agent roster:** 29 governance agents across 5 categories: Core (blueprint-mode, debugger, architect-reviewer, etc.), AI/Prompts (llm-architect, prompt-engineer), Research Team (orchestrator, analyst, technical-researcher, synthesizer, report-generator), Specialized (MCP, PostgreSQL, PowerShell, security), and Productivity (vault-keeper, content-marketer, competitive-analyst, workflow-orchestrator).
 
 **Blind Analysis Rule:** When dispatching agents for evaluation, the delegation message contains ONLY what to examine and criteria -- no hypotheses, no expected outcomes, no prior conclusions. This prevents anchoring bias. Exceptions: blueprint-mode (needs specs), implementation-plan (needs requirements), content-marketer (needs briefs), adversarial-reviewer (needs what to challenge).
 

@@ -56,9 +56,9 @@ For architecture-level planning, also consider delegating to **llm-architect** (
 
 ## Step 4 — Review (MANDATORY)
 
-**You MUST dispatch architect-review.** Skipping review is a process violation caught by the Stop hook.
+**You MUST dispatch architect-reviewer.** Skipping review is a process violation caught by the Stop hook.
 
-Delegate to the **architect-review** agent.
+Delegate to the **architect-reviewer** agent.
 
 Include in the prompt:
 - The plan from Step 3

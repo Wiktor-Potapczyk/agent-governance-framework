@@ -2,6 +2,10 @@
 
 ## 2026-06-10 — Per-artifact reference pages (hooks, agents, skills)
 
+### Fixed
+
+- **Ghost agent name `architect-review`:** `process-build/SKILL.md`, `process-planning/SKILL.md`, and the `docs/architecture.md` roster referenced `architect-review`, but the agent's frontmatter (the name dispatch resolves against) is `architect-reviewer`. All five occurrences corrected — surfaced while generating the agents reference page.
+
 ### Added
 
 - **`docs/reference/hooks.md`:** every production hook documented with the standard's attributes-table schema — event, matcher, registration, action, inputs, side-effects, the per-branch logical-paths row (with `test_<hook>.py` cited as the authoritative branch set where one exists), and failure mode. 37 production hooks + the opt-in `disabled/` set.
