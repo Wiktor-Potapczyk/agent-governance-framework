@@ -10,7 +10,7 @@ A reference catalogue of every artifact class in this framework — what is inst
 |---|---|---|
 | Governance agents | 29 | `agents/governance/` |
 | Domain-example agents | 2 | `agents/domain-examples/` |
-| Top-level agents | 2 | `agents/` (`code-simplifier`, `pm-orchestrator`) |
+| Top-level agents | 1 | `agents/` (`code-simplifier`) |
 | Core skills | 17 | `skills/core/` |
 | Vault-management skills | 7 | `skills/vault/` |
 | Domain-example skills | 19 | `skills/domain-examples/` (apify, n8n) |

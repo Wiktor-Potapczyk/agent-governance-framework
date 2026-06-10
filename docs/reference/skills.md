@@ -38,7 +38,6 @@ A skill is a Markdown procedure loaded by Claude Code's skill loader (walks `ski
 | `save` | utility | Checkpoint session state to STATE.md, PROJECT.md, task_plan.md, and memory |
 | `standup` | utility | Quick bullet-point summary of in-progress, blocked, and next items |
 | **Top-level** | | |
-| `save` (top-level) | utility | Identical contract to vault/save; the top-level copy is the canonical install target |
 
 ---
 

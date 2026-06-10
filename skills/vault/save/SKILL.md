@@ -69,7 +69,7 @@ Check if `Projects/[Name]/task_plan.md` exists.
 
 Review the conversation for reusable knowledge: API quirks, tool gotchas, architectural decisions, user preferences, project context that future sessions need.
 
-**Memory path:** `.claude/projects/<project-slug>/memory/`
+**Memory path:** The memory directory path from MEMORY.md (typically `.claude/projects/<vault-project-id>/memory/`)
 
 For each piece of knowledge worth persisting:
 
@@ -81,19 +81,57 @@ For each piece of knowledge worth persisting:
 ---
 name: <memory name>
 description: <one-line description — be specific, this is used for relevance matching>
-type: <user|feedback|project|reference>
+type: <user|feedback|project|reference|finding|hypothesis|decision>
+confidence: <high|medium|low>
+last_verified: <YYYY-MM-DD>
+expires: <YYYY-MM-DD or null>
 ---
 
 <memory content>
 ```
 
-4. Update `MEMORY.md` at the same memory path. Keep it concise — one line per memory file with description.
+**Type selection:**
+- `user` — role, goals, preferences, knowledge
+- `feedback` — user corrections or confirmed approaches (never expires)
+- `project` — ongoing work context (expires when project archives)
+- `reference` — API quirks, tool behaviors, external facts (expires: 90 days for bugs/behaviors, 60 days for IDs/URLs)
+- `finding` — empirically confirmed result (upgraded from hypothesis or observed directly)
+- `hypothesis` — proposed but unverified claim (always `confidence: low` until tested)
+- `decision` — architectural or process choice with rationale
+
+**Confidence rubric:**
+- `high` — confirmed across 2+ sessions, or empirically tested (hook ran, code executed, API returned expected result)
+- `medium` — observed once with reasonable certainty, or from a single authoritative source. **Default for new memories.**
+- `low` — inferred, hypothesized, or from indirect evidence. Single data point.
+
+**Expiry rules:**
+- `feedback`, `user`: `null` (never expires)
+- `reference` (bugs/behaviors): 90 days from `last_verified`
+- `reference` (IDs/URLs): 60 days from `last_verified`
+- `project` (active): `null`; (archived project): archive immediately
+- `finding`: `null` (empirically confirmed)
+- `hypothesis`: 30 days (must be tested or archived)
+- `decision`: `null` (decisions are permanent until explicitly reversed)
+
+4. **Append to `memory-log.jsonl`** at the same memory path. One JSON line per action:
+
+```json
+{"ts": "2026-04-12T14:30:00", "action": "created", "file": "reference_foo.md", "reason": "Discovered during Awards build", "confidence": "medium"}
+```
+
+Valid actions: `created`, `updated`, `archived`, `verified`, `confidence_changed`, `rejected`, `corrected`.
+
+- `rejected` — a memory proved wrong. Record what was wrong and why.
+- `corrected` — a memory was updated to fix an error. Record what changed.
+- `verified` — content was confirmed still accurate (resets `last_verified` date).
+
+5. Update `MEMORY.md` at the same memory path. Keep it concise — one line per memory file with description.
 
 Skip this step if nothing reusable was learned this session.
 
 ## Rules
 
-- **Use built-in Read/Write/Edit tools** for all file operations.
+- **Use built-in Read/Write/Edit tools** for all file operations. They work on the OneDrive path.
 - **One topic per memory file** — keep memories focused and independently useful.
 - **Never overwrite memory without reading first** — always read existing content and merge.
 - **Don't duplicate** — check existing memories before creating new ones.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-10 — Dedupe: pm-orchestrator agent + save skill single-sourced
+
+### Fixed
+
+- **Duplicate `pm-orchestrator` agent definitions** (`agents/governance/pm-orchestrator.md` + `agents/pm-orchestrator.md`) with diverged checkpoint protocols. The top-level copy carried the current protocol (mandatory Re-Ranked Next-3-Tickets block); the manifest-pinned governance copy was stale. Current content moved into `agents/governance/` (the counted location); top-level duplicate removed. Governance agent count unchanged (29).
+- **Duplicate `save` skill** (`skills/save/` + `skills/vault/save/`) with diverged memory schemas. The top-level copy carried the current expanded schema (type/confidence/last_verified/expires); moved into `skills/vault/save/` (the counted location); top-level duplicate removed. Vault skill count unchanged (7).
+- **Reference pages + setup inventory** updated to match (32 agents total, 1 top-level; single save entry).
+
+
 ## 2026-06-10 — Per-artifact reference pages (hooks, agents, skills)
 
 ### Fixed

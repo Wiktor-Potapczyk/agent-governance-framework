@@ -4,7 +4,7 @@
 
 **Mode:** Reference (Diátaxis). This page describes *what each agent IS* — fields, contracts, known failures. For *why* agents are shaped this way, see `docs/concepts/` and `docs/adr/`. For *how to use* them end-to-end, see the skill reference pages.
 
-**Coverage:** 33 agents total — 29 from `agents/governance/`, 2 from `agents/domain-examples/n8n/`, 2 top-level (`agents/code-simplifier.md`, `agents/pm-orchestrator.md`).
+**Coverage:** 32 agents total — 29 from `agents/governance/`, 2 from `agents/domain-examples/n8n/`, 1 top-level (`agents/code-simplifier.md`).
 
 ---
 
@@ -40,8 +40,7 @@
 | content-marketer | Specialized | Write external-audience marketing copy from provided source material |
 | vault-keeper | Specialized | Obsidian vault organization: inbox triage, daily notes, health checks |
 | workflow-orchestrator | Specialized | Design n8n automation orchestration blueprints (design only, no JSON) |
-| pm-orchestrator (governance/) | Productivity/PM | Project lifecycle management: phase detection, checkpoints, viability gates |
-| pm-orchestrator (top-level) | Productivity/PM | Extended pm-orchestrator with re-ranked next-3-tickets checkpoint block |
+| pm-orchestrator | Productivity/PM | Project lifecycle management: phase detection, checkpoints with mandatory re-ranked next-3-tickets, viability gates |
 | code-simplifier | Productivity/PM | Mechanical hygiene cleanup on recently modified n8n JSON, Python hooks, Markdown skills |
 | n8n-workflow-architect | Domain examples | Phase 1 n8n design: blueprint + guidelines compliance matrix |
 | n8n-workflow-builder | Domain examples | Phase 2 n8n implementation: execute blueprint via Spiral pattern + autonomous QA loop |
@@ -450,31 +449,17 @@
 
 ## Productivity / PM
 
-### pm-orchestrator (governance/)
+### pm-orchestrator
 
 | Field | Value |
 |---|---|
-| Domain | Project lifecycle management for solo operators: phase detection, checkpoint protocols, viability gates, kill criteria, artifact ownership |
+| Domain | Project lifecycle management for solo operators: phase detection, checkpoint protocols (5 questions + mandatory re-rank), viability gates, kill criteria, artifact ownership |
 | Tools | all tools (no restriction declared in frontmatter) |
 | Dispatched by | `pm` skill (mandatory dispatch via Agent tool, SKILL.md binding) |
 | Model | sonnet |
 | Inputs | Project name (or asks if ambiguous); reads PROJECT.md, STATE.md, task_plan.md directly |
-| Output contract | Phase report (current phase, active tasks, blockers, next action); Checkpoint Protocol output (Q1–Q5 all answered from live files); artifact updates to PROJECT.md, STATE.md, task_plan.md; escalations when kill criteria met |
-| Known failure modes | Agent body documents: must Read files, not answer from memory; Reference Library rule: must Read PM research file before answering PM concept questions — path is user-defined, not included in this distribution |
-
----
-
-### pm-orchestrator (top-level, agents/pm-orchestrator.md)
-
-| Field | Value |
-|---|---|
-| Domain | Extended pm-orchestrator adding mandatory Re-Ranked Next-3-Tickets block to every checkpoint |
-| Tools | all tools (no restriction declared in frontmatter) |
-| Dispatched by | `pm` skill (mandatory dispatch via Agent tool, SKILL.md binding) |
-| Model | sonnet |
-| Inputs | Same as governance/pm-orchestrator |
-| Output contract | Same as governance/pm-orchestrator PLUS mandatory Re-Ranked Next-3-Tickets block after Q1–Q5: top 3 tickets with one-line justifications; promotions/demotions since last checkpoint. A checkpoint without this block is explicitly documented as incomplete |
-| Known failure modes | Same as governance/pm-orchestrator; additionally: "no reason" justification for ranking is invalid; fewer than 3 Shaped items — list all remaining |
+| Output contract | Phase report (current phase, active tasks, blockers, next action); Checkpoint Protocol output (Q1–Q5 all answered from live files) PLUS the mandatory Re-Ranked Next-3-Tickets block (top 3 tickets with one-line justifications; promotions/demotions since last checkpoint — a checkpoint without this block is incomplete); artifact updates to PROJECT.md, STATE.md, task_plan.md; escalations when kill criteria met |
+| Known failure modes | Agent body documents: must Read files, not answer from memory; "no reason" ranking justification is invalid; fewer than 3 open items — list all remaining |
 
 ---
 
