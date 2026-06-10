@@ -168,7 +168,7 @@ A skill is a Markdown procedure loaded by Claude Code's skill loader (walks `ski
 | Field | Value |
 |---|---|
 | Type | process |
-| Frontmatter | `name: process-governance-mine`; trigger: user says `/process-governance-mine`, "run governance mine", weekly cadence reminder from `lint-cadence-trigger.py` |
+| Frontmatter | `name: process-governance-mine`; trigger: user says `/process-governance-mine`, "run governance mine", weekly cadence reminder from the maintainer's SessionStart cadence hook (not shipped in this repo) |
 | Use-when | Weekly retrospective sweep of governance-log.jsonl; after a high-incident period; before a harness-architecture review |
 | Do-NOT-use-when | Fixing a hook or CLAUDE.md directly (proposals only — fixes go through `/hookify` or a separate Build task); log file is empty; investigating a single incident (use `process-qa`); validating wiki structure (use `process-lint`) |
 | Dispatches | None — calls `mine_governance.py` helper directly |
@@ -189,7 +189,7 @@ A skill is a Markdown procedure loaded by Claude Code's skill loader (walks `ski
 | Dispatches | None — executes tests directly using Bash, Read, Write, MCP tools |
 | Steps | Define PENTEST SCOPE → identify attack surface → execute tests per category (boundary / adversarial / regression / failure modes / integration) each with state→execute→raw-output→judge sequence → write PENTEST REPORT with Untested Surface → act on findings. Full procedure: [`skills/core/process-pentest/SKILL.md`](../../skills/core/process-pentest/SKILL.md) |
 | Outputs | PENTEST REPORT block (findings table, Untested Surface, Recommendation: SHIP / FIX-THEN-SHIP / ESCALATE, PASS/FAIL) |
-| Enforced by | `work-verification-check.py` (Stop hook — blocks if a PENTEST REPORT is written without execution tool calls in the transcript; blocks if pentest is skipped after increment completion) |
+| Enforced by | `work-verification-check.py` (Stop hook — blocks a PENTEST REPORT filed with zero execution tool calls) + `process-step-check.py` (Stop hook — tracks `pentest_seen`; hard-blocks increment completion paths that require the pentest report) |
 
 ---
 
@@ -365,13 +365,13 @@ A skill is a Markdown procedure loaded by Claude Code's skill loader (walks `ski
 | Field | Value |
 |---|---|
 | Type | process |
-| Frontmatter | `name: process-lint`; trigger: user says `/process-lint`, "run lint", "check wiki health"; weekly cadence reminder from `lint-cadence-trigger.py` |
+| Frontmatter | `name: process-lint`; trigger: user says `/process-lint`, "run lint", "check wiki health"; weekly cadence reminder from the maintainer's SessionStart cadence hook (not shipped in this repo) |
 | Use-when | Periodic wiki-layer health check; after bulk ingest (10+ pages); before promoting bootstrap entries to ratified |
 | Do-NOT-use-when | Wiki has zero pages; verifying a single specific claim (`process-qa`); intending to fix problems (lint is read-only) |
 | Dispatches | None — reads all wiki pages inline |
 | Steps | Inventory all `#wiki`-tagged files → Pass A (citation validation: file existence + SHA match + anchor + content overlap) → Pass B (orphan wiki pages: missing `source:`) → Pass C (index completeness: `Resources/KB/index.md` gaps) → Pass D (log continuity: `log.md` unlogged pages) → Pass E (stale pages: hash change + old `updated` date) → write lint report to `work/` → append LINT log.md entry. Full procedure: [`skills/vault/process-lint/SKILL.md`](../../skills/vault/process-lint/SKILL.md) |
 | Outputs | LINT REPORT block (total pages, citation_resolve_rate, error/warning/advisory counts, report path, log entry); dated `.md` lint report in `Projects/[Name]/work/` |
-| Enforced by | process discipline (no dedicated hook; `lint-cadence-trigger.py` SessionStart hook emits a reminder when last lint > 7 days) |
+| Enforced by | process discipline (no dedicated hook; the maintainer's SessionStart cadence hook — not shipped in this repo — emits a reminder when last lint > 7 days) |
 
 ---
 

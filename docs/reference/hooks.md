@@ -177,7 +177,7 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Registered in** | `settings/settings.json.template` |
 | **Action** | Advisory warning (not block) when dispatched agent is not in the MUST DISPATCH list extracted from the transcript. |
 | **Inputs** | stdin JSON payload: `tool_input` (agent description/type), `transcript_path`. Reads 200KB transcript tail. |
-| **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `additionalContext` warning text (advisory only, never `{"decision": "block"}`). Logs event to governance-log.jsonl. |
+| **Outputs / Side-effects** | stderr: advisory warning text (warn-downgrade — surfaced, never a block JSON). Logs event to governance-log.jsonl. |
 | **Logical paths** | Agent type in `ALWAYS_ALLOW` (general-purpose, explore, plan, bash) → allow silently. Transcript has no MUST DISPATCH block → allow. MUST DISPATCH block present → extract declared agent names via `extract_dispatch_names()` → expand aliases via `SKILL_AGENT_ALIASES` → dispatched agent in expanded set → allow + log exemption. process-* routing skill present in transcript → dispatched agent in registry → allow + log exemption. Otherwise → emit advisory warning to additionalContext + log event. authoritative branch set: `test_agent_dispatch_check.py` |
 | **Failure mode** | Fail-open: parse errors, missing transcript → allow silently. |
 | **Rationale** | Creates a soft signal when agents are dispatched outside declared MUST DISPATCH scope, supporting compliance measurement without blocking legitimate adaptive dispatches. |
@@ -193,7 +193,7 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Registered in** | `settings/settings.json.template` |
 | **Action** | Soft-warns (never blocks) when a memory file being written has a description field with Jaccard similarity ≥ 0.65 to an existing file in the same memory directory. |
 | **Inputs** | stdin JSON payload: `tool_input.file_path`, `tool_input.content`. |
-| **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `additionalContext` advisory (only on duplicate detection). No file writes. |
+| **Outputs / Side-effects** | stdout: flat `{"additionalContext": …}` advisory JSON (no `hookSpecificOutput` wrapper; only on duplicate detection). No file writes. |
 | **Logical paths** | Target path is not under `.claude/projects/*/memory/` → skip silently. Target is MEMORY.md (the index) → skip. No `description:` field in incoming content → skip. Extract `description:` token set → iterate existing `.md` files in memory dir → compute Jaccard against each file's `description:` tokens → any score ≥ 0.65 → emit advisory with matching file name. No match → silent. |
 | **Failure mode** | Fail-open: all I/O errors caught; emits nothing and continues. |
 | **Rationale** | Reduces memory folder bloat by surfacing near-duplicate facts before they are written, without blocking legitimate closely-related entries. |
@@ -508,7 +508,7 @@ Note: `subagent-scope-check.py` also fires at SubagentStop — documented in the
 | **Action** | Hard-blocks on missing process-skill structural requirements (SCOPE block, QA REPORT, PENTEST REPORT, PM checkpoint); soft-logs on advisory gaps (missing synthesis, missing architect-review, zero agent dispatches). |
 | **Inputs** | stdin JSON payload: `transcript_path`, `stop_hook_active`. Reads 200KB transcript tail. |
 | **Outputs / Side-effects** | On hard violation: stdout `{"decision": "block", "reason": "..."}`. Soft violations: logged to governance-log.jsonl (no stdout). |
-| **Logical paths** | `stop_hook_active=True` → return. Check: process skill invoked but no SCOPE block → hard block. process-qa invoked but no QA REPORT/PASS → hard block. process-pentest invoked but no PENTEST REPORT → hard block. PM invoked but pm-orchestrator not dispatched (rubber-stamp guard, B2 fix) → hard block. Increment complete but no /pm checkpoint → hard block. Missing synthesis (soft) → log. Missing architect-review (soft) → log. Zero agent dispatches (soft) → log. authoritative branch set: `test_process_step_check.py` |
+| **Logical paths** | `stop_hook_active=True` → return. Check: process skill invoked but no SCOPE block → hard block. process-qa invoked but no QA REPORT/PASS → hard block. process-pentest invoked but no PENTEST REPORT → hard block. PM invoked but pm-orchestrator not dispatched (rubber-stamp guard, B2 fix) → hard block. Increment complete (keyed on `pentest_seen` = a PENTEST REPORT in transcript) but no /pm checkpoint → hard block. Missing synthesis (soft) → log. Missing architect-review (soft) → log. Zero agent dispatches (soft) → log. authoritative branch set: `test_process_step_check.py` |
 | **Failure mode** | Fail-open: parse errors → exit without blocking. |
 | **Rationale** | Enforces process-skill structural completeness at turn-end, catching abbreviated skill execution (e.g. invoking /process-qa but not producing a report) before it registers as a completed step. |
 
@@ -654,5 +654,5 @@ These files ship in `hooks/disabled/` or are present in `hooks/` but explicitly 
 | `disabled/agent-dispatch-check.py` | `hooks/disabled/` | Disabled after failure — allowlist model blocked legitimate ad-hoc dispatches; ceilings punish adaptation | PreToolUse (Agent) version that blocked (not warned) dispatches not in a pre-approved allowlist |
 | `disabled/delegation-check.ps1` | `hooks/disabled/` | Disabled after failure — same rationale as agent-dispatch-check.py; PowerShell form | PowerShell PreToolUse hook that blocked undeclared agent dispatches |
 | `disabled/routing-table-validation.py` | `hooks/disabled/` | Opt-in by design — correct and tested (26 tests); ships unregistered because arming a blocking hook on CLAUDE.md + SKILL.md is a deliberate decision requiring a complete registry | PreToolUse (Edit\|Write\|MultiEdit) hook that denies edits introducing broken agent-name references in CLAUDE.md or any SKILL.md |
-| `disabled/weekly-usage.py` | `hooks/disabled/` | Opt-in — standalone script, not a hook; requires `claude_monitor` package | CLI utility printing weekly token usage grouped by model and day since last Friday 8PM |
+| `weekly-usage.py` | `hooks/` AND `hooks/disabled/` (duplicate copies) | Standalone CLI utility, not a hook -- never registered; requires `claude_monitor` package; duplicate-file state flagged for consolidation | CLI utility printing weekly token usage grouped by model and day since last Friday 8PM |
 | `prose-slop-check.py` | `hooks/` (dormant) | Opt-in — built and calibrated (0 false positives on a 19-page prose corpus); ships unregistered until the maintainer arms it | PostToolUse (Write) hook that warns on LLM-register slop vocabulary in `Resources/KB/` and `Projects/*/work/` prose |

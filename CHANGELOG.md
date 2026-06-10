@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-10 — Reference-page verification pass: 8 corrections
+
+### Fixed
+
+- **Deep verification of the generated reference pages** (60–84% entry coverage per page, every field checked against the artifact source) surfaced 8 wrong fields, all corrected: `agent-dispatch-check.py` advisory goes to stderr (not an additionalContext payload); `memory-dedup-check.py` emits a flat additionalContext JSON (no hookSpecificOutput wrapper); `adversarial-reviewer` dispatch bindings corrected (not bound in process-build; process-analysis is an allowed-specialist, not mandatory); `process-pentest` enforcement split across the two hooks that actually carry it (work-verification-check for evidence-less reports, process-step-check for the pentest_seen increment gate); the process-step-check logical-paths row now states the increment-completion branch keys on pentest_seen; three citations of a SessionStart cadence hook that does not ship in this repo annotated as maintainer-side; the `weekly-usage.py` CLI utility's duplicate-file state (present in both `hooks/` and `hooks/disabled/`) documented and flagged for consolidation.
+
+
 ## 2026-06-10 — Audit close-out: template README hook census, event list, count clarifications
 
 ### Fixed

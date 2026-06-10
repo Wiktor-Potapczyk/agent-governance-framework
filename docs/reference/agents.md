@@ -55,7 +55,7 @@
 |---|---|
 | Domain | Structured adversarial challenge: finds flaws in decisions, plans, designs, and recommendations |
 | Tools | Read, Grep, Glob |
-| Dispatched by | `process-planning` (mandatory for high-stakes plans); `process-analysis` (optional lens); `process-build` (DISPATCHES.json advisory); `task-classifier` (every plan gets adversarial challenge) — all mandatory per skill docs |
+| Dispatched by | `process-planning` (mandatory — DISPATCHES.json required binding); `process-analysis` (allowed specialist, optional lens); `task-classifier` (every Planning task gets adversarial challenge) |
 | Model | sonnet |
 | Inputs | The artifact under challenge; evaluation criteria (optional — defaults to internal rubric) |
 | Output contract | `## Adversarial Review` block with `### Findings` (each tagged CRITICAL/WARNING/GAP/NOTE with category and "why it matters") and `### Verdict` (one sentence + confidence 0.0–1.0) |
