@@ -153,7 +153,7 @@ The automated layers verify *consistency* of what exists; they do NOT verify *co
 | Layer | Checks | Does NOT check |
 |---|---|---|
 | **doc-consistency checker** (`.doc-consistency.json` manifest) | pinned counts match reality, no stale paths/names, cross-doc facts agree; exit 0 before push | whether a required reference entry / logical-paths row / ADR was actually *written* |
-| **INDEX link-integrity** | every internal `](path)` resolves on disk | whether the linked doc is complete |
+| **INDEX link-integrity** | every internal Markdown link target resolves on disk | whether the linked doc is complete |
 | **markdownlint** (candidate, not yet wired) | heading hierarchy, list consistency | semantics |
 | **documentation Definition-of-Done** (human-process) | artifacts land, README checked, every functionality+path documented, fast-forward | only as reliable as the operator running it — this is the completeness gate, NOT machine-enforced |
 

@@ -42,6 +42,10 @@ jobs:
               if '/.git/' in md: continue
               with open(md, encoding='utf-8') as fh:
                   txt = fh.read()
+              # strip fenced code blocks + inline code spans so literal
+              # `](path)` examples in docs are not parsed as real links
+              txt = re.sub(r'```.*?```', '', txt, flags=re.S)
+              txt = re.sub(r'`[^`\n]*`', '', txt)
               base = os.path.dirname(md)
               for link in re.findall(r'\]\((?!https?://|#|mailto:)([^)]+?)\)', txt):
                   target = link.split('#')[0].strip()
