@@ -53,7 +53,7 @@ A minimal allow-list of structural permissions. Extend with project-specific Web
 | Event | Count | Hooks |
 |---|---|---|
 | `UserPromptSubmit` | 1 | `user-prompt-submit.py` — CTX bar injection + classifier enforcement |
-| `PreToolUse` | 5 | `skill-routing-check.py` (Skill matcher), `bash-safety-guard.py` (Bash matcher), `agent-dispatch-check.py` (Agent matcher), `memory-dedup-check.py` (Write matcher), `check_forbidden_tokens.py` (Write\|Edit matcher) |
+| `PreToolUse` | 4 | `skill-routing-check.py` (Skill matcher), `bash-safety-guard.py` (Bash matcher), `agent-dispatch-check.py` (Agent matcher), `memory-dedup-check.py` (Write matcher) |
 | `PostToolUse` | 2 | `skill-step-reminder.py` (Skill matcher), `memory-schema-check.py` (Write\|Edit matcher) |
 | `SubagentStart` | 2 | `subagent-governance.py`, `agent-registry-check.py` |
 | `SubagentStop` | 1 | `subagent-quality-check.py` |

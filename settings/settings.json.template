@@ -117,15 +117,6 @@
         ]
       },
       {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"{{VAULT_ROOT}}/.claude/scripts/check_forbidden_tokens.py\""
-          }
-        ]
-      },
-      {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {
@@ -146,7 +137,7 @@
             "command": "python \"{{VAULT_ROOT}}/.claude/hooks/mcp-circuit-breaker.py\""
           }
         ]
-      },
+      }
     ],
     "PostToolUse": [
       {
@@ -205,7 +196,7 @@
             "command": "python \"{{VAULT_ROOT}}/.claude/hooks/checkpoint.py\""
           }
         ]
-      },
+      }
     ],
     "SubagentStart": [
       {

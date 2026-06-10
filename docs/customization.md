@@ -49,10 +49,12 @@ Skill content here. This is injected when the skill is invoked.
 
 ## Hooks
 
-All hooks read JSON from stdin and write JSON to stdout. The framework uses three response patterns:
+All hooks read JSON from stdin and write JSON to stdout. The framework uses three response patterns — **the block format is event-specific; using the wrong one makes the hook a silent no-op** (Claude Code ignores the unrecognized field and allows the action):
 
 1. **Allow** (default): exit with no output or exit code 0
-2. **Block**: output `{"decision": "block", "reason": "..."}`
+2. **Block — depends on the event:**
+   - `PreToolUse`: output `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "..."}}` (see `hooks/bash-safety-guard.py` for a live example). The legacy `{"decision": "block"}` form does NOT block PreToolUse.
+   - `Stop` / `SubagentStop`: output `{"decision": "block", "reason": "..."}`
 3. **Inject context**: output `{"hookSpecificOutput": {"additionalContext": "..."}}`
 
 **To add a new hook:**

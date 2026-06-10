@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-10 — Repo-wide flaw-audit fixes (settings template, hook docs, agent text artifacts)
+
+### Fixed
+
+- **`settings/settings.json.template`:** was invalid JSON (trailing commas) and wired a `check_forbidden_tokens.py` hook whose script deliberately does not ship in this repo (it is the maintainer's local NDA gate — a forbidden-token list cannot live in a public repo). Trailing commas removed; the ghost hook entry de-wired. The template now passes `json.loads`. Companion `settings.json.template.README.md` hook-census row corrected (PreToolUse 5 → 4).
+- **`docs/customization.md`:** taught a single block format for all hooks; the block format is event-specific, and the documented form silently fails on `PreToolUse`. Now documents both forms (`permissionDecision: deny` for PreToolUse; `decision: block` for Stop/SubagentStop) with a pointer to a live example.
+- **26 of 29 governance agent files:** a literal `u{2014}` escape artifact (copy-paste propagation in the anti-sycophancy section) replaced with the intended em-dash.
+- **`hooks/README.md`:** duplicate Active Hooks rows removed (one hook listed twice in two table sections).
+- **`README.md`:** layer-count contradiction fixed — prose said four layers, the table listed five rows; the two rows covering the same architectural layer (tool safety + quality enforcement, one layer in `docs/architecture.md`) merged. README and architecture now agree: four layers.
+
 ## 2026-06-09 — Documentation standard + setup inventory
 
 ### Added

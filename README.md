@@ -14,15 +14,14 @@ The framework operationalizes three research-backed principles: classify before 
 
 ## Architecture
 
-The framework operates across five layers, with 28 active enforcement hooks (plus four shared libraries):
+The framework operates across four layers, with 28 active enforcement hooks (plus four shared libraries):
 
 | Layer | What it does | Hook events |
 |---|---|---|
 | **Classifier** | Forces task classification on every non-trivial prompt; enforces all required fields (IMPLIES, TASK TYPE, APPROACH, MISSED); enforces PM in MUST DISPATCH for every non-Quick task | `UserPromptSubmit`, `Stop` (classifier-field-check) |
 | **Process Skills** | Routes tasks to typed process flows (research, analysis, build, QA, planning); validates skill selection matches classifier output | `PreToolUse` (skill-routing-check), `PostToolUse` (skill-step-reminder) |
 | **Agent Delegation** | Enforces MUST DISPATCH items from the classifier; injects behavioral governance into every subagent at spawn; quality-checks subagent output on exit | `SubagentStart`, `SubagentStop`, `Stop` (dispatch-compliance-check) |
-| **Quality Enforcement** | Blocks QA/pentest reports filed with zero execution tools; blocks premature escalation to user with fewer than 3 tool uses; monitors zero-work non-Quick tasks | `Stop` (work-verification-check) |
-| **Tool Safety** | Blocks dangerous Bash commands (rm -rf, force-push, credential exposure); monitors for unsupported citation patterns and dark-zone reasoning failures | `PreToolUse` (bash-safety-guard), `Stop` (dark-zone-check, process-step-check, governance-log) |
+| **Tool Safety & Quality Enforcement** | Blocks dangerous Bash commands (rm -rf, force-push, credential exposure); blocks QA/pentest reports filed with zero execution tools; blocks premature escalation with fewer than 3 tool uses; monitors unsupported citations and dark-zone reasoning failures | `PreToolUse` (bash-safety-guard), `Stop` (work-verification-check, dark-zone-check, process-step-check, governance-log) |
 
 All hooks are stateless Python scripts that read from stdin and write to stdout. They require no database, no server, and no persistent process.
 
