@@ -48,18 +48,18 @@ Hook commands invoke `python3`. On Windows, install Python 3.10+ and ensure `pyt
 
 A minimal allow-list of structural permissions. Extend with project-specific WebFetch domains and Bash patterns as needed.
 
-### Hooks — 16 hooks across 7 events
+### Hooks — 35 hooks across 8 events
 
 | Event | Count | Hooks |
 |---|---|---|
-| `UserPromptSubmit` | 1 | `user-prompt-submit.py` — CTX bar injection + classifier enforcement |
-| `PreToolUse` | 4 | `skill-routing-check.py` (Skill matcher), `bash-safety-guard.py` (Bash matcher), `agent-dispatch-check.py` (Agent matcher), `memory-dedup-check.py` (Write matcher) |
-| `PostToolUse` | 2 | `skill-step-reminder.py` (Skill matcher), `memory-schema-check.py` (Write\|Edit matcher) |
-| `SubagentStart` | 2 | `subagent-governance.py`, `agent-registry-check.py` |
-| `SubagentStop` | 1 | `subagent-quality-check.py` |
-| `Stop` | 7 | `classifier-field-check.py`, `dispatch-compliance-check.py`, `governance-log.py`, `process-step-check.py`, `dark-zone-check.py`, `work-verification-check.py`, `token-breakdown.py` |
-
-**Note:** `SessionStart` and `PreCompact` hooks exist in `settings.json` (global config) but are not in this project-level template. If you rely on them, add them from `settings.local.json.example`.
+| `SessionStart` | 2 | `session-start-log.py`, `session-start-orientation.py` |
+| `UserPromptSubmit` | 2 | `user-prompt-submit.py` — CTX bar injection + classifier enforcement, `user-prompt-state-inject.py` |
+| `PreToolUse` | 7 | `skill-routing-check.py` (Skill matcher), `bash-safety-guard.py` (Bash matcher), `agent-dispatch-check.py` (Agent matcher), `memory-dedup-check.py` (Write matcher), `config-protection.py`, `read-before-edit-check.py`, `tag-variant-check.py` |
+| `PostToolUse` | 7 | `skill-step-reminder.py` (Skill matcher), `memory-schema-check.py` (Write\|Edit matcher), `wiki-citation-check.py`, `bias-guard.py`, `mcp-circuit-breaker-record.py`, `inbox-auto-ingest.py`, `reviewer-scope-violation-check.py` |
+| `SubagentStart` | 4 | `subagent-governance.py`, `agent-registry-check.py`, `subagent-scope-check.py`, `mcp-circuit-breaker.py` |
+| `SubagentStop` | 2 | `subagent-quality-check.py`, `checkpoint.py` |
+| `Stop` | 11 | `classifier-field-check.py`, `dispatch-compliance-check.py`, `governance-log.py`, `process-step-check.py`, `dark-zone-check.py`, `work-verification-check.py`, `token-breakdown.py`, `epistemic-check.py`, `verifier-gate-check.py`, `task-plan-auto-sync.py`, `registry-staleness-check.py` |
+| `PreCompact` | 1 | `pre-compact.py` |
 
 ## After substitution
 

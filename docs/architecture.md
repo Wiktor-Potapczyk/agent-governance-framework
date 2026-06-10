@@ -81,7 +81,7 @@ Routes classified tasks to typed process flows. Each process skill defines a ste
 | `skill-step-reminder.py` | PostToolUse:Skill | Injects step reminders after a process skill loads | Context injection |
 | `process-step-check.py` | Stop | Blocks if required artifacts are missing (SCOPE block, QA REPORT, PENTEST REPORT). Also enforces PM after multi-step increments. | Hard block |
 
-**Process skills (12):**
+**Process skills (12 of 17 core skills; the remaining 5 are supporting tools: `db-migration-plan`, `process-postmortem`, `process-governance-mine`, `doc-consistency`, `verification-gated-research`):**
 
 | Skill | Purpose |
 |-------|---------|

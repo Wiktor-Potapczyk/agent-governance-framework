@@ -70,6 +70,10 @@ All hooks read JSON from stdin and write JSON to stdout. The framework uses thre
 - `SubagentStart` — when a subagent is spawned (can inject context)
 - `SubagentStop` — when a subagent finishes (can block)
 - `UserPromptSubmit` — when the user sends a message (can inject context)
+- `SessionStart` — when a Claude Code session begins (can inject context)
+- `PreCompact` — before context compaction (can inject context)
+- `PostCompact` — after context compaction completes (can inject context)
+- `SessionEnd` — when a session ends (logging only; transcript is not available)
 
 ## CLAUDE.md
 

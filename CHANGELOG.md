@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-10 — Audit close-out: template README hook census, event list, count clarifications
+
+### Fixed
+
+- **`settings/settings.json.template.README.md`:** hook census was badly stale — "16 hooks across 7 events" corrected to the actual 35 hooks across 8 events, with a per-event breakdown derived by parsing the template; removed an incorrect note claiming SessionStart/PreCompact are absent (both are registered).
+- **`docs/customization.md`:** hook events list extended with the four missing events (SessionStart, PreCompact, PostCompact, SessionEnd — the last noting the transcript is no longer available at that point).
+- **`docs/architecture.md`:** "Process skills (12)" clarified as 12 of the 17 core skills, naming the 5 supporting tools — resolves an apparent contradiction with the Component Counts table.
+
+
 ## 2026-06-10 — Dedupe: pm-orchestrator agent + save skill single-sourced
 
 ### Fixed
