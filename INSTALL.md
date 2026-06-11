@@ -167,6 +167,10 @@ Copy any of these the same way as core skills:
 cp -r skills/domain-examples/n8n/* /your/project/.claude/skills/
 ```
 
+## Workflow scripts (procedure-layer enforcement)
+
+Copy `workflows/*.js` into your `.claude/workflows/`. Then edit the six process-skill `SKILL.md` stubs: replace `{{VAULT_ROOT}}` in each `scriptPath` with YOUR absolute vault path (the Workflow tool needs an absolute path). Two rules from live operation: always invoke by `scriptPath`, never by name (named invocation resolves from a session cache, so mid-session script edits are silently ignored), and pass `args` as a JSON object (the scripts also tolerate a stringified object via a parse-if-string guard).
+
 ## Troubleshooting
 
 **Hook not firing:** Confirm the absolute path in settings matches the actual file location. Paths with spaces must be quoted inside the command string.

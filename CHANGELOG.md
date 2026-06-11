@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-06-11 — Full procedure-layer migration: workflows/, ADR-0006, reference pages
+
+### Added
+
+- **`workflows/`** (new artifact class, 6 scripts) — deterministic Claude Code Workflow scripts for all six core process skills: `process-research.js`, `process-analysis.js`, `process-build.js`, `process-planning.js`, `process-qa.js`, `process-pentest.js`. Each encodes the dispatch sequence for its corresponding skill by construction (routing-as-code). Shared invariants: parse-if-string + HALT guard, typed schemas on every `agent()` call, FILE CONTRACT pattern, PASS/FAIL derived in code, DISPATCHES.json untouched, HALT paths return not throw. See `workflows/README.md` for operator setup.
+- **`docs/adr/0006-full-procedure-layer-migration.md`** — MADR ADR accepting the full migration from the two-skill pilot (ADR-0004) to all six process skills. Documents evidence base, decision drivers, consequences, and per-script invariants.
+- **`docs/reference/workflows.md`** — new Reference-mode page with per-script attributes table (phases, HALT paths, typed schemas, invocation args, returns) plus shared-invariants table.
+
+### Changed
+
+- **`hooks/skill-routing-check.py`** — B-0 fix: Workflow tool_use whose name/scriptPath maps to a process-* skill resets routing context; avoids false deny on Skill calls following a Workflow-dispatched process skill. New test file: `hooks/test_skill_routing_check.py` (B-0 acceptance criteria + WorkflowBoundaryResetTests class).
+- **`hooks/process-step-check.py`** — B-1a fix: Workflow tool_use detected as process skill invocation (not only Skill tool_use). B-1b fix: tool_result wrapper entries do not reset scan state. `test_process_step_check.py` updated with WorkflowProcessSkillDetectionTests class.
+- **`hooks/work-verification-check.py`** — B-2 fix: pre-scan from real-user-idx boundary detects Workflow process-qa/pentest and sets `qa_via_workflow`/`pentest_via_workflow` flags. B-3 fix: CHECK 1 zero-execution-tools block suppressed when via_workflow flag is set. `hooks/test_work_verification_check.py` added (new file — B-2/B-3 acceptance criteria + CHECK 4 fabrication detection tests).
+- **`docs/architecture.md`** Layer-1 blockquote updated from "partial (two skills)" to full migration language; ADR-0006 cross-reference added.
+- **`docs/adr/0004-routing-as-code-workflow-enforcement.md`** status line: "Amended by ADR-0006 (2026-06-11 full migration)".
+- **`docs/reference/hooks.md`** — entries updated for `skill-routing-check.py` (B-0), `process-step-check.py` (B-1a/B-1b), `work-verification-check.py` (B-2/B-3).
+- **`docs/reference/skills.md`** — `Workflow-enforced` row added to all six process-* skill entries.
+- **`docs/reference/setup-inventory.md`** — Workflows class row added (count 6, location `workflows/`); Workflows section with per-script table added.
+- **`README.md`** — Documentation section updated (Setup Inventory mentions workflows, Workflows Reference link added); "Workflow-enforced procedure layer" bullet added to Core Innovations.
+- **`.doc-consistency.json`** — `workflows-count` check added (`workflows/*.js = 6`).
+- **`skills/core/process-{research,analysis,build,planning,qa,pentest}/SKILL.md`** — `## ⚡ Workflow-enforced (ADOPTED 2026-06-11)` section inserted in each, with scriptPath, args, dispatch-sequence description, and HALT paths.
+
 ## 2026-06-11 — Remove deprecated workflow-orchestrator; add CONTRIBUTING, ADRs, concepts
 
 ### Removed

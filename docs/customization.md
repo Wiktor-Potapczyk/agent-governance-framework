@@ -96,3 +96,13 @@ The framework is modular. You can run subsets:
 | Classification + process routing | Above + process-* skills + skill-routing-check hook |
 | Full governance | Everything |
 | Monitoring only | governance-log hook (no blocking, just JSONL logging) |
+
+## Workflow Scripts
+
+The procedure layer (process skills) is enforced via deterministic Workflow scripts in `workflows/`. To adapt or add one:
+
+1. **Start from a reference** - `workflows/process-planning.js` (routing-class) or `workflows/process-qa.js` (execution-class).
+2. **Keep the invariants:** a pure-literal `export const meta = {name, description, phases}`; an args guard that parses a stringified object and HALTs (returning a status object, spawning zero agents) when required fields are missing; a FILE CONTRACT on any step that must produce a disk artifact (the agent writes to an exact path, reads it back, returns that path - reviewers re-read it from disk); quality gates that derive pass/fail in code from evidence fields, never from an agent's self-report; revise loops capped at 2.
+3. **Never give writer steps a write-restricted agent type** - use the default workflow subagent and put the role in the prompt.
+4. **Wire the skill:** add a thin invoker section at the top of the skill's `SKILL.md` pointing at the script via absolute `scriptPath`; keep the prose as spec-of-record + fallback. Leave `DISPATCHES.json` untouched - it stays the read-only verification source.
+5. **Check your hooks:** any hook that detects skill invocations by the Skill tool alone will misfire or go silent for workflow-invoked skills - see `docs/reference/hooks.md` for the Workflow-aware patterns in the three shipped hooks.

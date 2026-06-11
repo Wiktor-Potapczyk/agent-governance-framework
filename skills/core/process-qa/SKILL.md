@@ -5,6 +5,20 @@ description: QA process template. Follow this procedure for QA compound tasks �
 
 # QA Process Template
 
+## ⚡ Workflow-enforced (ADOPTED 2026-06-11)
+
+This skill's procedure is enforced by construction: on invocation for a non-Quick task, execute it by calling the **Workflow tool** with `{scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-qa.js"}`, passing the claims as `args: {project, claims: [...], source?, constraints?}`. The `claims` array must be **explicitly enumerated** at invocation time — list each verifiable claim from the completed task. The script dispatches one execute-agent per claim (real Bash/MCP/Read), computes PASS/FAIL IN CODE from typed per-claim evidence fields (never agent self-report), and returns `qa_scope_text` + `qa_report_text`.
+
+**TRANSCRIPT RELAY (mandatory):** after the Workflow tool returns, relay BOTH `qa_scope_text` and `qa_report_text` verbatim as **plain unfenced text** in the main session response — exactly as the prose QA SCOPE and QA REPORT blocks below. The Stop hook (`process-step-check.py`) matches literal strings after fence-stripping; fenced blocks are invisible to it.
+
+**HOOK PRECONDITIONS:** three hook fixes (B-1 in `process-step-check.py`, B-2 + B-3 in `work-verification-check.py`) must be on disk before this thin invoker is active. Without them, a Workflow-driven QA run false-blocks because execution tools run inside the workflow subagent and are invisible to the main transcript. See `workflows/README.md` for details.
+
+**Path must be absolute** on the installing machine — replace `{{VAULT_ROOT}}` with the absolute path to your project root. After editing this file mid-session, invoke the script by `scriptPath` (not by name) because the name-to-path mapping is session-cached and will not pick up edits until the next session restart.
+
+The prose below remains (a) the procedure spec of record and (b) the FALLBACK path — use it only when the Workflow tool is unavailable (sub-agent context, degraded session) and say so explicitly. `DISPATCHES.json` is untouched and remains the read-only H11 verification source.
+
+---
+
 You have been routed here because the task-classifier detected a QA compound. QA verifies claims empirically — it is the output-side complement of IMPLIES (which forces exploration at entry).
 
 **QA is NOT review.** Review (architect-review, prompt-engineer) evaluates quality against criteria. QA tests whether claims are TRUE — did it actually work? Does the output match reality?

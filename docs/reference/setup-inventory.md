@@ -14,10 +14,26 @@ A reference catalogue of every artifact class in this framework — what is inst
 | Core skills | 17 | `skills/core/` |
 | Vault-management skills | 7 | `skills/vault/` |
 | Domain-example skills | 19 | `skills/domain-examples/` (apify, n8n) |
+| Workflow scripts | 6 | `workflows/` |
 | Production hook files | 40 | `hooks/` |
 | — of which active enforcement (registered) | 28 | `settings/` |
 | Shared hook libraries | 4 | `hooks/` |
 | Opt-in (disabled) hooks | 5 | `hooks/disabled/` |
+
+## Workflows (`workflows/`)
+
+Six deterministic workflow scripts back the six core process skills (adopted 2026-06-11; see ADR-0006). Each script is a Claude Code Workflow tool script that encodes the dispatch sequence for its corresponding process skill by construction — routing-as-code. Install by copying to `.claude/workflows/` and updating the `scriptPath` in each skill's `## ⚡ Workflow-enforced` section.
+
+| Script | Skill | HALT paths |
+|---|---|---|
+| `process-research.js` | `process-research` | `ralph-loop-hand-back`, `halted-malformed-args` |
+| `process-analysis.js` | `process-analysis` | `decomposition-hand-back`, `halted-malformed-args` |
+| `process-build.js` | `process-build` | `halted-malformed-args` |
+| `process-planning.js` | `process-planning` | `halted-malformed-args` |
+| `process-qa.js` | `process-qa` | `halted-malformed-args` |
+| `process-pentest.js` | `process-pentest` | `halted-malformed-args` |
+
+See [`docs/reference/workflows.md`](workflows.md) for the full per-script attributes table.
 
 ## Agents (`agents/`)
 

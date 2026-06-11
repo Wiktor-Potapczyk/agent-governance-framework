@@ -111,6 +111,10 @@ The **Logical paths** row enumerates each branch. **The code is the source of tr
 
 ---
 
+### 3d. Workflow script reference template (added 2026-06-11)
+
+Workflow scripts are the fourth artifact class. Their reference entries (see `docs/reference/workflows.md`) extend the skill template (3b) with four fields: **Invocation** (Workflow tool, absolute `scriptPath`), **Args contract** (required/optional fields + the HALT behavior on missing input), **Phases** (the meta-declared sequence with the dispatches inside each), and **Fallback** (the prose SKILL.md path and when it applies).
+
 ## 4. The decision log (ADRs)
 
 Every significant, costly, or hard-to-reverse choice → one MADR file in `docs/adr/`, numbered sequentially. Append-only: a reversed decision gets a NEW superseding ADR; the old one's Status flips to "Superseded by ADR-NNNN" but is never deleted.

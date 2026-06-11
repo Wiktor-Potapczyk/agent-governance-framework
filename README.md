@@ -12,6 +12,8 @@ The framework operationalizes three research-backed principles: classify before 
 
 - **Popperian QA** -- Quality assurance is framed as falsification, not confirmation. A PASS means "could not break it." Every QA artifact must declare what was *not* tested (Untested Surface). Three tiers: per-task verification, per-increment adversarial pentest, and human-triggered eval suites.
 
+- **Workflow-enforced procedure layer** -- All six core process skills (`process-research`, `process-analysis`, `process-build`, `process-planning`, `process-qa`, `process-pentest`) ship as deterministic Claude Code Workflow scripts (`workflows/process-*.js`) that make their dispatch sequence happen by construction. Routing-as-code: the script encodes which agents run, in what order, with typed handoffs and HALT paths. Agents reason freely inside each step. The prose SKILL.md survives as spec-of-record and fallback. See `docs/reference/workflows.md` and ADR-0006.
+
 ## Architecture
 
 The framework operates across four layers, with 28 active enforcement hooks (plus four shared libraries):
@@ -88,8 +90,8 @@ The format makes skill-routing decisions auditable from the SKILL.md alone — a
 This framework documents itself by a single, followable standard — derived from established industry practice (Diátaxis, ADR/MADR, Keep a Changelog, docs-as-code) and adapted to a repository whose artifacts are skills, hooks, and agent definitions rather than conventional code:
 
 - **[The Documentation Standard](docs/documentation-standard.md)** — Diátaxis mode-routing, the per-artifact attributes-table reference schema, the MADR decision-log single-authority rule, the maintainability rules, and the add/change/remove checklist that keeps the docs complete and current.
-- **[Setup Inventory](docs/reference/setup-inventory.md)** — the reference catalogue of every artifact class (agents, skills, hooks) and how the repository is organized.
-- **Per-artifact reference** — every artifact documented with the standard's attributes-table schema: **[Hooks Reference](docs/reference/hooks.md)** (event, matcher, action, inputs, side-effects, logical paths, failure mode — per hook), **[Agents Reference](docs/reference/agents.md)** (domain, tools, dispatch bindings, output contract — per agent), **[Skills Reference](docs/reference/skills.md)** (routing contract, dispatches, outputs, enforcing hook — per skill).
+- **[Setup Inventory](docs/reference/setup-inventory.md)** — the reference catalogue of every artifact class (agents, skills, hooks, workflows) and how the repository is organized.
+- **Per-artifact reference** — every artifact documented with the standard's attributes-table schema: **[Hooks Reference](docs/reference/hooks.md)** (event, matcher, action, inputs, side-effects, logical paths, failure mode — per hook), **[Agents Reference](docs/reference/agents.md)** (domain, tools, dispatch bindings, output contract — per agent), **[Skills Reference](docs/reference/skills.md)** (routing contract, dispatches, outputs, enforcing hook — per skill), **[Workflows Reference](docs/reference/workflows.md)** (phases, HALT paths, typed schemas, shared invariants — per script).
 - **[Architecture](docs/architecture.md)** — the layer model and how the pieces fit.
 - **[Decision Log (ADRs)](docs/adr/0001-record-architecture-decisions.md)** — MADR decision records for significant, costly, or hard-to-reverse choices: why hooks over prompts, why three-tier QA, why routing-as-code, why curated publication.
 - **[Concepts](docs/concepts/task-classification.md)** — explanation-quadrant pages on the framework's three core mental models: task classification, enforcement layers, and falsification QA.

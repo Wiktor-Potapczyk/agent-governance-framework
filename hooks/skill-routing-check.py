@@ -85,9 +85,30 @@ def main():
         f.seek(max(0, file_size - read_bytes))
         tail = f.read()
 
-    # Find the last valid TASK TYPE
+    # Workflow-boundary reset (B-0 fix, 2026-06-11):
+    # A Workflow tool_use whose name maps to a process skill is a routing-context
+    # reset — it consumed the TASK TYPE classification that triggered it. Any Skill
+    # invocation that follows should not be blocked by that stale classification.
+    # We track the LAST routing event: either a TASK TYPE assertion (text) or a
+    # Workflow dispatch (tool_use name="Workflow"). If the most recent routing event
+    # is a Workflow dispatch, we clear last_type before comparing.
     last_type = None
+    last_workflow_routing_reset = False  # True if the most-recent routing event was a Workflow
     valid_types = re.compile(r'(?:TASK TYPE|CLASSIFICATION):\s*(Quick|Research|Analysis|Content|Build|Planning|Compound)', re.IGNORECASE)
+
+    # Set of process-skill names a Workflow might be named after (matches ROUTING values)
+    WORKFLOW_PROCESS_NAMES = set(ROUTING.values()) | set(ROUTING.keys())
+    # Also the raw "process-*" prefix covers future skills
+    def _wf_name_is_process(wf_name: str) -> bool:
+        """Return True if a Workflow invocation name maps to a process skill."""
+        n = wf_name.lower().strip()
+        if n.startswith("process-"):
+            return True
+        # scriptPath basename without .js (e.g. ".claude/workflows/process-planning.js")
+        base = os.path.basename(n)
+        if base.endswith(".js"):
+            base = base[:-3]
+        return base.startswith("process-")
 
     for line in tail.split("\n"):
         line = line.strip()
@@ -110,6 +131,28 @@ def main():
                 m = valid_types.search(clean)
                 if m:
                     last_type = m.group(1).lower()
+                    last_workflow_routing_reset = False  # TASK TYPE assertion wins
+            elif block.get("type") == "tool_use" and block.get("name") == "Workflow":
+                inp = block.get("input", {})
+                if isinstance(inp, str):
+                    try:
+                        inp = json.loads(inp)
+                    except (json.JSONDecodeError, TypeError):
+                        inp = {}
+                wf_name = (inp.get("name") or inp.get("workflow_name") or "").strip()
+                if not wf_name:
+                    sp = inp.get("scriptPath") or ""
+                    base = os.path.basename(sp)
+                    wf_name = base[:-3] if base.endswith(".js") else base
+                if _wf_name_is_process(wf_name):
+                    # This Workflow consumed the last TASK TYPE — mark as reset
+                    last_workflow_routing_reset = True
+
+    # If the most-recent routing event was a Workflow dispatch, the classification
+    # context has been consumed. Clear last_type so the next Skill invocation is
+    # not blocked by stale residue from that Workflow's input classification.
+    if last_workflow_routing_reset:
+        last_type = None
 
     # If no classification found or Quick, allow
     if not last_type or last_type == "quick":

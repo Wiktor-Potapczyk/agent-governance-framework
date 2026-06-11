@@ -114,6 +114,15 @@ def main():
     is_non_quick = False
     has_process_qa = False
     has_process_pentest = False
+    # B-2/B-3 flags (2026-06-11): set when QA/pentest ran inside a Workflow invocation.
+    # The workflow's Bash/MCP calls run inside the subagent and never appear in the
+    # main transcript's tool list, so the execution_tools list is empty on the relay
+    # turn. B-3 suppresses CHECK 1's zero-execution-tools block when the flag is set —
+    # the execution-evidence obligation moves into the workflow script's typed per-claim
+    # fields (Part C process-qa note). The suppression is keyed on the workflow-invocation
+    # flag specifically, never on mere presence of any Workflow tool_use.
+    qa_via_workflow = False
+    pentest_via_workflow = False
 
     # Walk backwards to find last user message, then forward for the last assistant turn
     last_user_idx = -1
@@ -131,6 +140,76 @@ def main():
 
     if last_user_idx < 0:
         return  # No user message found
+
+    # B-2/B-3 pre-scan (2026-06-11): find the real last user message boundary to detect
+    # Workflow tool_use blocks that precede the tool_result wrapper entry.
+    # The Workflow transcript shape is three entries:
+    #   1. assistant — Workflow tool_use       ← we need to see this
+    #   2. user      — tool_result wrapper     ← last_user_idx points HERE
+    #   3. assistant — relay text (QA REPORT)  ← last_user_idx+1 scan starts here
+    # The Workflow tool_use (entry 1) is before last_user_idx, so the main scan misses it.
+    # We use the real-last-user-idx (same logic as CHECK 4 below) to scan from the
+    # real user boundary, catching the Workflow tool_use between the real user turn
+    # and the relay assistant entry.
+    _real_last_user_idx_b2 = -1
+    for i in range(len(lines) - 1, -1, -1):
+        line = lines[i].strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+            if entry.get("type") == "user":
+                content = entry.get("message", {}).get("content")
+                if isinstance(content, str):
+                    _real_last_user_idx_b2 = i
+                    break
+                if isinstance(content, list):
+                    has_text = any(
+                        isinstance(b, dict) and b.get("type") == "text" for b in content
+                    )
+                    has_only_tool_result = all(
+                        isinstance(b, dict) and b.get("type") == "tool_result" for b in content
+                    ) if content else False
+                    if has_text and not has_only_tool_result:
+                        _real_last_user_idx_b2 = i
+                        break
+        except json.JSONDecodeError:
+            continue
+    if _real_last_user_idx_b2 < 0:
+        _real_last_user_idx_b2 = 0  # R-2: scan window start, never past the Workflow tool_use  # fallback
+
+    # Scan from the real user boundary for Workflow process-qa/process-pentest tool_use.
+    # This captures the Workflow tool_use (entry 1) even when last_user_idx points to
+    # the tool_result wrapper (entry 2) that follows it.
+    for i in range(_real_last_user_idx_b2 + 1, len(lines)):
+        line = lines[i].strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if entry.get("type") != "assistant":
+            continue
+        for block in entry.get("message", {}).get("content", []):
+            if block.get("type") == "tool_use" and block.get("name") == "Workflow":
+                inp = block.get("input", {})
+                if isinstance(inp, str):
+                    try:
+                        inp = json.loads(inp)
+                    except (json.JSONDecodeError, TypeError):
+                        inp = {}
+                wf_name = (inp.get("name") or inp.get("workflow_name") or "").strip().lower()
+                if not wf_name:
+                    sp = inp.get("scriptPath") or ""
+                    base = os.path.basename(sp)
+                    wf_name = base[:-3].lower() if base.endswith(".js") else base.lower()
+                if wf_name == "process-qa":
+                    has_process_qa = True
+                    qa_via_workflow = True
+                elif wf_name == "process-pentest":
+                    has_process_pentest = True
+                    pentest_via_workflow = True
 
     # Process everything after the last user message
     for i in range(last_user_idx + 1, len(lines)):
@@ -174,7 +253,7 @@ def main():
                 name = block.get("name", "")
                 last_turn_tools.append(name)
 
-                # Track QA/pentest skill invocation
+                # Track QA/pentest skill invocation — via Skill tool (existing path)
                 if name == "Skill":
                     inp = block.get("input", {})
                     if isinstance(inp, str):
@@ -188,6 +267,10 @@ def main():
                     elif skill == "process-pentest":
                         has_process_pentest = True
 
+                # Note: Workflow process-qa/pentest detection is handled by the
+                # B-2 pre-scan above (real-last-user-idx boundary), which correctly
+                # captures the Workflow tool_use that precedes the tool_result wrapper.
+
     # Categorize tools
     execution_tools = [t for t in last_turn_tools if t == "Bash" or t.startswith("mcp__")]
     any_tools = [t for t in last_turn_tools if t not in ("Skill",)]  # Skill alone doesn't count as "work"
@@ -198,8 +281,17 @@ def main():
 
     # --- CHECK 1: QA/Pentest Execution (HARD) ---
     # Catches lazy execution WITHIN an invoked process-qa/process-pentest skill.
+    # B-3 suppression (2026-06-11): when QA/pentest ran inside a Workflow invocation,
+    # the workflow's Bash/MCP calls run in the subagent and are invisible to the main
+    # transcript's execution_tools list (built from main-transcript tool_use only).
+    # The zero-execution-tools block is suppressed when qa_via_workflow or
+    # pentest_via_workflow is True — the execution-evidence obligation has moved into
+    # the workflow script's typed per-claim fields. The suppression is keyed on the
+    # workflow-invocation flag specifically, not on mere Workflow presence in the turn,
+    # so Skill-path process-qa with zero execution tools is still blocked normally.
     if (has_qa_report or has_pentest_report) and (has_process_qa or has_process_pentest):
-        if len(execution_tools) == 0:
+        _via_workflow = (has_qa_report and qa_via_workflow) or (has_pentest_report and pentest_via_workflow)
+        if len(execution_tools) == 0 and not _via_workflow:
             # Check if Read/Grep were used (acceptable for some claim types)
             read_tools = [t for t in last_turn_tools if t in ("Read", "Grep", "Glob")]
             if len(read_tools) == 0:

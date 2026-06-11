@@ -5,6 +5,18 @@ description: Research process template. Follow this procedure for all Research-t
 
 # Research Process Template
 
+## ⚡ Workflow-enforced (ADOPTED 2026-06-11)
+
+This skill's procedure is enforced by construction: on invocation for a non-Quick task, execute it by calling the **Workflow tool** with `{scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-research.js"}`, passing the task brief as `args: {project, question, sources?, constraints?}`. The script drives the dispatch sequence (scope → path classification → research agents [research-analyst / technical-researcher / research-orchestrator per coverage flag] → synthesis [research-synthesizer, mandatory if 2+ gatherers, enforced in code] → report-generator [mandatory] → quality gate); agents reason freely inside each step.
+
+**Ralph Loop path (3A):** when the scope agent sets `ralph_loop_indicated: true`, the workflow HALTs with `status: 'ralph-loop-hand-back'` and returns the scope block. The main session must then invoke the `architect-loop` skill via the prose path (Step 3A below), then re-invoke this workflow with the loop findings as `args.question`. A workflow cannot invoke a skill; the HALT is the designed hand-back mechanism.
+
+**Path must be absolute** on the installing machine — replace `{{VAULT_ROOT}}` with the absolute path to your project root. After editing this file mid-session, invoke the script by `scriptPath` (not by name) because the name-to-path mapping is session-cached and will not pick up edits until the next session restart.
+
+The prose below remains (a) the procedure spec of record and (b) the FALLBACK path — use it only when the Workflow tool is unavailable (sub-agent context, degraded session) and say so explicitly. `DISPATCHES.json` is untouched and remains the read-only H11 verification source.
+
+---
+
 You have been routed here by the task-classifier. The task type is Research.
 
 ## Step 1 — Define Scope

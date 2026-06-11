@@ -5,6 +5,18 @@ description: Analysis process template. Follow this procedure for all Analysis-t
 
 # Analysis Process Template
 
+## ⚡ Workflow-enforced (ADOPTED 2026-06-11)
+
+This skill's procedure is enforced by construction: on invocation for a non-Quick task, execute it by calling the **Workflow tool** with `{scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-analysis.js"}`, passing the task brief as `args: {project, subject, mode?, rubric?, constraints?}`. The script drives the dispatch sequence (scope → mode branch → specialist fan-out → synthesis [research-synthesizer, mandatory if 2+ specialists, enforced in code] → report [conditional on complex flag] → quality gate); agents reason freely inside each step.
+
+**Decomposition mode:** when the scope agent returns `mode: 'decomposition'`, the workflow HALTs with `status: 'decomposition-hand-back'` and returns the numbered sub-task list. The main session must then invoke the appropriate process skill for each sub-task via the prose path. A workflow cannot invoke skills; the HALT is the designed hand-back mechanism.
+
+**Path must be absolute** on the installing machine — replace `{{VAULT_ROOT}}` with the absolute path to your project root. After editing this file mid-session, invoke the script by `scriptPath` (not by name) because the name-to-path mapping is session-cached and will not pick up edits until the next session restart.
+
+The prose below remains (a) the procedure spec of record and (b) the FALLBACK path — use it only when the Workflow tool is unavailable (sub-agent context, degraded session) and say so explicitly. `DISPATCHES.json` is untouched and remains the read-only H11 verification source.
+
+---
+
 You have been routed here by the task-classifier. The task type is Analysis.
 
 Analysis covers three modes:

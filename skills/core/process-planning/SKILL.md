@@ -5,6 +5,16 @@ description: Planning process template. Follow this procedure for all Planning-t
 
 # Planning Process Template
 
+## ⚡ Workflow-enforced (ADOPTED 2026-06-11)
+
+This skill's procedure is enforced by construction: on invocation for a non-Quick task, execute it by calling the **Workflow tool** with `{scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-planning.js"}`, passing the task brief + classification block via `args`. The script drives the dispatch sequence (scope → optional research → implementation-plan → **mandatory parallel review: architect-reviewer + adversarial-reviewer** (+ prompt-engineer if the plan contains LLM prompts) → capped revise → quality gate); agents reason freely inside each step.
+
+**Path must be absolute** on the installing machine — replace `{{VAULT_ROOT}}` with the absolute path to your project root. After editing this file mid-session, invoke the script by `scriptPath` (not by name) because the name-to-path mapping is session-cached and will not pick up edits until the next session restart.
+
+The prose below remains (a) the procedure spec of record and (b) the FALLBACK path — use it only when the Workflow tool is unavailable (sub-agent context, degraded session) and say so explicitly. `DISPATCHES.json` is untouched and remains the read-only H11 verification source.
+
+---
+
 You have been routed here by the task-classifier. The task type is Planning.
 
 ## Step 1 — Define Scope

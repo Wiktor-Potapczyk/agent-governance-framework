@@ -229,6 +229,17 @@ def check_pm_after_increment(lines):
                     task_creates = 0
                     task_completes = 0
                     pentest_seen = False
+            elif name == "Workflow":
+                # 2026-06-11 adoption: process-pentest may run as a Workflow
+                # invocation; count it or the PM-after-increment gate silently
+                # stops firing (architect review F2).
+                wf = (inp.get("name") or "").lower()
+                if not wf:
+                    sp = inp.get("scriptPath") or ""
+                    base = os.path.basename(sp)
+                    wf = base[:-3].lower() if base.endswith(".js") else base.lower()
+                if wf == "process-pentest":
+                    pentest_seen = True
 
     # Only enforce for multi-step increments
     if task_creates < 2:
@@ -288,23 +299,72 @@ def main():
         except json.JSONDecodeError:
             continue
 
-        # User message = turn boundary. If a process skill was found in a
-        # previous turn, a user message means that turn completed — reset.
+        # B-1b fix (2026-06-11): Turn-boundary reset must fire only on REAL user
+        # messages, not on tool_result wrapper entries. A Workflow invocation lands
+        # as three transcript entries:
+        #   1. assistant  — Workflow tool_use
+        #   2. user       — tool_result wrapper  ← NOT a real user turn
+        #   3. assistant  — relay text (contains SCOPE/QA REPORT)
+        # If we reset on entry 2, found_skill is False before the relay text (entry 3)
+        # arrives, and the SCOPE/QA-REPORT check silently skips — B-1a without B-1b
+        # has zero enforcement effect.
+        # Real user message: content is a plain string, or a list containing a "text"
+        # block that is not all-tool_result. Ported from work-verification-check.py
+        # lines 335-372 (same logic, same comment structure).
         if entry.get("type") == "user" and found_skill:
-            # The previous turn had a process skill. Check if it already
-            # passed (has SCOPE + QA REPORT as needed). If so, clear state
-            # so we don't re-check on future turns.
-            last_process_skill = None
-            text_after_skill = []
-            agents_after_skill = []
-            found_skill = False
+            content = entry.get("message", {}).get("content")
+            is_real_user = False
+            if isinstance(content, str):
+                is_real_user = True
+            elif isinstance(content, list):
+                has_text = any(
+                    isinstance(b, dict) and b.get("type") == "text"
+                    for b in content
+                )
+                has_only_tool_result = all(
+                    isinstance(b, dict) and b.get("type") == "tool_result"
+                    for b in content
+                ) if content else False
+                if has_text and not has_only_tool_result:
+                    is_real_user = True
+            if is_real_user:
+                # The previous turn had a process skill. A real user message means
+                # that turn completed — reset state so we don't re-check on future turns.
+                last_process_skill = None
+                text_after_skill = []
+                agents_after_skill = []
+                found_skill = False
 
         if entry.get("type") != "assistant":
             continue
 
         message = entry.get("message", {})
         for block in message.get("content", []):
-            # Detect process skill invocation
+            # B-1a fix (2026-06-11): Detect process skill invocation via EITHER
+            # a Skill tool_use (existing path) OR a Workflow tool_use whose name/
+            # scriptPath basename maps to a process-* skill. Without this branch,
+            # Workflow-based process skills are never recognized and SCOPE/QA REPORT
+            # checks go silent for all converted skills.
+            if block.get("type") == "tool_use" and block.get("name") == "Workflow":
+                inp = block.get("input", {})
+                if isinstance(inp, str):
+                    try:
+                        inp = json.loads(inp)
+                    except (json.JSONDecodeError, TypeError):
+                        inp = {}
+                wf_name = (inp.get("name") or inp.get("workflow_name") or "").strip().lower()
+                if not wf_name:
+                    sp = inp.get("scriptPath") or ""
+                    base = os.path.basename(sp)
+                    wf_name = base[:-3].lower() if base.endswith(".js") else base.lower()
+                if wf_name.startswith("process-"):
+                    last_process_skill = wf_name
+                    text_after_skill = []
+                    agents_after_skill = []
+                    found_skill = True
+                    continue
+
+            # Detect process skill invocation via Skill tool
             if block.get("type") == "tool_use" and block.get("name") == "Skill":
                 inp = block.get("input", {})
                 if isinstance(inp, str):

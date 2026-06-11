@@ -55,6 +55,14 @@
       ]
     },
     {
+      "id": "workflows-count",
+      "expect": { "count_files": { "dir": "workflows", "glob": "*.js" } },
+      "asserted_in": [
+        { "file": "docs/reference/setup-inventory.md", "pattern": "Workflow scripts \\| (\\d+)" },
+        { "file": "CHANGELOG.md", "pattern": "workflows/\\*\\.js = (\\d+)" }
+      ]
+    },
+    {
       "id": "active-enforcement-hooks",
       "expect": { "literal": "28" },
       "asserted_in": [

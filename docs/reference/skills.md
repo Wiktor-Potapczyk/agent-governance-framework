@@ -145,6 +145,7 @@ A skill is a Markdown procedure loaded by Claude Code's skill loader (walks `ski
 | Steps | Define ANALYSIS SCOPE block (mode + subject + question + deliverable) → assign specialist(s) → synthesize if 2+ agents (mandatory) → report. Full procedure: [`skills/core/process-analysis/SKILL.md`](../../skills/core/process-analysis/SKILL.md) |
 | Outputs | ANALYSIS SCOPE block; specialist agent output(s); synthesis (when multi-agent); final assessment saved to `Projects/[Name]/work/` |
 | Enforced by | `process-step-check.py` (Stop hook — checks ANALYSIS SCOPE block present, synthesis dispatched when 2+ agents contributed) |
+| Workflow-enforced | `workflows/process-analysis.js` (adopted 2026-06-11) — scriptPath: `{{VAULT_ROOT}}/.claude/workflows/process-analysis.js`. HALT paths: `decomposition-hand-back` (mode=decomposition), `halted-malformed-args`. See [`docs/reference/workflows.md`](workflows.md). |
 
 ---
 
@@ -160,6 +161,7 @@ A skill is a Markdown procedure loaded by Claude Code's skill loader (walks `ski
 | Steps | Define BUILD SCOPE block → delegate to `implementation-plan` → delegate to `blueprint-mode` → mandatory `architect-review` (+ `prompt-engineer` if LLM prompts) → quality check including live verification. Full procedure: [`skills/core/process-build/SKILL.md`](../../skills/core/process-build/SKILL.md) |
 | Outputs | BUILD SCOPE block; implementation plan; built artifact at `Projects/[Name]/work/`; review report |
 | Enforced by | `process-step-check.py` (Stop hook — checks BUILD SCOPE block and architect-reviewer dispatch); `dispatch-compliance-check.py` (verifies `process-build` invoked when MUST DISPATCH names it; checks `architect-reviewer` and `implementation-plan` were dispatched) |
+| Workflow-enforced | `workflows/process-build.js` (adopted 2026-06-11) — scriptPath: `{{VAULT_ROOT}}/.claude/workflows/process-build.js`. HALT paths: `halted-malformed-args`. See [`docs/reference/workflows.md`](workflows.md). |
 
 ---
 
@@ -190,6 +192,7 @@ A skill is a Markdown procedure loaded by Claude Code's skill loader (walks `ski
 | Steps | Define PENTEST SCOPE → identify attack surface → execute tests per category (boundary / adversarial / regression / failure modes / integration) each with state→execute→raw-output→judge sequence → write PENTEST REPORT with Untested Surface → act on findings. Full procedure: [`skills/core/process-pentest/SKILL.md`](../../skills/core/process-pentest/SKILL.md) |
 | Outputs | PENTEST REPORT block (findings table, Untested Surface, Recommendation: SHIP / FIX-THEN-SHIP / ESCALATE, PASS/FAIL) |
 | Enforced by | `work-verification-check.py` (Stop hook — blocks a PENTEST REPORT filed with zero execution tool calls) + `process-step-check.py` (Stop hook — tracks `pentest_seen`; hard-blocks increment completion paths that require the pentest report) |
+| Workflow-enforced | `workflows/process-pentest.js` (adopted 2026-06-11) — scriptPath: `{{VAULT_ROOT}}/.claude/workflows/process-pentest.js`. HALT paths: `halted-malformed-args`. See [`docs/reference/workflows.md`](workflows.md). |
 
 ---
 
@@ -205,6 +208,7 @@ A skill is a Markdown procedure loaded by Claude Code's skill loader (walks `ski
 | Steps | Read STATE.md/PROJECT.md for appetite/phase → define PLANNING SCOPE block → optional research step → delegate to `implementation-plan` → mandatory `architect-review` → revise loop → quality check. Full procedure: [`skills/core/process-planning/SKILL.md`](../../skills/core/process-planning/SKILL.md) |
 | Outputs | PLANNING SCOPE block; sequenced plan with acceptance criteria saved to `Projects/[Name]/work/`; review report |
 | Enforced by | `process-step-check.py` (Stop hook — checks PLANNING SCOPE block and architect-reviewer dispatch); `dispatch-compliance-check.py` (verifies `process-planning` invoked when MUST DISPATCH names it; checks `implementation-plan` and `adversarial-reviewer` dispatched) |
+| Workflow-enforced | `workflows/process-planning.js` (adopted 2026-06-11) — scriptPath: `{{VAULT_ROOT}}/.claude/workflows/process-planning.js`. HALT paths: `halted-malformed-args`. See [`docs/reference/workflows.md`](workflows.md). |
 
 ---
 
@@ -235,6 +239,7 @@ A skill is a Markdown procedure loaded by Claude Code's skill loader (walks `ski
 | Steps | List all verifiable claims (QA SCOPE) → select verification method per claim type → execute each claim (run → show raw output → judge PASS/FAIL) → coverage check → write QA REPORT with Untested Surface → escalate FAILs (report only, do not fix). Full procedure: [`skills/core/process-qa/SKILL.md`](../../skills/core/process-qa/SKILL.md) |
 | Outputs | QA REPORT block (claims table with PASS/FAIL/MANUAL counts, evidence column, Untested Surface) |
 | Enforced by | `work-verification-check.py` (Stop hook — blocks QA REPORT with zero execution tool calls; blocks non-Quick task completion without `process-qa` invocation); `dispatch-compliance-check.py` (verifies `process-qa` in MUST DISPATCH for every non-Quick task and that it was invoked) |
+| Workflow-enforced | `workflows/process-qa.js` (adopted 2026-06-11) — scriptPath: `{{VAULT_ROOT}}/.claude/workflows/process-qa.js`. HALT paths: `halted-malformed-args`. TRANSCRIPT RELAY: after Workflow returns, relay `qa_scope_text` + `qa_report_text` as plain unfenced text. See [`docs/reference/workflows.md`](workflows.md). |
 
 ---
 
@@ -250,6 +255,7 @@ A skill is a Markdown procedure loaded by Claude Code's skill loader (walks `ski
 | Steps | Define RESEARCH SCOPE → choose path (Ralph Loop if 3+ questions + 3+ sources + bias risk; direct otherwise) → run path → mandatory synthesis (2+ agents) → report-generator. Full procedure: [`skills/core/process-research/SKILL.md`](../../skills/core/process-research/SKILL.md) |
 | Outputs | RESEARCH SCOPE block; research findings; synthesis; final report saved to `Projects/[Name]/work/` |
 | Enforced by | `process-step-check.py` (Stop hook — checks synthesis dispatched when 2+ agents); `dispatch-compliance-check.py` (verifies `process-research` invoked when MUST DISPATCH names it) |
+| Workflow-enforced | `workflows/process-research.js` (adopted 2026-06-11) — scriptPath: `{{VAULT_ROOT}}/.claude/workflows/process-research.js`. HALT paths: `ralph-loop-hand-back`, `halted-malformed-args`. See [`docs/reference/workflows.md`](workflows.md). |
 
 ---
 

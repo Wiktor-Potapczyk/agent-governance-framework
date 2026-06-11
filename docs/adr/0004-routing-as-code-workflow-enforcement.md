@@ -1,6 +1,6 @@
 # ADR-0004: Routing-as-Code for the Procedure Layer (Pilot Direction)
 
-**Status:** Pilot — not yet adopted
+**Status:** Adopted 2026-06-11 (owner waived the calibration-baseline gate; same-day pilot then full rollout). Amended by ADR-0006 (full migration).
 **Date:** 2026-06-09
 
 ## Context and Problem Statement
