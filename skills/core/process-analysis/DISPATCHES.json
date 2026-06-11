@@ -23,7 +23,7 @@
     "debugger",
     "api-designer",
     "data-engineer",
-    "workflow-orchestrator",
+    "n8n-workflow-architect",
     "api-security-audit",
     "adversarial-reviewer"
   ],

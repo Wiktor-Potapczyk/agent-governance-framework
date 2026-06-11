@@ -141,7 +141,7 @@ A skill is a Markdown procedure loaded by Claude Code's skill loader (walks `ski
 | Frontmatter | `name: process-analysis`; routed to by `task-classifier` for Analysis-type tasks |
 | Use-when | Evaluating artifacts against a rubric; investigating causes or behavior; decomposing a Compound task into sub-tasks |
 | Do-NOT-use-when | Single factual lookup (Quick); building or implementing (that is `process-build`) |
-| Dispatches | Specialist agents per subject (prompt-engineer, architect-review, debugger, api-designer, data-engineer, workflow-orchestrator, api-security-audit); `research-synthesizer` when 2+ agents contributed (mandatory); `report-generator` for final output |
+| Dispatches | Specialist agents per subject (prompt-engineer, architect-review, debugger, api-designer, data-engineer, n8n-workflow-architect, api-security-audit); `research-synthesizer` when 2+ agents contributed (mandatory); `report-generator` for final output |
 | Steps | Define ANALYSIS SCOPE block (mode + subject + question + deliverable) → assign specialist(s) → synthesize if 2+ agents (mandatory) → report. Full procedure: [`skills/core/process-analysis/SKILL.md`](../../skills/core/process-analysis/SKILL.md) |
 | Outputs | ANALYSIS SCOPE block; specialist agent output(s); synthesis (when multi-agent); final assessment saved to `Projects/[Name]/work/` |
 | Enforced by | `process-step-check.py` (Stop hook — checks ANALYSIS SCOPE block present, synthesis dispatched when 2+ agents contributed) |

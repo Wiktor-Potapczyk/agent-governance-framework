@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-06-11 — Remove deprecated workflow-orchestrator; add CONTRIBUTING, ADRs, concepts
+
+### Removed
+
+- **`agents/governance/workflow-orchestrator.md`** — deprecated alias of `n8n-workflow-architect`; agent file, summary-table row, and reference entry all removed. Governance agent count 29 → 28 updated across `docs/architecture.md`, `docs/reference/agents.md`, `docs/reference/setup-inventory.md`, `INSTALL.md`, and `README.md`. A one-line removal note replaces the reference entry in `docs/reference/agents.md`.
+
+### Added
+
+- **`CONTRIBUTING.md`** (root) — how-to guide for fork-and-adapt contributors: fork model, per-artifact add/modify procedures pointing to `docs/customization.md`, documentation rule (§8 checklist), CI checks verbatim from `.github/workflows/docs.yml`, code of conduct one-liner, maintainer-framework note.
+- **`docs/adr/`** — MADR decision log; five ADRs derived from decisions already documented in the repo:
+  - `0001-record-architecture-decisions.md` — the meta ADR; establishes the log itself.
+  - `0002-hooks-enforce-process-not-prompts.md` — ~25% vs ~90% compliance rationale; why every critical rule has a hook.
+  - `0003-three-tier-qa-falsification.md` — per-task / per-increment / human-triggered QA structure; the "PASS = could not break it" framing.
+  - `0004-routing-as-code-workflow-enforcement.md` — procedure-layer-as-workflows pilot direction (status: Pilot, not yet adopted; dated 2026-06-09 when first documented in architecture.md).
+  - `0005-curated-publication-not-mirror.md` — repo ships a curated subset; counts pinned in `.doc-consistency.json`; CI verifies on every push.
+- **`docs/concepts/`** — three Diátaxis explanation pages (each ≤120 lines, mutually cross-linked, derived from README/CLAUDE.md/architecture.md content already in the repo):
+  - `task-classification.md` — why classify-first; burden-of-proof on Quick; Explicit Imperative fast path; compound detection and MUST DISPATCH.
+  - `enforcement-layers.md` — skills = procedure, hooks = enforcement, workflows = construction-time guarantee; how the four layers compose; the routing-as-code pilot direction.
+  - `falsification-qa.md` — QA proves absence of found bugs; 3a/3b/3c execution pattern; Untested Surface discipline; why `work-verification-check.py` exists.
+- **README.md Documentation section** updated: three new bullets linking Decision Log, Concepts, and Contributing.
+
+
 ## 2026-06-10 — Second verification pass: full reference coverage, 7 corrections
 
 ### Fixed

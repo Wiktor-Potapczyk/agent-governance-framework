@@ -8,7 +8,7 @@ A reference catalogue of every artifact class in this framework — what is inst
 
 | Asset class | Count | Location |
 |---|---|---|
-| Governance agents | 29 | `agents/governance/` |
+| Governance agents | 28 | `agents/governance/` |
 | Domain-example agents | 2 | `agents/domain-examples/` |
 | Top-level agents | 1 | `agents/` (`code-simplifier`) |
 | Core skills | 17 | `skills/core/` |
@@ -21,7 +21,7 @@ A reference catalogue of every artifact class in this framework — what is inst
 
 ## Agents (`agents/`)
 
-The 29 governance agents span five working categories:
+The 28 governance agents span five working categories:
 
 - **Core build/review:** blueprint-mode, debugger, architect-reviewer, adversarial-reviewer, implementation-plan, api-designer, data-engineer, code-simplifier, git-flow-manager.
 - **AI / prompts:** llm-architect, prompt-engineer.

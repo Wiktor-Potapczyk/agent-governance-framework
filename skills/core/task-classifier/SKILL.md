@@ -67,7 +67,7 @@ If the task involves a specialist domain, note it. Domain detection overrides th
 
 | Domain | Specialist Agent | Trigger |
 |--------|-----------------|---------|
-| n8n workflows | workflow-orchestrator (design) / blueprint-mode (build) | n8n nodes, workflow JSON, execution errors |
+| n8n workflows | n8n-workflow-architect (design) / n8n-workflow-builder (build) | n8n nodes, workflow JSON, execution errors |
 | MCP servers/clients | mcp-server-architect (design) / mcp-developer (build) | MCP protocol, transport, tool definitions |
 | PostgreSQL | postgres-pro | queries, EXPLAIN, replication, pgBouncer, JSONB |
 | Redis/MongoDB/NoSQL | nosql-specialist | Redis, MongoDB, Cassandra, document stores |

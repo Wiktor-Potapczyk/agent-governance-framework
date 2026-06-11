@@ -4,7 +4,7 @@
 
 **Mode:** Reference (Diátaxis). This page describes *what each agent IS* — fields, contracts, known failures. For *why* agents are shaped this way, see `docs/concepts/` and `docs/adr/`. For *how to use* them end-to-end, see the skill reference pages.
 
-**Coverage:** 32 agents total — 29 from `agents/governance/`, 2 from `agents/domain-examples/n8n/`, 1 top-level (`agents/code-simplifier.md`).
+**Coverage:** 31 agents total — 28 from `agents/governance/`, 2 from `agents/domain-examples/n8n/`, 1 top-level (`agents/code-simplifier.md`).
 
 ---
 
@@ -39,7 +39,6 @@
 | competitive-analyst | Specialized | Apply competitive frameworks (SWOT, feature matrix, Porter's) to research data |
 | content-marketer | Specialized | Write external-audience marketing copy from provided source material |
 | vault-keeper | Specialized | Obsidian vault organization: inbox triage, daily notes, health checks |
-| workflow-orchestrator | Specialized | Design n8n automation orchestration blueprints (design only, no JSON) |
 | pm-orchestrator | Productivity/PM | Project lifecycle management: phase detection, checkpoints with mandatory re-ranked next-3-tickets, viability gates |
 | code-simplifier | Productivity/PM | Mechanical hygiene cleanup on recently modified n8n JSON, Python hooks, Markdown skills |
 | n8n-workflow-architect | Domain examples | Phase 1 n8n design: blueprint + guidelines compliance matrix |
@@ -433,17 +432,7 @@
 
 ---
 
-### workflow-orchestrator
-
-| Field | Value |
-|---|---|
-| Domain | Design high-level n8n automation orchestration blueprints: state machines, branching logic, error recovery, parallel execution — design only, no JSON production |
-| Tools | Read, Write, Edit, Glob, Grep |
-| Dispatched by | `process-analysis` (DISPATCHES.json advisory for n8n workflow logic); `task-classifier` (n8n workflows design domain row) |
-| Model | sonnet |
-| Inputs | Process requirements; existing related workflows; project STATE.md |
-| Output contract | Orchestration design document at `Projects/<name>/work/YYYY-MM-DD-orchestration-<workflow>.md` with: Mermaid `stateDiagram-v2`, Data Contracts table (step/input/output/side-effects), Error Handling Matrix (failure mode/retry/fallback/compensation per external-service step), Open Questions; handoff note to blueprint-mode |
-| Known failure modes | Agent body states: only 1–3 clarifying questions if ambiguous; no design with unresolved ambiguities; every Mermaid state must have at least one exit transition; all conditions must be exact (not vague) |
+> **`workflow-orchestrator` removed 2026-06-11** — was a deprecated alias of `n8n-workflow-architect`; see [n8n-workflow-architect](#n8n-workflow-architect) under Domain Examples. The name is retained in three hook allowlists as a deprecated-alias safety net (`_DEPRECATED_DISPATCH_ALIASES` — see `hooks/agent-dispatch-check.py`); it does not route to an agent file.
 
 ---
 

@@ -32,7 +32,7 @@ For a detailed technical walkthrough of the architecture, see [docs/architecture
 ```
 framework-repo/
 ├── agents/
-│   ├── governance/          # 29 specialist agents (research team, architect, QA, planning, etc.)
+│   ├── governance/          # 28 specialist agents (research team, architect, QA, planning, etc.)
 │   └── domain-examples/     # Placeholder for project-specific agent examples
 ├── hooks/
 │   ├── user-prompt-submit.py        # Context bar + classifier enforcement on every message
@@ -91,6 +91,9 @@ This framework documents itself by a single, followable standard — derived fro
 - **[Setup Inventory](docs/reference/setup-inventory.md)** — the reference catalogue of every artifact class (agents, skills, hooks) and how the repository is organized.
 - **Per-artifact reference** — every artifact documented with the standard's attributes-table schema: **[Hooks Reference](docs/reference/hooks.md)** (event, matcher, action, inputs, side-effects, logical paths, failure mode — per hook), **[Agents Reference](docs/reference/agents.md)** (domain, tools, dispatch bindings, output contract — per agent), **[Skills Reference](docs/reference/skills.md)** (routing contract, dispatches, outputs, enforcing hook — per skill).
 - **[Architecture](docs/architecture.md)** — the layer model and how the pieces fit.
+- **[Decision Log (ADRs)](docs/adr/0001-record-architecture-decisions.md)** — MADR decision records for significant, costly, or hard-to-reverse choices: why hooks over prompts, why three-tier QA, why routing-as-code, why curated publication.
+- **[Concepts](docs/concepts/task-classification.md)** — explanation-quadrant pages on the framework's three core mental models: task classification, enforcement layers, and falsification QA.
+- **[Contributing](CONTRIBUTING.md)** — fork-and-adapt model, how to add/modify agents/skills/hooks, documentation rule, CI checks you can run locally.
 
 The standard's bar for "documented" is *every functionality and every logical path*, checked at publish time by the `doc-consistency` gate — not a surface mention.
 

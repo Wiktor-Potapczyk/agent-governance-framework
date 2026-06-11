@@ -110,7 +110,7 @@ Controls how specialist agents are spawned, what context they receive, and what 
 | `subagent-quality-check.py` | SubagentStop | Blocks if agent output is empty, errored, or unstructured | Soft block |
 | `dispatch-compliance-check.py` | Stop | Verifies every item in MUST DISPATCH was actually invoked via Skill or Agent tool | Hard block |
 
-**Agent roster:** 29 governance agents across 5 categories: Core (blueprint-mode, debugger, architect-reviewer, etc.), AI/Prompts (llm-architect, prompt-engineer), Research Team (orchestrator, analyst, technical-researcher, synthesizer, report-generator), Specialized (MCP, PostgreSQL, PowerShell, security), and Productivity (vault-keeper, content-marketer, competitive-analyst, workflow-orchestrator).
+**Agent roster:** 28 governance agents across 5 categories: Core (blueprint-mode, debugger, architect-reviewer, etc.), AI/Prompts (llm-architect, prompt-engineer), Research Team (orchestrator, analyst, technical-researcher, synthesizer, report-generator), Specialized (MCP, PostgreSQL, PowerShell, security), and Productivity (vault-keeper, content-marketer, competitive-analyst). `workflow-orchestrator` removed 2026-06-11 as deprecated alias of `n8n-workflow-architect`.
 
 **Blind Analysis Rule:** When dispatching agents for evaluation, the delegation message contains ONLY what to examine and criteria -- no hypotheses, no expected outcomes, no prior conclusions. This prevents anchoring bias. Exceptions: blueprint-mode (needs specs), implementation-plan (needs requirements), content-marketer (needs briefs), adversarial-reviewer (needs what to challenge).
 
@@ -229,7 +229,7 @@ When Claude Code compacts a long session, the SessionStart hook can persist a sn
 | Shared hook libraries | 4 (`sidecar_loader.py`, `_governance_logger.py`, `_wiki_citation_logic.py`, `_subagent_quality_logic.py`) | `hooks/` |
 | Archived stub | 1 (`context-fill-log.py`) | `_archived/hooks/` |
 | Optional/disabled hook scripts | 5 (4 Python + 1 PowerShell) | `hooks/disabled/` |
-| Governance agents | 29 | `agents/governance/` |
+| Governance agents | 28 | `agents/governance/` |
 | Core skills | 17 | `skills/core/` |
 | Vault management skills | 7 | `skills/vault/` |
 | Domain example skills | 19 | `skills/domain-examples/` (12 Apify + 7 n8n) |

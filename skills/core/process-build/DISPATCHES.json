@@ -32,7 +32,7 @@
   "allowed_specialists_via_process_exemption": [
     "data-engineer",
     "api-designer",
-    "workflow-orchestrator",
+    "n8n-workflow-architect",
     "mcp-developer",
     "postgres-pro",
     "nosql-specialist",
