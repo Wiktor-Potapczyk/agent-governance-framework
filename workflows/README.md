@@ -61,7 +61,7 @@ The process skills define *which procedure to follow* (routing + prose spec). Th
 
 4. **DISPATCHES.json** — the `DISPATCHES.json` sidecar in each skill directory maps skill name to expected dispatch set. Do not delete it; it is the H11 read-only verification source used by `dispatch-compliance-check.py`.
 
-5. **Hook preconditions for process-qa** — `process-qa.js` relies on three hook fixes (listed in its file header as B-1, B-2, B-3) in `process-step-check.py` and `work-verification-check.py`. Without these, the `work-verification-check` will false-block a Workflow-driven QA run because the execution tools run inside the workflow subagent and are invisible to the main transcript. Ship the three updated hook files before wiring the process-qa SKILL.md stub.
+5. **Hook preconditions for process-qa** — `process-qa.js` relies on three hook fixes (described in its file header) in `process-step-check.py` and `work-verification-check.py`. Without these, the `work-verification-check` will false-block a Workflow-driven QA run because the execution tools run inside the workflow subagent and are invisible to the main transcript. Ship the three updated hook files before wiring the process-qa SKILL.md stub.
 
 ---
 
