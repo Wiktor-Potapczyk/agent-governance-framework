@@ -4,77 +4,183 @@
   "checks": [
     {
       "id": "governance-agents-count",
-      "expect": { "count_files": { "dir": "agents/governance", "glob": "*.md" } },
+      "expect": {
+        "count_files": {
+          "dir": "agents/governance",
+          "glob": "*.md"
+        }
+      },
       "asserted_in": [
-        { "file": "docs/architecture.md", "pattern": "Governance agents \\| (\\d+)" },
-        { "file": "docs/architecture.md", "pattern": "(\\d+) governance agents across" },
-        { "file": "INSTALL.md", "pattern": "The (\\d+) governance agents cover" },
-        { "file": "README.md", "pattern": "(\\d+) specialist agents" }
+        {
+          "file": "docs/architecture.md",
+          "pattern": "Governance agents \\| (\\d+)"
+        },
+        {
+          "file": "docs/architecture.md",
+          "pattern": "(\\d+) governance agents across"
+        },
+        {
+          "file": "INSTALL.md",
+          "pattern": "The (\\d+) governance agents cover"
+        },
+        {
+          "file": "README.md",
+          "pattern": "(\\d+) specialist agents"
+        }
       ]
     },
     {
       "id": "core-skills-count",
-      "expect": { "count_files": { "dir": "skills/core", "glob": "*/SKILL.md" } },
+      "expect": {
+        "count_files": {
+          "dir": "skills/core",
+          "glob": "*/SKILL.md"
+        }
+      },
       "asserted_in": [
-        { "file": "docs/architecture.md", "pattern": "Core skills \\| (\\d+)" },
-        { "file": "README.md", "pattern": "(\\d+) governance skills" }
+        {
+          "file": "docs/architecture.md",
+          "pattern": "Core skills \\| (\\d+)"
+        },
+        {
+          "file": "README.md",
+          "pattern": "(\\d+) governance skills"
+        }
       ]
     },
     {
       "id": "vault-skills-count",
-      "expect": { "count_files": { "dir": "skills/vault", "glob": "*/SKILL.md" } },
+      "expect": {
+        "count_files": {
+          "dir": "skills/vault",
+          "glob": "*/SKILL.md"
+        }
+      },
       "asserted_in": [
-        { "file": "docs/architecture.md", "pattern": "Vault management skills \\| (\\d+)" },
-        { "file": "INSTALL.md", "pattern": "Vault management skills\\*\\* \\((\\d+) total" },
-        { "file": "README.md", "pattern": "(\\d+) knowledge-management skills" }
+        {
+          "file": "docs/architecture.md",
+          "pattern": "Vault management skills \\| (\\d+)"
+        },
+        {
+          "file": "INSTALL.md",
+          "pattern": "Vault management skills\\*\\* \\((\\d+) total"
+        },
+        {
+          "file": "README.md",
+          "pattern": "(\\d+) knowledge-management skills"
+        }
       ]
     },
     {
       "id": "apify-skills-count",
-      "expect": { "count_files": { "dir": "skills/domain-examples/apify", "glob": "*/SKILL.md" } },
+      "expect": {
+        "count_files": {
+          "dir": "skills/domain-examples/apify",
+          "glob": "*/SKILL.md"
+        }
+      },
       "asserted_in": [
-        { "file": "docs/architecture.md", "pattern": "\\((\\d+) Apify" },
-        { "file": "INSTALL.md", "pattern": "Apify: (\\d+) skills" }
+        {
+          "file": "docs/architecture.md",
+          "pattern": "\\((\\d+) Apify"
+        },
+        {
+          "file": "INSTALL.md",
+          "pattern": "Apify: (\\d+) skills"
+        }
       ]
     },
     {
       "id": "n8n-skills-count",
-      "expect": { "count_files": { "dir": "skills/domain-examples/n8n", "glob": "*/SKILL.md" } },
+      "expect": {
+        "count_files": {
+          "dir": "skills/domain-examples/n8n",
+          "glob": "*/SKILL.md"
+        }
+      },
       "asserted_in": [
-        { "file": "docs/architecture.md", "pattern": "\\+ (\\d+) n8n\\)" },
-        { "file": "INSTALL.md", "pattern": "n8n: (\\d+) skills" }
+        {
+          "file": "docs/architecture.md",
+          "pattern": "\\+ (\\d+) n8n\\)"
+        },
+        {
+          "file": "INSTALL.md",
+          "pattern": "n8n: (\\d+) skills"
+        }
       ]
     },
     {
       "id": "domain-skills-total",
-      "expect": { "count_files": { "dir": "skills/domain-examples", "glob": "*/*/SKILL.md" } },
+      "expect": {
+        "count_files": {
+          "dir": "skills/domain-examples",
+          "glob": "*/*/SKILL.md"
+        }
+      },
       "asserted_in": [
-        { "file": "docs/architecture.md", "pattern": "Domain example skills \\| (\\d+)" },
-        { "file": "README.md", "pattern": "(\\d+) domain skills" },
-        { "file": "INSTALL.md", "pattern": "\\((\\d+) total in `skills/domain-examples" }
+        {
+          "file": "docs/architecture.md",
+          "pattern": "Domain example skills \\| (\\d+)"
+        },
+        {
+          "file": "README.md",
+          "pattern": "(\\d+) domain skills"
+        },
+        {
+          "file": "INSTALL.md",
+          "pattern": "\\((\\d+) total in `skills/domain-examples"
+        }
       ]
     },
     {
       "id": "workflows-count",
-      "expect": { "count_files": { "dir": "workflows", "glob": "*.js" } },
+      "expect": {
+        "count_files": {
+          "dir": "workflows",
+          "glob": "*.js"
+        }
+      },
       "asserted_in": [
-        { "file": "docs/reference/setup-inventory.md", "pattern": "Workflow scripts \\| (\\d+)" },
-        { "file": "CHANGELOG.md", "pattern": "workflows/\\*\\.js = (\\d+)" }
+        {
+          "file": "docs/reference/setup-inventory.md",
+          "pattern": "Workflow scripts \\| (\\d+)"
+        },
+        {
+          "file": "CHANGELOG.md",
+          "pattern": "workflows/\\*\\.js = (\\d+)"
+        },
+        {
+          "file": "README.md",
+          "pattern": "workflows/\\s+# (\\d+) deterministic process-skill workflow scripts"
+        }
       ]
     },
     {
       "id": "active-enforcement-hooks",
-      "expect": { "literal": "28" },
+      "expect": {
+        "literal": "28"
+      },
       "asserted_in": [
-        { "file": "docs/architecture.md", "pattern": "Active enforcement hooks \\(default config\\) \\| (\\d+)" },
-        { "file": "hooks/README.md", "pattern": "uses (\\d+) active enforcement hooks" }
+        {
+          "file": "docs/architecture.md",
+          "pattern": "Active enforcement hooks \\(default config\\) \\| (\\d+)"
+        },
+        {
+          "file": "hooks/README.md",
+          "pattern": "uses (\\d+) active enforcement hooks"
+        }
       ]
     },
     {
       "id": "shared-hook-libraries",
-      "expect": { "literal": "4" },
+      "expect": {
+        "literal": "4"
+      },
       "asserted_in": [
-        { "file": "docs/architecture.md", "pattern": "Shared hook libraries \\| (\\d+)" }
+        {
+          "file": "docs/architecture.md",
+          "pattern": "Shared hook libraries \\| (\\d+)"
+        }
       ]
     }
   ]

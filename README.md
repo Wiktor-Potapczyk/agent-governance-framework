@@ -59,6 +59,7 @@ framework-repo/
 │   ├── core/                # 17 governance skills (task-classifier, process-*, db-migration-plan, process-postmortem, doc-consistency, verify, ensemble, pm, process-governance-mine, etc.)
 │   ├── vault/               # 7 knowledge-management skills (save, inbox, standup, process-ingest, process-lint, etc.)
 │   └── domain-examples/     # 19 domain skills across Apify and n8n
+├── workflows/               # 6 deterministic process-skill workflow scripts (the enforced procedure layer)
 ├── settings/
 │   ├── settings.json.example        # Global hook registration template
 │   └── settings.local.json.example  # Project-level override (registers 12 default hooks; remaining 5 active hooks are opt-in)
