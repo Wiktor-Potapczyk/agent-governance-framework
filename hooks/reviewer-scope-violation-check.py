@@ -1,7 +1,7 @@
 """
 Reviewer Scope Violation Check - PreToolUse Hook (matcher: Write|Edit|MultiEdit)
 
-Design: Projects/Agent-Governance-Research/work/2026-05-25-reviewer-scope-violation-check-design.md
+Design: Projects/your-project/work/2026-05-25-reviewer-scope-violation-check-design.md
 AW-5 Finding 2: evaluative-reviewer sub-agents with Write access can edit the
 artifact they were dispatched to review, then produce a critique of their own edit.
 This is the runtime enforcement layer (~90% compliance) on top of the prompt-level
@@ -10,16 +10,16 @@ This is the runtime enforcement layer (~90% compliance) on top of the prompt-lev
 Blocked agents: adversarial-reviewer, architect-reviewer, code-reviewer.
 
 Detection (§1 of design):
-1. PRIMARY — read agent_type from PreToolUse payload. On match, apply FP rules.
-2. FALLBACK — if agent_type absent/empty, walk sub-agent transcript (200KB tail)
+1. PRIMARY: read agent_type from PreToolUse payload. On match, apply FP rules.
+2. FALLBACK: if agent_type absent/empty, walk sub-agent transcript (200KB tail)
    for first user entry that contains the agent frontmatter name: field. Sub-agents
    receive their dispatch prompt (including frontmatter) as the first user message
-   in their OWN transcript — not the parent session's transcript. The transcript_path
+   in their OWN transcript: not the parent session's transcript. The transcript_path
    in a sub-agent's PreToolUse payload points to the sub-agent's JSONL.
 
 False-positive rules applied in order (§3 of design):
-  Rule A — if target path matches `work/YYYY-MM-DD-*-review-*.md` → ALLOW (report output)
-  Rule C — if target path does NOT exist on disk → ALLOW (new file = new report)
+  Rule A: if target path matches `work/YYYY-MM-DD-*-review-*.md` → ALLOW (report output)
+  Rule C: if target path does NOT exist on disk → ALLOW (new file = new report)
   Otherwise → BLOCK (existing non-review file from reviewer context)
 
 Block format: JSON {"decision": "block", "reason": "..."} to stdout + governance-log entry.
@@ -34,11 +34,11 @@ import json
 import os
 import re
 
-# 200KB window — matches all other hardened hooks in this directory
+# 200KB window: matches all other hardened hooks in this directory
 READ_BYTES = 204800
 
 # The evaluative reviewer agents this hook is responsible for blocking.
-# code-reviewer is a plugin agent (superpowers/code-review) — included because
+# code-reviewer is a plugin agent (superpowers/code-review): included because
 # detection is via agent_type field, which is runtime, not frontmatter.
 REVIEWER_AGENTS = {"adversarial-reviewer", "architect-reviewer", "code-reviewer"}
 
@@ -66,7 +66,7 @@ def _norm_path(p):
     """
     return p.replace(os.sep, "/")
 
-# Observability v2 shared helper — silent on import failure.
+# Observability v2 shared helper: silent on import failure.
 try:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from _event_emit import emit_event  # type: ignore
@@ -130,7 +130,7 @@ def _extract_agent_type_from_transcript(transcript_path):
     entry and extract the `name:` field.
 
     Returns the agent name string if found and in REVIEWER_AGENTS, else None.
-    This function does NOT check REVIEWER_AGENTS membership — caller does that.
+    This function does NOT check REVIEWER_AGENTS membership: caller does that.
     """
     if not transcript_path or not os.path.exists(transcript_path):
         return None
@@ -143,7 +143,7 @@ def _extract_agent_type_from_transcript(transcript_path):
             fh.seek(max(0, file_size - read_bytes))
             tail = fh.read()
 
-        # Walk lines looking for first user entry — that's the dispatch prompt
+        # Walk lines looking for first user entry: that's the dispatch prompt
         for raw_line in tail.split("\n"):
             raw_line = raw_line.strip()
             if not raw_line:
@@ -180,7 +180,7 @@ def _extract_agent_type_from_transcript(transcript_path):
             if m:
                 return m.group(1).strip()
 
-            # Only check the first user entry — subsequent user entries are not
+            # Only check the first user entry: subsequent user entries are not
             # the dispatch prompt and may introduce false matches.
             break
 
@@ -240,7 +240,7 @@ def main():
     file_path = (tool_input.get("file_path") or "").strip()
 
     if not file_path:
-        # No path to check — cannot determine target, allow (safe failure).
+        # No path to check: cannot determine target, allow (safe failure).
         return
 
     # -------------------------------------------------------------------
@@ -255,15 +255,15 @@ def main():
     # Rule A: Report-output path regex match → ALLOW.
     # Covers: existing report files being overwritten on a re-run (Rule C would block).
     if REVIEW_OUTPUT_RE.search(norm_path):
-        return  # exit 0 — legitimate report output
+        return  # exit 0: legitimate report output
 
     # Rule C: File does not yet exist on disk → ALLOW (new file = report output).
     # The artifact under review already exists; the reviewer's output is always new.
     if not os.path.exists(file_path):
-        return  # exit 0 — new file, safe to write
+        return  # exit 0: new file, safe to write
 
     # -------------------------------------------------------------------
-    # Step 4: BLOCK — reviewer is attempting to edit an existing non-report file.
+    # Step 4: BLOCK: reviewer is attempting to edit an existing non-report file.
     # -------------------------------------------------------------------
 
     block_reason = (
@@ -288,12 +288,12 @@ def main():
 
 if __name__ == "__main__":
     # -----------------------------------------------------------------------
-    # Smoke tests — only execute on direct invocation, NEVER when CC calls hook.
+    # Smoke tests: only execute on direct invocation, NEVER when CC calls hook.
     # Guard: HOOK_SMOKE_TEST=1 env var is set by the parent test runner on child
     # processes so the child does NOT re-enter this block (avoids infinite recursion).
     # -----------------------------------------------------------------------
     if os.environ.get("HOOK_SMOKE_TEST") == "1":
-        # Running as child subprocess invoked BY a smoke test — execute normally.
+        # Running as child subprocess invoked BY a smoke test: execute normally.
         main()
         sys.exit(0)
 
@@ -304,7 +304,7 @@ if __name__ == "__main__":
     # Use sys.executable only if it points to a real Python binary.
     # When the smoke tests are run via `python hook.py` directly, sys.executable
     # is the Python interpreter. When the hook is invoked by the CC hook runner
-    # (node process), sys.executable may not be Python — fall back to the known path.
+    # (node process), sys.executable may not be Python: fall back to the known path.
     _candidate = sys.executable
     python_exe = (
         _candidate
@@ -334,7 +334,7 @@ if __name__ == "__main__":
     def assert_test(name, condition, detail=""):
         global passed, failed
         status = "PASS" if condition else "FAIL"
-        suffix = f" — {detail}" if detail else ""
+        suffix = f": {detail}" if detail else ""
         print(f"  [{status}] {name}{suffix}")
         if condition:
             passed += 1
@@ -352,7 +352,7 @@ if __name__ == "__main__":
     _vault_root = os.path.dirname(os.path.dirname(_HOOK_DIR))
     existing_target = os.path.join(
         _vault_root,
-        "Projects", "Agent-Governance-Research", "STATE.md"
+        "Projects", "your-project", "STATE.md"
     )
     # If STATE.md doesn't exist locally, fall back to CLAUDE.md (guaranteed).
     if not os.path.exists(existing_target):
@@ -383,7 +383,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------
     new_report_path = os.path.join(
         _vault_root,
-        "Projects", "Agent-Governance-Research", "work",
+        "Projects", "your-project", "work",
         "2026-05-25-test-review-adversarial.md",
     )
     # Ensure the test target doesn't accidentally exist.
@@ -412,7 +412,7 @@ if __name__ == "__main__":
     # TN2: main-session (no agent_type) Edit on STATE.md → ALLOW (fast-path).
     # ------------------------------------------------------------------
     tn2_payload = {
-        # agent_type absent — simulates main-session Write call
+        # agent_type absent: simulates main-session Write call
         "tool_name": "Edit",
         "tool_input": {"file_path": existing_target},
         "transcript_path": "",

@@ -1,5 +1,5 @@
 """
-test_routing_table_validation.py — stdlib unittest boundary suite for
+test_routing_table_validation.py: stdlib unittest boundary suite for
 routing-table-validation.py (opt-in PreToolUse hook).
 
 Run:  python hooks/disabled/test_routing_table_validation.py
@@ -189,14 +189,14 @@ class TestDenyCases(unittest.TestCase):
 
 
 class TestAllowCases(unittest.TestCase):
-    """Cases that MUST produce ALLOW (silent stdout) — false-positive guards."""
+    """Cases that MUST produce ALLOW (silent stdout): false-positive guards."""
 
     def test_allow_all_real_agents_in_must_dispatch(self):
         """
         MUST DISPATCH with only real agents (both loaded dynamically from registry.json).
         Expected: ALLOW.
         """
-        # Use _REAL_AGENT twice to guarantee both tokens resolve — no hardcoded names
+        # Use _REAL_AGENT twice to guarantee both tokens resolve: no hardcoded names
         payload = {
             "tool_name": "Edit",
             "tool_input": {
@@ -272,7 +272,7 @@ class TestAllowCases(unittest.TestCase):
     def test_allow_non_routing_file_with_ghost_must_dispatch(self):
         """
         Ghost name in a MUST DISPATCH line but in a non-routing file.
-        Expected: ALLOW (gate a fails — wrong file class).
+        Expected: ALLOW (gate a fails: wrong file class).
         """
         payload = {
             "tool_name": "Edit",
@@ -289,8 +289,8 @@ class TestAllowCases(unittest.TestCase):
 
     def test_allow_single_word_token_not_agent_shaped(self):
         """
-        Single-word token (no hyphen/underscore — not agent-shaped by shape gate).
-        Expected: ALLOW (gate c fails — shape mismatch).
+        Single-word token (no hyphen/underscore: not agent-shaped by shape gate).
+        Expected: ALLOW (gate c fails: shape mismatch).
         """
         payload = {
             "tool_name": "Edit",
@@ -307,7 +307,7 @@ class TestAllowCases(unittest.TestCase):
 
     def test_allow_capitalized_token_not_agent_shaped(self):
         """
-        Capitalized word in a MUST DISPATCH line — not agent-shaped (starts uppercase).
+        Capitalized word in a MUST DISPATCH line: not agent-shaped (starts uppercase).
         Expected: ALLOW (gate c fails).
         """
         payload = {
@@ -326,7 +326,7 @@ class TestAllowCases(unittest.TestCase):
     def test_allow_path_shaped_token_not_agent_shaped(self):
         """
         Path-like token in a MUST DISPATCH line.
-        Expected: ALLOW (gate c fails — shape mismatch due to slashes/dots).
+        Expected: ALLOW (gate c fails: shape mismatch due to slashes/dots).
         """
         payload = {
             "tool_name": "Edit",
@@ -397,7 +397,7 @@ class TestAllowCases(unittest.TestCase):
 
     def test_allow_empty_new_string(self):
         """
-        Edit with empty new_string — nothing to validate.
+        Edit with empty new_string: nothing to validate.
         Expected: ALLOW.
         """
         payload = {
@@ -540,7 +540,7 @@ class TestDispatchPhraseProseAllows(unittest.TestCase):
 
     All prose forms of "dispatches to X" / "dispatch X" MUST ALLOW.
     The verb form is indistinguishable from ordinary English and was a
-    systematic false-positive source — the detector was removed.
+    systematic false-positive source: the detector was removed.
     Only MUST DISPATCH: lines, subagent_type: fields, and table rows are
     unambiguous dispatch positions.
     """
@@ -548,7 +548,7 @@ class TestDispatchPhraseProseAllows(unittest.TestCase):
     def test_allow_prose_dispatches_to_sub_tasks(self):
         """
         'The system dispatches to sub-tasks based on type.' -> ALLOW.
-        'sub-tasks' is agent-shaped but this is plain prose — must not block.
+        'sub-tasks' is agent-shaped but this is plain prose: must not block.
         """
         payload = {
             "tool_name": "Edit",
@@ -566,7 +566,7 @@ class TestDispatchPhraseProseAllows(unittest.TestCase):
     def test_allow_prose_dispatch_rate_limited_requests(self):
         """
         'dispatch rate-limited requests to the queue.' -> ALLOW.
-        'rate-limited' is agent-shaped but this is plain prose — must not block.
+        'rate-limited' is agent-shaped but this is plain prose: must not block.
         """
         payload = {
             "tool_name": "Edit",
@@ -584,7 +584,7 @@ class TestDispatchPhraseProseAllows(unittest.TestCase):
     def test_allow_prose_hook_dispatches_to_agent_registry_check(self):
         """
         'The hook dispatches to agent-registry-check and returns.' -> ALLOW.
-        This is prose — verb-dispatch must never block.
+        This is prose: verb-dispatch must never block.
         """
         payload = {
             "tool_name": "Edit",
@@ -647,7 +647,7 @@ class TestDispatchPhraseProseAllows(unittest.TestCase):
 
 
 class TestExitCodeAlways0(unittest.TestCase):
-    """Hook must always exit 0 — it must never abort the session."""
+    """Hook must always exit 0: it must never abort the session."""
 
     def test_exit_0_on_deny(self):
         payload = {

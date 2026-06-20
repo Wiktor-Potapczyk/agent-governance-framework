@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreCompact hook — comprehensive state save before compaction.
+"""PreCompact hook: comprehensive state save before compaction.
 
 Writes recovery file that SessionStart(compact) injects via restore-compact.sh.
 Collects STATE.md files, active task plans, and recent transcript context.
@@ -105,7 +105,7 @@ if transcript_path and os.path.isfile(transcript_path):
             except json.JSONDecodeError:
                 continue
 
-            # User messages — extract text content
+            # User messages: extract text content
             if entry.get("type") == "human":
                 msg = entry.get("message", {})
                 for block in msg.get("content", []):
@@ -115,7 +115,7 @@ if transcript_path and os.path.isfile(transcript_path):
                             text = text[:500] + "..."
                         recent_user.append(text)
 
-            # Assistant messages — extract classification + file writes
+            # Assistant messages: extract classification + file writes
             if entry.get("type") == "assistant":
                 msg = entry.get("message", {})
                 for block in msg.get("content", []):

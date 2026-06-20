@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PostToolUse hook — periodic save checkpoint reminder."""
+"""PostToolUse hook: periodic save checkpoint reminder."""
 import json
 import os
 import time

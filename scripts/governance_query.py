@@ -1,5 +1,5 @@
 """
-Governance Query — CLI tool to query observability.db with layer filtering.
+Governance Query: CLI tool to query observability.db with layer filtering.
 
 Usage:
     python governance_query.py                    # all layers, all sessions
@@ -66,7 +66,7 @@ def format_output(cols, sessions, kpi_rows, layer):
         return
 
     print(f"\n{'='*80}")
-    title = f"Governance Query — {layer.upper() if layer else 'ALL LAYERS'}"
+    title = f"Governance Query: {layer.upper() if layer else 'ALL LAYERS'}"
     print(f"  {title}")
     print(f"{'='*80}\n")
 

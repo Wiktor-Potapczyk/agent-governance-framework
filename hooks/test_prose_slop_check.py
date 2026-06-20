@@ -1,4 +1,4 @@
-"""Tests for prose-slop-check.py — DORMANT PostToolUse:Write quality hook.
+"""Tests for prose-slop-check.py: DORMANT PostToolUse:Write quality hook.
 
 Covers the pure detector (find_slop / should_warn) + the scope gate, and carries
 named FP-guards (C4 boundary coverage). The hook NEVER blocks (WARN-only), so the
@@ -72,7 +72,7 @@ class ProseSlopBoundaryTests(unittest.TestCase):
     def test_fp_borderline_technical_words_silent(self):
         """FP-PS-01 boundary_axis: 'hallmark LLM-slop vs legitimate technical register'.
         robust/comprehensive/crucial/significant/fundamental are EXCLUDED from the list
-        by calibration — a page full of them must NOT warn."""
+        by calibration: a page full of them must NOT warn."""
         text = ("This is a robust, comprehensive design. The crucial, significant, "
                 "fundamental decision leverages the existing landscape seamlessly.")
         d, t, _ = psc.find_slop(text)
@@ -101,14 +101,14 @@ class ProseSlopBoundaryTests(unittest.TestCase):
 
     def test_fp_raw_layer_path_not_linted(self):
         """FP-PS-05 boundary_axis: 'wiki/work layer vs raw layer'. Inbox/Clippings/
-        Daily Notes are human/external prose — out of scope even if slop-dense."""
+        Daily Notes are human/external prose: out of scope even if slop-dense."""
         err, _ = _run("Inbox/some-dump.md", "We delve into the vibrant tapestry of the realm, moreover.")
         self.assertEqual(err, "")
 
     def test_fp_substring_not_matched(self):
         """FP-PS-06 boundary_axis: 'whole word vs substring'. 'fostering' contains
         'foster' but \\b word-boundary anchoring should still match 'foster' only as a
-        whole word — 'realm' must not match inside 'realms'? Guard the common false
+        whole word: 'realm' must not match inside 'realms'? Guard the common false
         substring case: 'foster' must not fire on unrelated 'fostered' check is moot,
         but 'real' inside 'really' must NOT count as 'realm'."""
         d, t, _ = psc.find_slop("I really think the area is well understood.")

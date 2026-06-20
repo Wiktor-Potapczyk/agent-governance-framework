@@ -1,21 +1,21 @@
 # The Documentation Standard
 
-**One followable standard for how this framework documents itself** — the repository and its docs — so the docs stay orderly, complete, and current. Derived from established industry frameworks (Diátaxis, arc42/C4, ADR/MADR, Keep a Changelog, SemVer, standard-readme, docs-as-code) and adapted to the place those frameworks leave a gap: documenting a markdown/skill/hook/agent-heavy repository rather than a conventional code library.
+**One followable standard for how this framework documents itself**: the repository and its docs: so the docs stay orderly, complete, and current. Derived from established industry frameworks (Diátaxis, arc42/C4, ADR/MADR, Keep a Changelog, SemVer, standard-readme, docs-as-code) and adapted to the place those frameworks leave a gap: documenting a markdown/skill/hook/agent-heavy repository rather than a conventional code library.
 
 This is the format. When you document anything here, you follow these rules.
 
-**Scope.** This standard governs the published repository in full. It is **process doctrine, not a runtime hook** — deliberately NOT enforced by a blocking hook (that approach was tried and rejected as over-engineering). Its single enforcement point is the **documentation-sync push gate** (§7): the §8 checklist is the *what*, and the doc-consistency + Definition-of-Done pass at push time is the *when-checked*. Nothing self-executes on every keystroke — and that is intentional.
+**Scope.** This standard governs the published repository in full. It is **process doctrine, not a runtime hook**: deliberately NOT enforced by a blocking hook (that approach was tried and rejected as over-engineering). Its single enforcement point is the **documentation-sync push gate** (§7): the §8 checklist is the *what*, and the doc-consistency + Definition-of-Done pass at push time is the *when-checked*. Nothing self-executes on every keystroke: and that is intentional.
 
 ---
 
 ## 0. The governing decisions (why this shape)
 
-1. **Diátaxis governs *where* a doc goes.** Every doc is exactly one of four modes — Tutorial, How-to, Reference, Explanation — never mixed in one file. (diataxis.fr)
-2. **The attributes-table is the unit of Reference.** Because the artifacts here are hooks/skills/agents (configurable entities), not functions, each is documented with a uniform field table — the dominant convention for config-heavy repos (Ansible modules, Terraform variables, CrewAI concepts). Narrative prose is NOT the reference form.
+1. **Diátaxis governs *where* a doc goes.** Every doc is exactly one of four modes: Tutorial, How-to, Reference, Explanation: never mixed in one file. (diataxis.fr)
+2. **The attributes-table is the unit of Reference.** Because the artifacts here are hooks/skills/agents (configurable entities), not functions, each is documented with a uniform field table: the dominant convention for config-heavy repos (Ansible modules, Terraform variables, CrewAI concepts). Narrative prose is NOT the reference form.
 3. **The "why" lives in ONE decision store, never inline in a reference table.** Decision-from-description separation (Nygard; arc42 §9). See §4 for the single-authority rule that avoids competing "why" corpora.
 4. **Single-source-of-truth is absolute.** A fact lives in exactly one doc; everything else links to it. No copied counts, no restated rules. (Google style guide; Write the Docs)
 5. **Docs change in the same commit as the thing they describe.** Incorrect docs are worse than missing docs. (Write the Docs; Google)
-6. **Completeness is the bar: every functionality AND every logical path.** "Mentioned" is not "documented." Within a doc's scope, cover concepts in full or not at all — a partial map misleads. (Write the Docs)
+6. **Completeness is the bar: every functionality AND every logical path.** "Mentioned" is not "documented." Within a doc's scope, cover concepts in full or not at all: a partial map misleads. (Write the Docs)
 
 ---
 
@@ -28,12 +28,12 @@ This is the format. When you document anything here, you follow these rules.
 | `README.md` | mixed entry | Front door: what it is, install, usage, links out | root | **Always** |
 | `CHANGELOG.md` | reference | Human-readable release history (Keep a Changelog) | root | **Always** |
 | `docs/architecture.md` | explanation | The layer model + how the pieces fit | `docs/` | **Always** |
-| `docs/reference/` | reference | Attributes-table pages — per hook/skill/agent class | `docs/reference/` | If non-trivial |
+| `docs/reference/` | reference | Attributes-table pages: per hook/skill/agent class | `docs/reference/` | If non-trivial |
 | `docs/adr/NNNN-*.md` | decision log | Immutable MADR decision records | `docs/adr/` | As decisions are made |
 | `docs/concepts/` | explanation | Why the architecture is shaped this way; mental models | `docs/concepts/` | If non-trivial |
 | `INSTALL.md` | how-to | Setup steps | root | **Always** |
 | `CONTRIBUTING.md` | how-to | How to contribute + the rules (incl. this standard) | root or `.github/` | If public |
-| `LICENSE` | — | Legal terms | root | **Always** |
+| `LICENSE` |: | Legal terms | root | **Always** |
 
 **README section order** (standard-readme): Title → one-line description (<120 chars) → TOC (if >100 lines) → Install → Usage → Architecture summary (link to architecture.md) → Contributing → License (last). Cognitive funnel: broad first, narrow last.
 
@@ -48,15 +48,15 @@ Decide the mode before you write. Pick the ONE that fits; if it feels like two, 
 | teaches a newcomer by doing, start-to-finish | **Tutorial** | `docs/tutorials/` |
 | helps someone accomplish a specific goal | **How-to** | `docs/how-to/` |
 | describes what a thing IS (fields, behavior, contract) | **Reference** | `docs/reference/` |
-| explains WHY — rationale, model, tradeoffs | **Explanation** | `docs/concepts/` or an ADR |
+| explains WHY: rationale, model, tradeoffs | **Explanation** | `docs/concepts/` or an ADR |
 
-**The no-mixing rule:** a reference page does not contain a tutorial; a how-to does not digress into architectural rationale (link to the concept/ADR instead). **Clarification:** a one-line `Rationale` field or a `Use-when` pointer *inside* a reference attributes-table is NOT mode-mixing — those are cross-reference fields (a link + a sentence), not the prose explanation/tutorial sections the rule forbids. A reference table may *point at* the why; it must not *contain* the multi-paragraph why.
+**The no-mixing rule:** a reference page does not contain a tutorial; a how-to does not digress into architectural rationale (link to the concept/ADR instead). **Clarification:** a one-line `Rationale` field or a `Use-when` pointer *inside* a reference attributes-table is NOT mode-mixing: those are cross-reference fields (a link + a sentence), not the prose explanation/tutorial sections the rule forbids. A reference table may *point at* the why; it must not *contain* the multi-paragraph why.
 
 ---
 
 ## 3. The artifact Reference schema (the heart of this standard)
 
-Every **hook**, **skill**, and **agent** gets a Reference entry with a uniform attributes table. This is how a config/markdown repo documents "every functionality and every logical path." No published cross-tool standard exists for this — this IS the standard here.
+Every **hook**, **skill**, and **agent** gets a Reference entry with a uniform attributes table. This is how a config/markdown repo documents "every functionality and every logical path." No published cross-tool standard exists for this: this IS the standard here.
 
 ### 3a. Hook reference template
 
@@ -75,7 +75,7 @@ Every **hook**, **skill**, and **agent** gets a Reference entry with a uniform a
 | Rationale | one line + link to the decision record that motivated it |
 ```
 
-The **Logical paths** row enumerates each branch. **The code is the source of truth, not this row** — so the row cites the hook's `test_<hook>.py` where one exists (the test file is the verified, executable branch enumeration). Maintain it under the §6.2 same-commit rule. **Honest limitation:** a hand-maintained branch table that has gone stale is *worse* than an absent one, because a reader trusts it. If you cannot keep the enumeration current, write "see `test_<hook>.py` for the authoritative branch set" + a one-line summary rather than a fake-complete table.
+The **Logical paths** row enumerates each branch. **The code is the source of truth, not this row**: so the row cites the hook's `test_<hook>.py` where one exists (the test file is the verified, executable branch enumeration). Maintain it under the §6.2 same-commit rule. **Honest limitation:** a hand-maintained branch table that has gone stale is *worse* than an absent one, because a reader trusts it. If you cannot keep the enumeration current, write "see `test_<hook>.py` for the authoritative branch set" + a one-line summary rather than a fake-complete table.
 
 ### 3b. Skill reference template
 
@@ -107,7 +107,7 @@ The **Logical paths** row enumerates each branch. **The code is the source of tr
 | Known failure modes | documented risks |
 ```
 
-**Control-flow across artifacts** (which hook fires in what order, which skill dispatches which agent) is documented ONCE in an Explanation page (`docs/concepts/execution-model.md`) with a flow diagram — NOT repeated in each artifact's reference entry (single-source-of-truth).
+**Control-flow across artifacts** (which hook fires in what order, which skill dispatches which agent) is documented ONCE in an Explanation page (`docs/concepts/execution-model.md`) with a flow diagram: NOT repeated in each artifact's reference entry (single-source-of-truth).
 
 ---
 
@@ -140,17 +140,17 @@ Every artifact added or changed produces a CHANGELOG line in the same commit.
 
 ## 6. Maintainability rules (non-negotiable)
 
-1. **Single-source-of-truth.** A count/rule/fact appears in ONE place; everything else links. Counts live in the registry + the doc-consistency manifest — docs cite, never restate them.
+1. **Single-source-of-truth.** A count/rule/fact appears in ONE place; everything else links. Counts live in the registry + the doc-consistency manifest: docs cite, never restate them.
 2. **Freshness = same-commit.** Change an artifact → update its reference entry + CHANGELOG in the same commit.
 3. **Completeness within scope.** Every functionality present as an artifact AND covered in reference; every logical path traceable. No partial coverage.
 4. **Mode separation.** Never mix Diátaxis modes in one file (§2).
-5. **ARID, not DRY.** Accept *some* repetition for readability — don't force a reader through three links to assemble one answer.
+5. **ARID, not DRY.** Accept *some* repetition for readability: don't force a reader through three links to assemble one answer.
 6. **Ownership.** `CODEOWNERS` (or the INDEX) names who maintains each doc area. Unowned docs rot.
 7. **Audience-first.** Each doc names its reader (newcomer / contributor / operator) and is written for that one reader.
 
 ---
 
-## 7. Enforcement (docs-as-code) — and its honest limits
+## 7. Enforcement (docs-as-code): and its honest limits
 
 The automated layers verify *consistency* of what exists; they do NOT verify *completeness* of what the standard requires. Completeness is a human-process gate. Do not over-trust the green checkmark.
 
@@ -159,7 +159,7 @@ The automated layers verify *consistency* of what exists; they do NOT verify *co
 | **doc-consistency checker** (`.doc-consistency.json` manifest) | pinned counts match reality, no stale paths/names, cross-doc facts agree; exit 0 before push | whether a required reference entry / logical-paths row / ADR was actually *written* |
 | **INDEX link-integrity** | every internal Markdown link target resolves on disk | whether the linked doc is complete |
 | **markdownlint** (candidate, not yet wired) | heading hierarchy, list consistency | semantics |
-| **documentation Definition-of-Done** (human-process) | artifacts land, README checked, every functionality+path documented, fast-forward | only as reliable as the operator running it — this is the completeness gate, NOT machine-enforced |
+| **documentation Definition-of-Done** (human-process) | artifacts land, README checked, every functionality+path documented, fast-forward | only as reliable as the operator running it: this is the completeness gate, NOT machine-enforced |
 
 The honest picture: completeness rests on the DoD being run, which is process discipline. That is an accepted limit. The mitigation is that the DoD is invoked on every repository update, and this standard's §8 checklist is its content.
 
@@ -188,7 +188,7 @@ The honest picture: completeness rests on the DoD being run, which is process di
 
 **When you write a NEW doc:**
 - [ ] Decide the Diátaxis mode FIRST (§2); put it in the right folder
-- [ ] One mode only — no mixing
+- [ ] One mode only: no mixing
 - [ ] Name its audience in the first lines
 - [ ] Link, don't restate, any fact owned elsewhere
 
@@ -198,9 +198,9 @@ The honest picture: completeness rests on the DoD being run, which is process di
 
 - It does not adopt C4 diagrams as mandatory (a single architecture.md layer diagram suffices; C4 is available if a container/component view is ever needed).
 - It does not require full arc42 (12 sections is overkill; we take §1 goals, §5 building blocks = the reference set, §6 runtime = the execution-model concept doc, §9 decisions = the ADR log, §12 glossary).
-- It does not mandate a doc-site generator (MkDocs/Docusaurus) — docs are read in-repo as Markdown. A future increment if the doc set outgrows flat files.
+- It does not mandate a doc-site generator (MkDocs/Docusaurus): docs are read in-repo as Markdown. A future increment if the doc set outgrows flat files.
 
-These omissions are choices, not gaps — recorded so a future reader does not "fix" them by accident.
+These omissions are choices, not gaps: recorded so a future reader does not "fix" them by accident.
 
 ---
 

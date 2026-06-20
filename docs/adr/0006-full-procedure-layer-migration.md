@@ -19,13 +19,13 @@ The pilot ran across a realistic workload. The following evidence justified full
 - The pilot validated the enabling assumption: Claude Code workflow sub-agents have the full tool surface (shell, file-read, dynamic tool-loading, MCP).
 - Six concrete workflow scripts are now shipped and verified with `node --check`.
 - The `workflows/` artifact class is a net addition; no hooks or skills are removed.
-- DISPATCHES.json survives as a read-only H11 audit artifact — the compliance hook reads it for post-compaction fallback; retiring it would break that fallback.
+- DISPATCHES.json survives as a read-only H11 audit artifact: the compliance hook reads it for post-compaction fallback; retiring it would break that fallback.
 
 ## Considered Options
 
-1. **Full migration (all six process skills)** — ship `workflows/process-*.js` for all six; update SKILL.md stubs with `## ⚡ Workflow-enforced` sections pointing to the scripts.
-2. **Incremental expansion** — convert two more skills (process-research, process-analysis) now; defer process-build and process-qa until after another calibration round.
-3. **Keep at two-skill pilot** — leave the pilot at process-planning and process-pentest; treat routing-as-code as an optional layer.
+1. **Full migration (all six process skills)**: ship `workflows/process-*.js` for all six; update SKILL.md stubs with `## ⚡ Workflow-enforced` sections pointing to the scripts.
+2. **Incremental expansion**: convert two more skills (process-research, process-analysis) now; defer process-build and process-qa until after another calibration round.
+3. **Keep at two-skill pilot**: leave the pilot at process-planning and process-pentest; treat routing-as-code as an optional layer.
 
 ## Decision Outcome
 
@@ -46,14 +46,14 @@ All six core process skills are now backed by deterministic workflow scripts in 
 
 All six scripts in `workflows/` follow these invariants (enforced by code structure, not by prose):
 
-1. **Parse-if-string + HALT guard** — all scripts guard against `args` delivered as a JSON string vs. object; halt with `status: 'halted-malformed-args'` before spawning any agents if required fields are missing.
-2. **Typed schemas on every `agent()` call** — forces structured output; PASS/FAIL logic evaluates typed fields, not prose self-report.
-3. **FILE CONTRACT pattern** — agents that must produce files receive an explicit FILE CONTRACT; the quality gate reads the file to confirm.
-4. **PASS/FAIL derived in code** — pass conditions evaluate typed evidence sub-fields, never prose agent self-report.
-5. **DISPATCHES.json untouched** — the H11 sidecar is never modified by workflow scripts; it remains the read-only verification source for `dispatch-compliance-check.py`.
-6. **HALT paths return, not throw** — all HALT conditions (`halted-malformed-args`, `ralph-loop-hand-back`, `decomposition-hand-back`) return a structured object rather than throwing an error, so callers can inspect the result.
+1. **Parse-if-string + HALT guard**: all scripts guard against `args` delivered as a JSON string vs. object; halt with `status: 'halted-malformed-args'` before spawning any agents if required fields are missing.
+2. **Typed schemas on every `agent()` call**: forces structured output; PASS/FAIL logic evaluates typed fields, not prose self-report.
+3. **FILE CONTRACT pattern**: agents that must produce files receive an explicit FILE CONTRACT; the quality gate reads the file to confirm.
+4. **PASS/FAIL derived in code**: pass conditions evaluate typed evidence sub-fields, never prose agent self-report.
+5. **DISPATCHES.json untouched**: the H11 sidecar is never modified by workflow scripts; it remains the read-only verification source for `dispatch-compliance-check.py`.
+6. **HALT paths return, not throw**: all HALT conditions (`halted-malformed-args`, `ralph-loop-hand-back`, `decomposition-hand-back`) return a structured object rather than throwing an error, so callers can inspect the result.
 
 ## Relationship to Previous ADRs
 
-- **ADR-0004** — this ADR amends ADR-0004. The pilot direction (status: Pilot, 2026-06-09) is superseded by this accepted decision. ADR-0004 is retained as the rationale record for the routing-as-code concept and the two-skill pilot.
-- **ADR-0002** — the hooks-over-prompts rationale extends to workflow scripts: construction-time routing is a stronger guarantee than runtime hook enforcement, which is itself stronger than prose instruction.
+- **ADR-0004**: this ADR amends ADR-0004. The pilot direction (status: Pilot, 2026-06-09) is superseded by this accepted decision. ADR-0004 is retained as the rationale record for the routing-as-code concept and the two-skill pilot.
+- **ADR-0002**: the hooks-over-prompts rationale extends to workflow scripts: construction-time routing is a stronger guarantee than runtime hook enforcement, which is itself stronger than prose instruction.

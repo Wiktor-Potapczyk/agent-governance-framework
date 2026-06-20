@@ -5,7 +5,7 @@
 
 ## Context and Problem Statement
 
-Significant, costly, or hard-to-reverse choices made during the development of this framework were not being recorded in a queryable, append-only form. Without a decision log, future maintainers must reconstruct *why* the framework is shaped the way it is from changelog entries, comments, and memory — all of which degrade over time.
+Significant, costly, or hard-to-reverse choices made during the development of this framework were not being recorded in a queryable, append-only form. Without a decision log, future maintainers must reconstruct *why* the framework is shaped the way it is from changelog entries, comments, and memory: all of which degrade over time.
 
 ## Decision Drivers
 
@@ -15,9 +15,9 @@ Significant, costly, or hard-to-reverse choices made during the development of t
 
 ## Considered Options
 
-1. **MADR files in `docs/adr/`** — lightweight, text-based, well-supported format (adr.github.io/madr).
-2. **Inline rationale in skill/hook files** — co-located with the artifact, but scattered and harder to query.
-3. **Changelog-only** — already exists, but structured for change history, not decision rationale.
+1. **MADR files in `docs/adr/`**: lightweight, text-based, well-supported format (adr.github.io/madr).
+2. **Inline rationale in skill/hook files**: co-located with the artifact, but scattered and harder to query.
+3. **Changelog-only**: already exists, but structured for change history, not decision rationale.
 
 ## Decision Outcome
 
@@ -28,8 +28,8 @@ Every significant, costly, or hard-to-reverse choice produces one MADR file, num
 **Consequences:**
 
 - *Positive:* decision rationale is queryable in one place; future maintainers can distinguish settled-and-deliberate from incidental choices.
-- *Positive:* the single-authority rule is satisfied — ADRs are the canonical "why" store; CLAUDE.md and skill files state the rule in force and link here.
-- *Negative:* adds a maintenance obligation — every significant choice requires a new file.
+- *Positive:* the single-authority rule is satisfied: ADRs are the canonical "why" store; CLAUDE.md and skill files state the rule in force and link here.
+- *Negative:* adds a maintenance obligation: every significant choice requires a new file.
 - *Negative:* the boundary between "significant enough for an ADR" and "changelog-only" requires judgment.
 
 ## Pros and Cons of the Options
@@ -41,7 +41,7 @@ Every significant, costly, or hard-to-reverse choice produces one MADR file, num
 
 **Inline rationale**
 - Con: scattered across the repo; no single queryable location.
-- Con: mixes "what it does" with "why we chose it" — violates Diátaxis mode separation.
+- Con: mixes "what it does" with "why we chose it": violates Diátaxis mode separation.
 
 **Changelog-only**
 - Con: changelog entries are change-scoped; rationale for rejected options has no home.

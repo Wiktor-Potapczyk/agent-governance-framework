@@ -1,6 +1,6 @@
 # Hooks Reference
 
-This is a Reference-mode document per the [documentation standard](../documentation-standard.md): attributes tables, no tutorial prose. **Code is the source of truth** — if a field here disagrees with the `.py` file, the code wins. Where a `test_<name>.py` file exists in `hooks/`, it is the authoritative enumeration of branches; the Logical-paths cell ends with a pointer to that file.
+This is a Reference-mode document per the [documentation standard](../documentation-standard.md): attributes tables, no tutorial prose. **Code is the source of truth**: if a field here disagrees with the `.py` file, the code wins. Where a `test_<name>.py` file exists in `hooks/`, it is the authoritative enumeration of branches; the Logical-paths cell ends with a pointer to that file.
 
 Every production hook is listed below. Library modules (`_`-prefixed), test files (`test_`-prefixed), and the `disabled/` subdirectory are excluded from the per-hook sections; disabled and opt-in hooks appear in the [Disabled / opt-in hooks](#disabled--opt-in-hooks) section at the end.
 
@@ -10,43 +10,43 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 
 | Hook file | Event | Action (brief) | Registered by default? |
 |---|---|---|---|
-| `session-start-log.py` | SessionStart | Log session_start to governance-log.jsonl | Yes — `settings.json.template` |
-| `session-start-orientation.py` | SessionStart | Inject project STATE + task context as additionalContext | Yes — `settings.json.template` |
-| `registry-staleness-check.py` | SessionStart | Warn if registry.json is >7 days old | No — opt-in |
-| `user-prompt-submit.py` | UserPromptSubmit | Inject context bar + classifier enforcement reminder | Yes — `settings.json.template` |
-| `user-prompt-state-inject.py` | UserPromptSubmit | Inject STATE.md orientation (throttled 30min) | Yes — `settings.json.template` |
-| `skill-routing-check.py` | PreToolUse (Skill) | Deny process-skill if routing mismatches last TASK TYPE | Yes — `settings.json.template` |
-| `bash-safety-guard.py` | PreToolUse (Bash) | Block dangerous shell commands | Yes — `settings.json.template` |
-| `agent-dispatch-check.py` | PreToolUse (Agent) | Warn when dispatched agent not in MUST DISPATCH list | Yes — `settings.json.template` |
-| `memory-dedup-check.py` | PreToolUse (Write) | Soft-warn on duplicate memory file (Jaccard ≥ 0.65) | Yes — `settings.json.template` |
-| `reviewer-scope-violation-check.py` | PreToolUse (Write\|Edit\|MultiEdit) | Block reviewer agents from editing non-report files | Yes — `settings.json.template` |
-| `config-protection.py` | PreToolUse (Write\|Edit\|MultiEdit) | Hard-block writes to protected config files | Yes — `settings.json.template` |
-| `mcp-circuit-breaker.py` | PreToolUse (mcp__.*) | Trip breaker after ≥3 MCP failures in 600s window | Yes — `settings.json.template` |
-| `skill-step-reminder.py` | PostToolUse (Skill) | Inject mandatory process-step reminder for process-* skills | Yes — `settings.json.template` |
-| `memory-schema-check.py` | PostToolUse (Write\|Edit) | Soft-warn on missing/invalid memory frontmatter fields | Yes — `settings.json.template` |
-| `tag-variant-check.py` | PostToolUse (Write) | Advisory on non-canonical tags in .md frontmatter | Yes — `settings.json.template` |
-| `mcp-circuit-breaker-record.py` | PostToolUse (mcp__.*) | Record MCP tool result as success/failure to breaker state | Yes — `settings.json.template` |
-| `wiki-citation-check.py` | PostToolUse (Write\|Edit) | Validate source: field + SHA integrity on wiki-layer files | Yes — `settings.json.template` |
-| `inbox-auto-ingest.py` | PostToolUse (Write\|Edit) | Trigger process-ingest when file written under Inbox/ | Yes — `settings.json.template` |
-| `checkpoint.py` | PostToolUse (no matcher) | Inject knowledge reminder at ≥60s; CHECKPOINT notice at ≥300s | Yes — `settings.json.template` |
-| `subagent-governance.py` | SubagentStart | Inject governance additionalContext; log agent_type | Yes — `settings.json.template` |
-| `agent-registry-check.py` | SubagentStart | Suggest specialist agents for generic dispatches | Yes — `settings.json.template` |
-| `subagent-scope-check.py` | SubagentStart + SubagentStop | Capture/diff git status baseline per subagent | Yes — `settings.json.template` |
-| `bias-guard.py` | SubagentStart | Inject Blind Analysis Rule for evaluator agents | Yes — `settings.json.template` |
-| `subagent-quality-check.py` | SubagentStop | Block on structural quality violations in agent output | Yes — `settings.json.template` |
-| `classifier-field-check.py` | Stop | Block when required classifier fields missing | Yes — `settings.json.template` |
-| `dispatch-compliance-check.py` | Stop | Block when MUST DISPATCH items not fulfilled | Yes — `settings.json.template` |
-| `governance-log.py` | Stop | Append turn_summary to governance-log.jsonl | Yes — `settings.json.template` |
-| `process-step-check.py` | Stop | Block/log on missing process-skill steps | Yes — `settings.json.template` |
-| `dark-zone-check.py` | Stop | Log dark-zone metric (agent citations vs dispatches) | Yes — `settings.json.template` |
-| `work-verification-check.py` | Stop | Block lazy QA, premature escalation, fabrication claims | Yes — `settings.json.template` |
-| `token-breakdown.py` | Stop | Log per-turn token breakdown telemetry | Yes — `settings.json.template` |
-| `read-before-edit-check.py` | Stop | Log edit-without-read instrumentation | Yes — `settings.json.template` |
-| `epistemic-check.py` | Stop | Spawn Haiku to evaluate overconfidence; block if flagged | Yes — `settings.json.template` |
-| `verifier-gate-check.py` | Stop | Block if verification-gated-research ran without verifier agent | Yes — `settings.json.template` |
-| `task-plan-auto-sync.py` | Stop | Mark task_plan.md item done on QA PASS | Yes — `settings.json.template` |
-| `pre-compact.py` | PreCompact | Write recovery snapshot before context compaction | Yes — `settings.json.template` |
-| `prose-slop-check.py` | PostToolUse (Write) | Warn on LLM-register slop words in wiki/work prose | No — dormant, not registered |
+| `session-start-log.py` | SessionStart | Log session_start to governance-log.jsonl | Yes: `settings.json.template` |
+| `session-start-orientation.py` | SessionStart | Inject project STATE + task context as additionalContext | Yes: `settings.json.template` |
+| `registry-staleness-check.py` | SessionStart | Warn if registry.json is >7 days old | No: opt-in |
+| `user-prompt-submit.py` | UserPromptSubmit | Inject context bar + classifier enforcement reminder | Yes: `settings.json.template` |
+| `user-prompt-state-inject.py` | UserPromptSubmit | Inject STATE.md orientation (throttled 30min) | Yes: `settings.json.template` |
+| `skill-routing-check.py` | PreToolUse (Skill) | Deny process-skill if routing mismatches last TASK TYPE | Yes: `settings.json.template` |
+| `bash-safety-guard.py` | PreToolUse (Bash) | Block dangerous shell commands | Yes: `settings.json.template` |
+| `agent-dispatch-check.py` | PreToolUse (Agent) | Warn when dispatched agent not in MUST DISPATCH list | Yes: `settings.json.template` |
+| `memory-dedup-check.py` | PreToolUse (Write) | Soft-warn on duplicate memory file (Jaccard ≥ 0.65) | Yes: `settings.json.template` |
+| `reviewer-scope-violation-check.py` | PreToolUse (Write\|Edit\|MultiEdit) | Block reviewer agents from editing non-report files | Yes: `settings.json.template` |
+| `config-protection.py` | PreToolUse (Write\|Edit\|MultiEdit) | Hard-block writes to protected config files | Yes: `settings.json.template` |
+| `mcp-circuit-breaker.py` | PreToolUse (mcp__.*) | Trip breaker after ≥3 MCP failures in 600s window | Yes: `settings.json.template` |
+| `skill-step-reminder.py` | PostToolUse (Skill) | Inject mandatory process-step reminder for process-* skills | Yes: `settings.json.template` |
+| `memory-schema-check.py` | PostToolUse (Write\|Edit) | Soft-warn on missing/invalid memory frontmatter fields | Yes: `settings.json.template` |
+| `tag-variant-check.py` | PostToolUse (Write) | Advisory on non-canonical tags in .md frontmatter | Yes: `settings.json.template` |
+| `mcp-circuit-breaker-record.py` | PostToolUse (mcp__.*) | Record MCP tool result as success/failure to breaker state | Yes: `settings.json.template` |
+| `wiki-citation-check.py` | PostToolUse (Write\|Edit) | Validate source: field + SHA integrity on wiki-layer files | Yes: `settings.json.template` |
+| `inbox-auto-ingest.py` | PostToolUse (Write\|Edit) | Trigger process-ingest when file written under Inbox/ | Yes: `settings.json.template` |
+| `checkpoint.py` | PostToolUse (no matcher) | Inject knowledge reminder at ≥60s; CHECKPOINT notice at ≥300s | Yes: `settings.json.template` |
+| `subagent-governance.py` | SubagentStart | Inject governance additionalContext; log agent_type | Yes: `settings.json.template` |
+| `agent-registry-check.py` | SubagentStart | Suggest specialist agents for generic dispatches | Yes: `settings.json.template` |
+| `subagent-scope-check.py` | SubagentStart + SubagentStop | Capture/diff git status baseline per subagent | Yes: `settings.json.template` |
+| `bias-guard.py` | SubagentStart | Inject Blind Analysis Rule for evaluator agents | Yes: `settings.json.template` |
+| `subagent-quality-check.py` | SubagentStop | Block on structural quality violations in agent output | Yes: `settings.json.template` |
+| `classifier-field-check.py` | Stop | Block when required classifier fields missing | Yes: `settings.json.template` |
+| `dispatch-compliance-check.py` | Stop | Block when MUST DISPATCH items not fulfilled | Yes: `settings.json.template` |
+| `governance-log.py` | Stop | Append turn_summary to governance-log.jsonl | Yes: `settings.json.template` |
+| `process-step-check.py` | Stop | Block/log on missing process-skill steps | Yes: `settings.json.template` |
+| `dark-zone-check.py` | Stop | Log dark-zone metric (agent citations vs dispatches) | Yes: `settings.json.template` |
+| `work-verification-check.py` | Stop | Block lazy QA, premature escalation, fabrication claims | Yes: `settings.json.template` |
+| `token-breakdown.py` | Stop | Log per-turn token breakdown telemetry | Yes: `settings.json.template` |
+| `read-before-edit-check.py` | Stop | Log edit-without-read instrumentation | Yes: `settings.json.template` |
+| `epistemic-check.py` | Stop | Spawn Haiku to evaluate overconfidence; block if flagged | Yes: `settings.json.template` |
+| `verifier-gate-check.py` | Stop | Block if verification-gated-research ran without verifier agent | Yes: `settings.json.template` |
+| `task-plan-auto-sync.py` | Stop | Mark task_plan.md item done on QA PASS | Yes: `settings.json.template` |
+| `pre-compact.py` | PreCompact | Write recovery snapshot before context compaction | Yes: `settings.json.template` |
+| `prose-slop-check.py` | PostToolUse (Write) | Warn on LLM-register slop words in wiki/work prose | No: dormant, not registered |
 
 ---
 
@@ -75,7 +75,7 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Event** | SessionStart |
 | **Matcher** | none |
 | **Registered in** | `settings/settings.json.template` |
-| **Action** | Injects a project-state orientation block as `additionalContext` — active project STATE.md summary + open task_plan items + recent decisions. |
+| **Action** | Injects a project-state orientation block as `additionalContext`: active project STATE.md summary + open task_plan items + recent decisions. |
 | **Inputs** | stdin JSON payload. Reads: project override file, STATE.md of most-recently-modified project, task_plan.md, cost-summary.py output (best-effort). |
 | **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `additionalContext` JSON containing orientation block. No file writes. |
 | **Logical paths** | Project detection: override file present → use it; else walk projects for most-recently-modified STATE.md; else fallback empty. Read STATE.md status + last_action → read task_plan.md open items (cap 10) → read recent decisions (cap 3) → call cost-summary.py (best-effort) → emit orientation block. Empty context path: any read failure → emit `{}`. |
@@ -90,7 +90,7 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 |---|---|
 | **Event** | SessionStart |
 | **Matcher** | none |
-| **Registered in** | Not registered by default — opt-in |
+| **Registered in** | Not registered by default: opt-in |
 | **Action** | Reads `registry.json` age from `generated_at` field (or file mtime fallback). Emits advisory additionalContext when age >7 days. Silent when fresh. |
 | **Inputs** | stdin JSON (consumed, not used). Reads `{{VAULT_ROOT}}/.claude/registry.json`. |
 | **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `additionalContext` advisory string (only when stale or missing). No file writes. |
@@ -143,7 +143,7 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Event** | PreToolUse |
 | **Matcher** | `Skill` |
 | **Registered in** | `settings/settings.json.template` |
-| **Action** | For process-* skills: reads last TASK TYPE from transcript and denies invocation if the routing table maps the task type to a different process skill. Non-process skills always pass. **B-0 fix (2026-06-11):** a Workflow tool_use whose name/scriptPath basename maps to a process-* skill resets the routing context — any Skill invocation following a Workflow-dispatched process skill is not blocked by the stale pre-Workflow classification. |
+| **Action** | For process-* skills: reads last TASK TYPE from transcript and denies invocation if the routing table maps the task type to a different process skill. Non-process skills always pass. **B-0 fix (2026-06-11):** a Workflow tool_use whose name/scriptPath basename maps to a process-* skill resets the routing context: any Skill invocation following a Workflow-dispatched process skill is not blocked by the stale pre-Workflow classification. |
 | **Inputs** | stdin JSON payload: `tool_name`, `tool_input` (skill name, args), `transcript_path`. Reads 200KB transcript tail. |
 | **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `permissionDecision: deny` + reason (on mismatch); nothing on allow. |
 | **Logical paths** | Non-process skill → allow immediately. Process skill invoked → scan transcript for routing events (TASK TYPE assertions and Workflow tool_use blocks). Last routing event is a Workflow dispatch of a process-* skill → clear last_type (routing context consumed) → allow. Quick classification → allow. No classification → allow. Classification found → look up ROUTING table (research→process-research, analysis→process-analysis, content/build→process-build, planning→process-planning, compound→process-analysis) → skill matches expected → allow. Skill does not match → deny with explanation showing correct skill. authoritative branch set: `test_skill_routing_check.py` |
@@ -177,7 +177,7 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Registered in** | `settings/settings.json.template` |
 | **Action** | Advisory warning (not block) when dispatched agent is not in the MUST DISPATCH list extracted from the transcript. |
 | **Inputs** | stdin JSON payload: `tool_input` (agent description/type), `transcript_path`. Reads 200KB transcript tail. |
-| **Outputs / Side-effects** | stderr: advisory warning text (warn-downgrade — surfaced, never a block JSON). Logs event to governance-log.jsonl. |
+| **Outputs / Side-effects** | stderr: advisory warning text (warn-downgrade: surfaced, never a block JSON). Logs event to governance-log.jsonl. |
 | **Logical paths** | Agent type in `ALWAYS_ALLOW` (general-purpose, explore, plan, bash) → allow silently. Transcript has no MUST DISPATCH block → allow. MUST DISPATCH block present → extract declared agent names via `extract_dispatch_names()` → expand aliases via `SKILL_AGENT_ALIASES` → dispatched agent in expanded set → allow + log exemption. process-* routing skill present in transcript → dispatched agent in registry → allow + log exemption. Otherwise → emit advisory warning to additionalContext + log event. authoritative branch set: `test_agent_dispatch_check.py` |
 | **Failure mode** | Fail-open: parse errors, missing transcript → allow silently. |
 | **Rationale** | Creates a soft signal when agents are dispatched outside declared MUST DISPATCH scope, supporting compliance measurement without blocking legitimate adaptive dispatches. |
@@ -212,7 +212,7 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `permissionDecision: deny` + reason (on violation); nothing on allow. |
 | **Logical paths** | Current agent not a reviewer type → allow. Reviewer detected (primary: `agent_type` field; fallback: scan transcript for `name:` frontmatter line): Rule A: path matches `work/YYYY-MM-DD-*-review-*.md` → allow (review report). Rule C: file does not exist on disk (new file) → allow. All other existing non-report paths → deny with scope-violation message. |
 | **Failure mode** | Fail-open: agent detection failures default to allow. |
-| **Rationale** | Enforces the Blind Analysis Rule — reviewer agents should produce review documents, not edit the artifacts they are reviewing. |
+| **Rationale** | Enforces the Blind Analysis Rule: reviewer agents should produce review documents, not edit the artifacts they are reviewing. |
 
 ---
 
@@ -321,7 +321,7 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Event** | PostToolUse |
 | **Matcher** | `Write\|Edit` |
 | **Registered in** | `settings/settings.json.template` |
-| **Action** | After writing a wiki-layer file, validates the `source:` frontmatter field — path existence, SHA-256 integrity — and emits a soft advisory (hard block disabled in v1). |
+| **Action** | After writing a wiki-layer file, validates the `source:` frontmatter field: path existence, SHA-256 integrity: and emits a soft advisory (hard block disabled in v1). |
 | **Inputs** | stdin JSON payload: `tool_input.file_path`, `tool_input.content`. Reads source file bytes for SHA recomputation (via `_wiki_citation_logic.py`). |
 | **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `additionalContext` advisory on violation. Appends violation records to `hooks/aggregates/wiki-citation-violations.jsonl`. |
 | **Logical paths** | Target not on wiki layer (not `Resources/KB/`; not `Notes/*.md` with `#wiki` tag; not `Projects/*/archive/*.md` with `#wiki` tag) → skip. Parse frontmatter → `source:` field absent or empty → advisory `MISSING_SOURCE`. For each source entry: check `path` field exists on disk → missing → advisory `ORPHAN_CITATION`. For entries without `type: generated` and `type: schema-doctrine`: recompute SHA-256 of file bytes → compare to `sha256` field → mismatch → advisory `SOURCE_DRIFT`. All pass → silent. authoritative branch set: `test_wiki_citation_logic.py` |
@@ -356,7 +356,7 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Action** | Tracks time since last fire via `~/.claude/last-checkpoint`. At ≥60 seconds injects a KNOWLEDGE_REMINDER; at ≥300 seconds prepends a [CHECKPOINT] 5-minute save notice. |
 | **Inputs** | stdin JSON payload (any PostToolUse payload). Reads/writes `{{HOME}}/.claude/last-checkpoint` timestamp file. |
 | **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `additionalContext` (only when time thresholds met). Writes updated checkpoint timestamp. |
-| **Logical paths** | Read last-checkpoint timestamp. Missing file → treat as epoch 0. Now − last < 60s → emit nothing (silent). 60s ≤ now − last < 300s → inject KNOWLEDGE_REMINDER. now − last ≥ 300s → inject [CHECKPOINT] save notice + KNOWLEDGE_REMINDER. Update last-checkpoint to now. |
+| **Logical paths** | Read last-checkpoint timestamp. Missing file → treat as epoch 0. Now - last < 60s → emit nothing (silent). 60s ≤ now - last < 300s → inject KNOWLEDGE_REMINDER. now - last ≥ 300s → inject [CHECKPOINT] save notice + KNOWLEDGE_REMINDER. Update last-checkpoint to now. |
 | **Failure mode** | Fail-open: timestamp parse error or write error → continue without blocking. |
 | **Rationale** | Provides a low-noise periodic reminder to save state during long sessions, reducing the risk of losing context or work across compaction. |
 
@@ -387,12 +387,12 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Event** | SubagentStart |
 | **Matcher** | none |
 | **Registered in** | `settings/settings.json.template` |
-| **Action** | When a generic/untyped agent is dispatched, scores prompt words against registry keyword lists and suggests specialist agents with overlap score ≥ 3. Advisory only — never blocks. |
+| **Action** | When a generic/untyped agent is dispatched, scores prompt words against registry keyword lists and suggests specialist agents with overlap score ≥ 3. Advisory only: never blocks. |
 | **Inputs** | stdin JSON payload: `subagent_type` / `agent_type`, `agent_id`, `prompt` / `description`. Reads `{{VAULT_ROOT}}/.claude/registry.json`. |
 | **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `additionalContext` with specialist suggestions (only when match found). Appends one line to `hooks/agent-registry-check.log`. |
 | **Logical paths** | Agent type not in `GENERIC_TYPES` (general-purpose, explore, plan, "", unknown) → skip silently. No prompt text → skip. Registry unreadable → skip. Extract prompt word set → find specialist agents with keyword overlap ≥ `MIN_MATCH_SCORE` (3) → top 3 matches → emit suggestion text. No matches → log `no_match` silently. |
 | **Failure mode** | Fail-open: any exception → exit without blocking. |
-| **Rationale** | Nudges toward specialist agents when a generic dispatch is used, without enforcing it — addresses the advisory routing gap for domain-specific agents. |
+| **Rationale** | Nudges toward specialist agents when a generic dispatch is used, without enforcing it: addresses the advisory routing gap for domain-specific agents. |
 
 ---
 
@@ -403,7 +403,7 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Event** | SubagentStart + SubagentStop |
 | **Matcher** | none |
 | **Registered in** | `settings/settings.json.template` (both SubagentStart and SubagentStop) |
-| **Action** | At SubagentStart: captures `git status --porcelain` baseline keyed by agent_id. At SubagentStop: diffs current git status against baseline and logs new/resolved changes. Pure instrumentation — never blocks. |
+| **Action** | At SubagentStart: captures `git status --porcelain` baseline keyed by agent_id. At SubagentStop: diffs current git status against baseline and logs new/resolved changes. Pure instrumentation: never blocks. |
 | **Inputs** | stdin JSON payload: `agent_id`. Reads/writes `hooks/_state/subagent-scope-baselines.json`. Runs `git status --porcelain`. |
 | **Outputs / Side-effects** | Start: writes baseline to `_state/subagent-scope-baselines.json`. Stop: appends diff record to `hooks/subagent-scope-log.jsonl`; emits stderr warning if new changes found. No stdout (no additionalContext). |
 | **Logical paths** | Start: parse payload → run git status → store baseline under agent_id → exit. Stop: parse payload → run git status → load baseline for agent_id → compute diff (new files, resolved files) → log diff to JSONL → if new_changes non-empty → stderr warning. No baseline found for agent_id → log with empty baseline. git failure → log error, skip diff. |
@@ -442,9 +442,9 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Outputs / Side-effects** | On violation: stdout `{"decision": "block", "reason": "..."}`. Appends record to both `hooks/subagent-quality.log` and `hooks/governance-log.jsonl` (with `violation_excerpt`, `block_reason`). |
 | **Logical paths** | `stop_hook_active=True` → return immediately (prevent infinite loop). Parse payload → call `classify_subagent_output(message)` (pure logic in `_subagent_quality_logic.py`) → `blocked=True` → log to both files + emit block. `blocked=False` → log PASS to subagent-quality.log → exit. authoritative branch set: `test_subagent_quality_check.py` |
 | **Failure mode** | Fail-open: parse/import errors → exit 0 without blocking. |
-| **Rationale** | Provides a structural exit gate for agent output — catches agents that produce empty, malformed, or non-compliant output before it propagates into the main session. |
+| **Rationale** | Provides a structural exit gate for agent output: catches agents that produce empty, malformed, or non-compliant output before it propagates into the main session. |
 
-Note: `subagent-scope-check.py` also fires at SubagentStop — documented in the SubagentStart section above.
+Note: `subagent-scope-check.py` also fires at SubagentStop: documented in the SubagentStart section above.
 
 ---
 
@@ -478,7 +478,7 @@ Note: `subagent-scope-check.py` also fires at SubagentStop — documented in the
 | **Outputs / Side-effects** | On violation: stdout `{"decision": "block", "reason": "..."}`. On pass: logs pass event to governance-log.jsonl. |
 | **Logical paths** | `stop_hook_active=True` → return. Extract MUST DISPATCH from last assistant text via `extract_dispatch_names()`. MUST DISPATCH = "none" or empty → H3 check: non-Quick task with empty MUST DISPATCH → block (missing declaration). MUST DISPATCH present → collect actual agent dispatches from transcript (with alias expansion via `SKILL_AGENT_ALIASES`) → all declared names fulfilled → pass. Any declared name not found in actual dispatches → block. H11 sidecar fallback: if post-compaction and sidecar has dispatch record → use sidecar data. authoritative branch set: `test_dispatch_compliance.py` |
 | **Failure mode** | Fail-open: parse errors, missing transcript → pass. |
-| **Rationale** | Enforces that MUST DISPATCH declarations are executable commitments, not suggestions — the primary driver of the 53% → target compliance-rate improvement. |
+| **Rationale** | Enforces that MUST DISPATCH declarations are executable commitments, not suggestions: the primary driver of the 53% → target compliance-rate improvement. |
 
 ---
 
@@ -489,7 +489,7 @@ Note: `subagent-scope-check.py` also fires at SubagentStop — documented in the
 | **Event** | Stop |
 | **Matcher** | none |
 | **Registered in** | `settings/settings.json.template` |
-| **Action** | Appends one `turn_summary` JSONL entry to governance-log.jsonl per turn that contains a classification block. Pure logging — never blocks. |
+| **Action** | Appends one `turn_summary` JSONL entry to governance-log.jsonl per turn that contains a classification block. Pure logging: never blocks. |
 | **Inputs** | stdin JSON payload: `transcript_path`. Reads 200KB transcript tail to extract classification fields. |
 | **Outputs / Side-effects** | Appends one record to `hooks/governance-log.jsonl`. Fields: `ts`, `schema=2`, `event=turn_summary`, `session`, `type`, `effort_level`, `implies`, `domain`, `must_dispatch`, `agents` (list), `skills` (list), `agent_count`, `skill_count`, `wiki_queried`. No stdout. |
 | **Logical paths** | No classification found in transcript → skip (no entry written). Classification found → extract fields → determine `wiki_queried` (was `mcp__qmd__query` used this turn?) → write JSONL. Write failure → swallow error. authoritative branch set: `test_governance_log.py` |
@@ -505,10 +505,10 @@ Note: `subagent-scope-check.py` also fires at SubagentStop — documented in the
 | **Event** | Stop |
 | **Matcher** | none |
 | **Registered in** | `settings/settings.json.template` |
-| **Action** | Hard-blocks on missing process-skill structural requirements (SCOPE block, QA REPORT, PENTEST REPORT, PM checkpoint); soft-logs on advisory gaps (missing synthesis, missing architect-review, zero agent dispatches). **B-1a fix (2026-06-11):** Workflow tool_use whose name/scriptPath maps to a process-* skill is detected as a skill invocation (not just Skill tool_use). **B-1b fix (2026-06-11):** tool_result wrapper user entries (entry 2 of the three-entry Workflow shape) do NOT reset scan state — only real user messages reset it. |
+| **Action** | Hard-blocks on missing process-skill structural requirements (SCOPE block, QA REPORT, PENTEST REPORT, PM checkpoint); soft-logs on advisory gaps (missing synthesis, missing architect-review, zero agent dispatches). **B-1a fix (2026-06-11):** Workflow tool_use whose name/scriptPath maps to a process-* skill is detected as a skill invocation (not just Skill tool_use). **B-1b fix (2026-06-11):** tool_result wrapper user entries (entry 2 of the three-entry Workflow shape) do NOT reset scan state: only real user messages reset it. |
 | **Inputs** | stdin JSON payload: `transcript_path`, `stop_hook_active`. Reads 200KB transcript tail. |
 | **Outputs / Side-effects** | On hard violation: stdout `{"decision": "block", "reason": "..."}`. Soft violations: logged to governance-log.jsonl (no stdout). |
-| **Logical paths** | `stop_hook_active=True` → return. Scan transcript: detect process skill via Skill tool_use OR Workflow tool_use (B-1a). Turn-boundary reset fires only on real user messages, not tool_result wrappers (B-1b). After process skill detection: collect relay text from subsequent assistant turns. Check: no SCOPE block in relay text → hard block. process-qa detected but no QA REPORT/PASS in relay text → hard block. process-pentest detected but no PENTEST REPORT → hard block. PM invoked but pm-orchestrator not dispatched (rubber-stamp guard) → hard block. Increment complete (2+ TaskCreate completed + pentest_seen — set by Skill or Workflow process-pentest) but no /pm → hard block. Missing synthesis (soft) → log. Missing architect-review (soft) → log. Zero agent dispatches (soft) → log. authoritative branch set: `test_process_step_check.py` |
+| **Logical paths** | `stop_hook_active=True` → return. Scan transcript: detect process skill via Skill tool_use OR Workflow tool_use (B-1a). Turn-boundary reset fires only on real user messages, not tool_result wrappers (B-1b). After process skill detection: collect relay text from subsequent assistant turns. Check: no SCOPE block in relay text → hard block. process-qa detected but no QA REPORT/PASS in relay text → hard block. process-pentest detected but no PENTEST REPORT → hard block. PM invoked but pm-orchestrator not dispatched (rubber-stamp guard) → hard block. Increment complete (2+ TaskCreate completed + pentest_seen: set by Skill or Workflow process-pentest) but no /pm → hard block. Missing synthesis (soft) → log. Missing architect-review (soft) → log. Zero agent dispatches (soft) → log. authoritative branch set: `test_process_step_check.py` |
 | **Failure mode** | Fail-open: parse errors → exit without blocking. |
 | **Rationale** | Enforces process-skill structural completeness at turn-end, catching abbreviated skill execution (e.g. invoking /process-qa but not producing a report) before it registers as a completed step. B-1a/B-1b ensure enforcement is not silently bypassed when process skills run as Workflow scripts. |
 
@@ -526,7 +526,7 @@ Note: `subagent-scope-check.py` also fires at SubagentStop — documented in the
 | **Outputs / Side-effects** | Appends one dark-zone event record to governance-log.jsonl. No stdout. |
 | **Logical paths** | Count Agent dispatches in last turn. Count citation patterns (source references) in response text. Count file writes. Compute `effective_citations = citations + files_written`; severity: ≥1 agent dispatch + zero effective citations → `high`. Citation ratio < 0.5 → `medium`. Adequate citations → `low`. Write dark-zone event with severity, counts. |
 | **Failure mode** | Fail-open: all exceptions swallowed; never blocks. |
-| **Rationale** | Provides a signal for turns where agents were dispatched but the response cites no evidence — a pattern associated with fabricated inventory claims documented in `feedback_main_session_can_fabricate_inventory.md`. |
+| **Rationale** | Provides a signal for turns where agents were dispatched but the response cites no evidence: a pattern associated with fabricated inventory claims documented in `feedback_main_session_can_fabricate_inventory.md`. |
 
 ---
 
@@ -537,7 +537,7 @@ Note: `subagent-scope-check.py` also fires at SubagentStop — documented in the
 | **Event** | Stop |
 | **Matcher** | none |
 | **Registered in** | `settings/settings.json.template` |
-| **Action** | Four checks: (CHECK 1) Hard-blocks QA/pentest report filed with zero tool usage. (CHECK 1b) Hard-blocks inline QA report on non-Quick task without /process-qa invocation. (CHECK 2) Hard-blocks premature escalation (asks user for help after <3 tool uses). (CHECK 4) Soft-logs/warns fabricated Write claims (claimed to write path that doesn't exist and wasn't written). Also emits session_end and qa_fail_reported telemetry events. **B-2 fix (2026-06-11):** pre-scan from the real user boundary detects Workflow process-qa/pentest tool_use (which precedes the tool_result wrapper) and sets `qa_via_workflow` / `pentest_via_workflow` flags. **B-3 fix (2026-06-11):** CHECK 1's zero-execution-tools block is suppressed when the corresponding `*_via_workflow` flag is set — the execution evidence obligation moves into the workflow script's typed per-claim fields. |
+| **Action** | Four checks: (CHECK 1) Hard-blocks QA/pentest report filed with zero tool usage. (CHECK 1b) Hard-blocks inline QA report on non-Quick task without /process-qa invocation. (CHECK 2) Hard-blocks premature escalation (asks user for help after <3 tool uses). (CHECK 4) Soft-logs/warns fabricated Write claims (claimed to write path that doesn't exist and wasn't written). Also emits session_end and qa_fail_reported telemetry events. **B-2 fix (2026-06-11):** pre-scan from the real user boundary detects Workflow process-qa/pentest tool_use (which precedes the tool_result wrapper) and sets `qa_via_workflow` / `pentest_via_workflow` flags. **B-3 fix (2026-06-11):** CHECK 1's zero-execution-tools block is suppressed when the corresponding `*_via_workflow` flag is set: the execution evidence obligation moves into the workflow script's typed per-claim fields. |
 | **Inputs** | stdin JSON payload: `transcript_path`, `stop_hook_active`. Reads 200KB transcript tail plus tool_result blocks. |
 | **Outputs / Side-effects** | On CHECK 1/1b/2 violation: stdout `{"decision": "block", "reason": "..."}` + governance-log.jsonl entry. On CHECK 4 fabrication: stderr warning + governance-log.jsonl entry (non-blocking). Emits `session_end` heartbeat and `qa_fail_reported` events via `_event_emit`. |
 | **Logical paths** | `stop_hook_active=True` → return. **B-2 pre-scan:** walk from real-last-user-idx boundary (skips tool_result wrappers) to find Workflow process-qa or process-pentest tool_use; set `qa_via_workflow` / `pentest_via_workflow` flags. Walk last turn collecting tool uses, text blocks, QA/pentest report markers, classification, skill invocations. Compute execution_tools (Bash + mcp__*), tool_count (all except Skill). CHECK 1: QA/pentest report present + process skill invoked + zero execution tools + zero Read tools + NOT via_workflow → hard block. **B-3:** `qa_via_workflow` / `pentest_via_workflow` set → suppress CHECK 1 zero-execution-tools block. CHECK 1b: non-Quick + QA report present + process-qa not invoked (Skill or Workflow) → hard block. CHECK 4: scan text for Write-claim regex patterns → claimed path not in Write trace AND not on disk → fabrication → stderr warn + log. CHECK 2: escalation patterns in response + non-Quick + tool_count < 3 → hard block. CHECK 3 (soft): non-Quick + zero tool_count → log warn. Emit session_end heartbeat. Emit qa_fail_reported if QA REPORT with FAIL: lines. Log pass for monitoring. authoritative branch set: `test_work_verification_check.py` |
@@ -553,9 +553,9 @@ Note: `subagent-scope-check.py` also fires at SubagentStop — documented in the
 | **Event** | Stop |
 | **Matcher** | none |
 | **Registered in** | `settings/settings.json.template` |
-| **Action** | Aggregates token usage for the turn (main session + per-subagent) and emits a `token_breakdown` event. Telemetry only — never blocks. |
+| **Action** | Aggregates token usage for the turn (main session + per-subagent) and emits a `token_breakdown` event. Telemetry only: never blocks. |
 | **Inputs** | stdin JSON payload: `transcript_path`. Reads transcript tail for `message.usage` fields and `toolUseResult.usage` fields (subagent). |
-| **Outputs / Side-effects** | Emits `token_breakdown` event via `_event_emit` helper. Fields: `turn_total_tokens`, `main_session`, `by_subagent` (list — one entry per Agent tool call), `tool_calls`, `skill_names`, `task_type`. No stdout to CC. |
+| **Outputs / Side-effects** | Emits `token_breakdown` event via `_event_emit` helper. Fields: `turn_total_tokens`, `main_session`, `by_subagent` (list: one entry per Agent tool call), `tool_calls`, `skill_names`, `task_type`. No stdout to CC. |
 | **Logical paths** | Parse transcript → find last assistant turn → sum input/output tokens from `message.usage` → iterate tool_result blocks for subagent usage (`toolUseResult.usage`) → all-zero total → skip emit. Non-zero → emit event. Transcript read error → skip. |
 | **Failure mode** | Fail-open: all exceptions swallowed; never blocks; silently skips if all-zero. |
 | **Rationale** | Provides per-turn token accounting for cost attribution and the cost-summary dashboard, including per-subagent breakdown that the CC UI does not expose. |
@@ -637,7 +637,7 @@ Note: `subagent-scope-check.py` also fires at SubagentStop — documented in the
 | **Registered in** | `settings/settings.json.template` |
 | **Action** | Before context compaction, writes a recovery snapshot file containing: STATE.md contents from all projects, active task_plan.md items, last 3 user messages, last classification, recently modified files. Resets checkpoint timer. |
 | **Inputs** | stdin JSON payload (PreCompact fields). Reads transcript tail (50KB). Reads all `Projects/*/STATE.md` and `Projects/*/task_plan.md` files. |
-| **Outputs / Side-effects** | Writes `{{HOME}}/.claude/pre-compact-recovery.md`. Resets `{{HOME}}/.claude/last-checkpoint` to epoch. **Produces no stdout** — PreCompact does not accept `additionalContext`. |
+| **Outputs / Side-effects** | Writes `{{HOME}}/.claude/pre-compact-recovery.md`. Resets `{{HOME}}/.claude/last-checkpoint` to epoch. **Produces no stdout**: PreCompact does not accept `additionalContext`. |
 | **Logical paths** | Parse payload → read transcript tail → extract last 3 user messages → extract last classification block → list recently modified files → read all STATE.md files → extract In Progress / Shaped task_plan sections (cap) → write recovery file. Any individual read error → skip that section, continue. |
 | **Failure mode** | Fail-open: individual file read errors skipped; write failure logged to stderr; exit 0 always. |
 | **Rationale** | Provides a human-readable recovery point before each compaction so state can be restored if the compacted summary loses critical context (addresses the compaction-loses-attribution failure mode). |
@@ -650,9 +650,9 @@ These files ship in `hooks/disabled/` or are present in `hooks/` but explicitly 
 
 | Hook file | Where | Reason unregistered | One-line description |
 |---|---|---|---|
-| `disabled/epistemic-check.py` | `hooks/disabled/` | Disabled after failure — never blocked in practice; cannot distinguish correct from incorrect confidence without semantic domain understanding | Earlier version of the Stop-event Haiku evaluator; disabled per `disabled/README.md` lessons |
-| `disabled/agent-dispatch-check.py` | `hooks/disabled/` | Disabled after failure — allowlist model blocked legitimate ad-hoc dispatches; ceilings punish adaptation | PreToolUse (Agent) version that blocked (not warned) dispatches not in a pre-approved allowlist |
-| `disabled/delegation-check.ps1` | `hooks/disabled/` | Disabled after failure — same rationale as agent-dispatch-check.py; PowerShell form | PowerShell PreToolUse hook that blocked undeclared agent dispatches |
-| `disabled/routing-table-validation.py` | `hooks/disabled/` | Opt-in by design — correct and tested (26 tests); ships unregistered because arming a blocking hook on CLAUDE.md + SKILL.md is a deliberate decision requiring a complete registry | PreToolUse (Edit\|Write\|MultiEdit) hook that denies edits introducing broken agent-name references in CLAUDE.md or any SKILL.md |
+| `disabled/epistemic-check.py` | `hooks/disabled/` | Disabled after failure: never blocked in practice; cannot distinguish correct from incorrect confidence without semantic domain understanding | Earlier version of the Stop-event Haiku evaluator; disabled per `disabled/README.md` lessons |
+| `disabled/agent-dispatch-check.py` | `hooks/disabled/` | Disabled after failure: allowlist model blocked legitimate ad-hoc dispatches; ceilings punish adaptation | PreToolUse (Agent) version that blocked (not warned) dispatches not in a pre-approved allowlist |
+| `disabled/delegation-check.ps1` | `hooks/disabled/` | Disabled after failure: same rationale as agent-dispatch-check.py; PowerShell form | PowerShell PreToolUse hook that blocked undeclared agent dispatches |
+| `disabled/routing-table-validation.py` | `hooks/disabled/` | Opt-in by design: correct and tested (26 tests); ships unregistered because arming a blocking hook on CLAUDE.md + SKILL.md is a deliberate decision requiring a complete registry | PreToolUse (Edit\|Write\|MultiEdit) hook that denies edits introducing broken agent-name references in CLAUDE.md or any SKILL.md |
 | `weekly-usage.py` | `hooks/` AND `hooks/disabled/` (duplicate copies) | Standalone CLI utility, not a hook -- never registered; requires `claude_monitor` package; duplicate-file state flagged for consolidation | CLI utility printing weekly token usage grouped by model and day since last Friday 8PM |
-| `prose-slop-check.py` | `hooks/` (dormant) | Opt-in — built and calibrated (0 false positives on a 19-page prose corpus); ships unregistered until the maintainer arms it | PostToolUse (Write) hook that warns on LLM-register slop vocabulary in `Resources/KB/` and `Projects/*/work/` prose |
+| `prose-slop-check.py` | `hooks/` (dormant) | Opt-in: built and calibrated (0 false positives on a 19-page prose corpus); ships unregistered until the maintainer arms it | PostToolUse (Write) hook that warns on LLM-register slop vocabulary in `Resources/KB/` and `Projects/*/work/` prose |

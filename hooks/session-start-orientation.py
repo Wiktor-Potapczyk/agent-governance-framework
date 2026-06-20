@@ -10,7 +10,7 @@ Active project detection (in order):
 3. Fallback: first project found in Projects/ with a STATE.md
 
 Output contract: stdout JSON per Anthropic SessionStart hook spec.
-Never blocks — errors silently swallowed, empty additionalContext on failure.
+Never blocks: errors silently swallowed, empty additionalContext on failure.
 
 Workspace root detection: walks up from this file's location until a directory
 containing CLAUDE.md is found (standard framework-repo convention).
@@ -77,7 +77,7 @@ def detect_active_project():
             plan = os.path.join(PROJECTS_DIR, proj, "task_plan.md")
             return proj, sp, (plan if os.path.isfile(plan) else None)
 
-    # 3. No fallback — return empty
+    # 3. No fallback: return empty
     return "", None, None
 
 
@@ -113,7 +113,7 @@ def extract_open_tasks(plan_text, limit=OPEN_ITEMS_LIMIT):
     """Pull open `[ ]` items from task_plan.md, capped at limit."""
     if not plan_text:
         return []
-    # Match `- [ ] **TASK-ID** — text` or `- [ ] text`
+    # Match `- [ ] **TASK-ID**: text` or `- [ ] text`
     items = []
     for line in plan_text.split("\n"):
         m = re.match(r"^\s*-\s*\[\s\]\s*(.+)$", line)
@@ -177,7 +177,7 @@ def get_cost_line():
 
 def build_orientation_text(project, status, last_action, open_tasks, decisions):
     """Compose plain-English orientation block for additionalContext."""
-    parts = [f"[WORKSPACE ORIENTATION — {datetime.now().strftime('%Y-%m-%d %H:%M')}]"]
+    parts = [f"[WORKSPACE ORIENTATION: {datetime.now().strftime('%Y-%m-%d %H:%M')}]"]
     if project:
         parts.append(f"Active project: {project}")
     else:
@@ -208,7 +208,7 @@ def build_orientation_text(project, status, last_action, open_tasks, decisions):
 
     parts.append(
         "\nReminder: STATE.md / task_plan.md / PROJECT.md are the canonical state. "
-        "Read them in full when tackling project-specific work — this summary is orientation only."
+        "Read them in full when tackling project-specific work: this summary is orientation only."
     )
     return "\n".join(parts)
 
@@ -223,7 +223,7 @@ def main():
     try:
         project, state_path, plan_path = detect_active_project()
 
-        # Size guard — read at most 512KB; any real STATE.md/task_plan.md is well under this
+        # Size guard: read at most 512KB; any real STATE.md/task_plan.md is well under this
         cap = 512_000
         state_text = ""
         if state_path and os.path.isfile(state_path):
@@ -257,7 +257,7 @@ def main():
         }
         print(json.dumps(output))
     except Exception:
-        # Never break session start — emit empty additional context on failure
+        # Never break session start: emit empty additional context on failure
         try:
             print(json.dumps({
                 "hookSpecificOutput": {

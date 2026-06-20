@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PostToolUse hook (matcher: Write|Edit) — check memory file schema.
+"""PostToolUse hook (matcher: Write|Edit): check memory file schema.
 
 Fires on ALL Write|Edit operations. Immediately exits if the target file
 is not in the memory directory. For memory files, checks that required
@@ -58,17 +58,17 @@ def check_schema(fm):
         warnings.append(f"Missing fields: {', '.join(sorted(missing))}")
 
     if fm.get("type") and fm["type"] not in VALID_TYPES:
-        warnings.append(f"Invalid type '{fm['type']}' — expected one of: {', '.join(sorted(VALID_TYPES))}")
+        warnings.append(f"Invalid type '{fm['type']}': expected one of: {', '.join(sorted(VALID_TYPES))}")
 
     if fm.get("confidence") and fm["confidence"] not in VALID_CONFIDENCE:
-        warnings.append(f"Invalid confidence '{fm['confidence']}' — expected: high, medium, low")
+        warnings.append(f"Invalid confidence '{fm['confidence']}': expected: high, medium, low")
 
     if fm.get("last_verified"):
         try:
             from datetime import datetime
             datetime.strptime(fm["last_verified"], "%Y-%m-%d")
         except ValueError:
-            warnings.append(f"Invalid last_verified date format: '{fm['last_verified']}' — expected YYYY-MM-DD")
+            warnings.append(f"Invalid last_verified date format: '{fm['last_verified']}': expected YYYY-MM-DD")
 
     return warnings
 

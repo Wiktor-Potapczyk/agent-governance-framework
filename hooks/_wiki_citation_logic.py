@@ -28,7 +28,7 @@ EXCLUDE_FILES = frozenset({
     "index.md", "INDEX.md",
     "MEMORY.md", "STATE.md", "CLAUDE.md", "PROJECT.md",
     # Knowledge-base utility / catalog pages: navigational catalogs / registries,
-    # NOT syntheses of raw docs, so a source: citation is meaningless for them —
+    # NOT syntheses of raw docs, so a source: citation is meaningless for them 
     # same class as index.md. Exempting by basename is consistent with the entries
     # above (also bare-basename, global). Adjust this set to your own catalog pages.
     "README.md", "tag-registry.md", "dataview-queries.md",
@@ -65,7 +65,7 @@ def is_wiki_path_by_tag(rel_path: str) -> bool:
 
 
 def is_wiki_path(rel_path: str) -> bool:
-    """Combined check — True if path COULD be wiki-layer.
+    """Combined check: True if path COULD be wiki-layer.
 
     Caller still checks has_wiki_tag for by-tag paths.
     """
@@ -81,7 +81,7 @@ def has_wiki_tag(content: str) -> bool:
                          - wiki
                          - moc
     Token matching: strips quotes, leading '#', and whitespace, then
-    compares case-insensitively to the bare string 'wiki' (exact match —
+    compares case-insensitively to the bare string 'wiki' (exact match 
     'wiki-derived' and 'wikilink' do NOT match).
     """
     if not content.startswith("---"):
@@ -132,7 +132,7 @@ def _parse_flow_mapping(s: str) -> dict:
     Minimal parser: splits on top-level commas, then 'key: value' on the FIRST
     colon (so timestamp values like '2026-05-10T21:42:04Z' survive). Strips one
     layer of surrounding quotes from values. Does NOT handle commas inside
-    quoted values or nested braces — vault source entries never contain them.
+    quoted values or nested braces: vault source entries never contain them.
     """
     inner = s.strip()
     if inner.startswith("{"):
@@ -239,7 +239,7 @@ def validate_source_entries(
 
     Returns (findings, has_blocking_error).
 
-    `vault_root` is the absolute path to the vault root — source[].path is
+    `vault_root` is the absolute path to the vault root: source[].path is
     interpreted as vault-relative. Filesystem access happens here:
     - file existence check
     - SHA-256 computation of source bytes for drift detection
@@ -284,12 +284,12 @@ def validate_source_entries(
         if entry.get("type") == "generated":
             continue
 
-        # Volatile hand-edited doctrine sources (e.g. CLAUDE.md, churn >1/wk —
+        # Volatile hand-edited doctrine sources (e.g. CLAUDE.md, churn >1/wk 
         # finding_volatile_files_unsuitable_as_source) cannot be SHA-pinned
         # without perpetual false SOURCE_DRIFT, but UNLIKE deterministic script
         # output they ARE mis-citable. So this is STRICTER than type: generated:
         # skip the whole-file SHA gate, but REQUIRE the cited anchor heading to
-        # exist in the source — a cheap fabrication check whole-file hashing
+        # exist in the source: a cheap fabrication check whole-file hashing
         # never provided. Semantic "still-supported" stays with process-lint
         # Pass A noun-overlap (WEAK_CITATION). (2026-06-01 ensemble decision.)
         if entry.get("type") == "schema-doctrine":
@@ -324,7 +324,7 @@ def validate_source_entries(
                     "severity": "error",
                     "message": (
                         f"source[{i}].anchor '{anchor}' heading not found in "
-                        f"'{path_str}' — possible fabricated citation"
+                        f"'{path_str}': possible fabricated citation"
                     ),
                 })
                 has_blocking = True
@@ -339,7 +339,7 @@ def validate_source_entries(
                         "code": "SOURCE_DRIFT",
                         "severity": "warning",
                         "message": (
-                            f"source[{i}].sha256 mismatch — committed "
+                            f"source[{i}].sha256 mismatch: committed "
                             f"{committed_hash[:8]}... but file currently "
                             f"{actual[:8]}..."
                         ),
@@ -355,7 +355,7 @@ def validate_source_entries(
                 "code": "MISSING_SHA",
                 "severity": "warning",
                 "message": (
-                    f"source[{i}].sha256 absent — M2 crypto binding "
+                    f"source[{i}].sha256 absent: M2 crypto binding "
                     f"skipped for this entry"
                 ),
             })
@@ -366,7 +366,7 @@ def validate_source_entries(
 def format_findings_message(rel_path: str, findings: list[dict], has_blocking: bool) -> str:
     """Format findings into a human-readable additionalContext message.
 
-    Pure function — same input always produces same output.
+    Pure function: same input always produces same output.
     """
     msgs = [f"[wiki-citation-check] {rel_path}"]
     for f in findings:

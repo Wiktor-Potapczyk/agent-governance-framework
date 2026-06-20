@@ -1,7 +1,7 @@
 """
 Read-Before-Edit Check - Stop Hook (instrumentation layer)
 
-Wiktor 2026-05-25 SA-1 closure (Q1 second half): "edit their system prompts to
+Owner note (SA-1 closure, 2026-05-25): "edit their system prompts to
 not edit existing files i guess. then we could use a stop hook to first read a
 file before editing it or something like this."
 
@@ -9,7 +9,7 @@ NOTE on redundancy with built-in Claude Code enforcement:
 Edit tool spec requires prior Read of the same file in the conversation. Write
 tool spec requires prior Read if the path exists. So in normal usage, Edit/Write
 without prior Read errors at the tool layer before reaching this hook. THIS hook
-is therefore INSTRUMENTATION — it emits governance-log entries documenting any
+is therefore INSTRUMENTATION: it emits governance-log entries documenting any
 Edit-without-Read patterns that escape the tool layer (edge cases: MultiEdit,
 tool errors retried, sub-agent transcripts with different context boundary).
 
@@ -19,10 +19,10 @@ Behavior:
 - Checks whether a Read tool_use with the same file_path appeared earlier in the
   same turn.
 - On miss: emits governance-log entry (event="edit_without_read") and prints
-  WARN to stderr. Does NOT block — built-in enforcement is the behavioral gate.
+  WARN to stderr. Does NOT block: built-in enforcement is the behavioral gate.
 - Exit code always 0.
 
-Reviewer-scope-violation-check (REV-2b — separate hook to be built later) is the
+Reviewer-scope-violation-check (REV-2b: separate hook to be built later) is the
 real prevention layer for reviewer-tampering. This hook is the visibility layer
 for blind-edit instrumentation.
 """
@@ -31,7 +31,7 @@ import sys
 import json
 import os
 
-READ_BYTES = 204800  # 200KB window — matches other hardened hooks
+READ_BYTES = 204800  # 200KB window: matches other hardened hooks
 
 try:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

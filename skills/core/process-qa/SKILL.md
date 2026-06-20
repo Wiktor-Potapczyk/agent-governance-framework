@@ -1,54 +1,54 @@
 ---
 name: process-qa
-description: QA process template. Follow this procedure for QA compound tasks — empirical verification of claims, outputs, and assumptions. QA asks "does this actually work?" not "is this good?" (that's Analysis). Invoke when task-classifier marks QA compound as yes.
+description: QA process template. Follow this procedure for QA compound tasks: empirical verification of claims, outputs, and assumptions. QA asks "does this actually work?" not "is this good?" (that's Analysis). Invoke when task-classifier marks QA compound as yes.
 ---
 
 # QA Process Template
 
 ## ⚡ Workflow-enforced (ADOPTED 2026-06-11)
 
-This skill's procedure is enforced by construction: on invocation for a non-Quick task, execute it by calling the **Workflow tool** with `{scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-qa.js"}`, passing the claims as `args: {project, claims: [...], source?, constraints?}`. The `claims` array must be **explicitly enumerated** at invocation time — list each verifiable claim from the completed task. The script dispatches one execute-agent per claim (real Bash/MCP/Read), computes PASS/FAIL IN CODE from typed per-claim evidence fields (never agent self-report), and returns `qa_scope_text` + `qa_report_text`.
+This skill's procedure is enforced by construction: on invocation for a non-Quick task, execute it by calling the **Workflow tool** with `{scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-qa.js"}`, passing the claims as `args: {project, claims: [...], source?, constraints?}`. The `claims` array must be **explicitly enumerated** at invocation time: list each verifiable claim from the completed task. The script dispatches one execute-agent per claim (real Bash/MCP/Read), computes PASS/FAIL IN CODE from typed per-claim evidence fields (never agent self-report), and returns `qa_scope_text` + `qa_report_text`.
 
-**TRANSCRIPT RELAY (mandatory):** after the Workflow tool returns, relay BOTH `qa_scope_text` and `qa_report_text` verbatim as **plain unfenced text** in the main session response — exactly as the prose QA SCOPE and QA REPORT blocks below. The Stop hook (`process-step-check.py`) matches literal strings after fence-stripping; fenced blocks are invisible to it.
+**TRANSCRIPT RELAY (mandatory):** after the Workflow tool returns, relay BOTH `qa_scope_text` and `qa_report_text` verbatim as **plain unfenced text** in the main session response: exactly as the prose QA SCOPE and QA REPORT blocks below. The Stop hook (`process-step-check.py`) matches literal strings after fence-stripping; fenced blocks are invisible to it.
 
 **HOOK PRECONDITIONS:** three hook fixes (B-1 in `process-step-check.py`, B-2 + B-3 in `work-verification-check.py`) must be on disk before this thin invoker is active. Without them, a Workflow-driven QA run false-blocks because execution tools run inside the workflow subagent and are invisible to the main transcript. See `workflows/README.md` for details.
 
-**Path must be absolute** on the installing machine — replace `{{VAULT_ROOT}}` with the absolute path to your project root. After editing this file mid-session, invoke the script by `scriptPath` (not by name) because the name-to-path mapping is session-cached and will not pick up edits until the next session restart.
+**Path must be absolute** on the installing machine: replace `{{VAULT_ROOT}}` with the absolute path to your project root. After editing this file mid-session, invoke the script by `scriptPath` (not by name) because the name-to-path mapping is session-cached and will not pick up edits until the next session restart.
 
-The prose below remains (a) the procedure spec of record and (b) the FALLBACK path — use it only when the Workflow tool is unavailable (sub-agent context, degraded session) and say so explicitly. `DISPATCHES.json` is untouched and remains the read-only H11 verification source.
+The prose below remains (a) the procedure spec of record and (b) the FALLBACK path: use it only when the Workflow tool is unavailable (sub-agent context, degraded session) and say so explicitly. `DISPATCHES.json` is untouched and remains the read-only H11 verification source.
 
 ---
 
-You have been routed here because the task-classifier detected a QA compound. QA verifies claims empirically — it is the output-side complement of IMPLIES (which forces exploration at entry).
+You have been routed here because the task-classifier detected a QA compound. QA verifies claims empirically: it is the output-side complement of IMPLIES (which forces exploration at entry).
 
-**QA is NOT review.** Review (architect-review, prompt-engineer) evaluates quality against criteria. QA tests whether claims are TRUE — did it actually work? Does the output match reality?
+**QA is NOT review.** Review (architect-review, prompt-engineer) evaluates quality against criteria. QA tests whether claims are TRUE: did it actually work? Does the output match reality?
 
-**QA is NOT reasoning about whether something would work.** It is EXECUTING a test and OBSERVING the result. If you catch yourself writing "this should work because..." without having run it — stop. Run it.
+**QA is NOT reasoning about whether something would work.** It is EXECUTING a test and OBSERVING the result. If you catch yourself writing "this should work because..." without having run it: stop. Run it.
 
-## Step 1 — Identify Claims to Verify
+## Step 1: Identify Claims to Verify
 
 Before any verification, list every verifiable claim from the work output:
 
 ```
 QA SCOPE
 Claims to verify:
-1. [claim] — how to test it
-2. [claim] — how to test it
-3. [claim] — how to test it
+1. [claim]: how to test it
+2. [claim]: how to test it
+3. [claim]: how to test it
 Source: [which work output produced these claims]
 ```
 
 Claims come from:
-- Agent outputs ("this hook blocks when X happens" — does it?)
-- Process outputs ("all 5 fields are present" — are they?)
-- Build outputs ("this code handles edge case Y" — does it?)
-- Research outputs ("framework X defines 5 phases" — does it say that?)
+- Agent outputs ("this hook blocks when X happens": does it?)
+- Process outputs ("all 5 fields are present": are they?)
+- Build outputs ("this code handles edge case Y": does it?)
+- Research outputs ("framework X defines 5 phases": does it say that?)
 
 **Scope check:** If the build produced N artifacts (workflows, scripts, hooks), ALL N must appear in claims. If you list 2 of 5 workflows, your QA scope is incomplete. Go back and list them all.
 
-If no verifiable claims exist, QA is not needed — report "no verifiable claims" and exit.
+If no verifiable claims exist, QA is not needed: report "no verifiable claims" and exit.
 
-## Step 2 — Choose Verification Method
+## Step 2: Choose Verification Method
 
 For each claim, select the appropriate method:
 
@@ -64,29 +64,29 @@ For each claim, select the appropriate method:
 | Agent produces X | Dispatch test agent | Agent | Must show agent output |
 | Database schema correct | Query it | MCP (Supabase/Postgres) | Must show query result |
 
-**If a claim requires execution (code, hook, workflow, API) and you choose Read instead — that is not QA. Reading a script is not the same as running it.**
+**If a claim requires execution (code, hook, workflow, API) and you choose Read instead: that is not QA. Reading a script is not the same as running it.**
 
-## Step 3 — Execute and Capture
+## Step 3: Execute and Capture
 
 For EACH claim, do these three things IN ORDER. Do not skip any.
 
-### 3a — Run the test
+### 3a: Run the test
 
 Execute the test using the tool from Step 2. This is a tool call, not reasoning.
 
-### 3b — Show the raw output
+### 3b: Show the raw output
 
-Immediately after the tool returns, quote the key output. Not a summary — the actual output text, error message, or execution result. Write it down before interpreting it.
+Immediately after the tool returns, quote the key output. Not a summary: the actual output text, error message, or execution result. Write it down before interpreting it.
 
 Format:
 ```
-CLAIM [N] — [one-line claim]
+CLAIM [N]: [one-line claim]
 TOOL: [tool name + parameters]
 RAW OUTPUT:
-[paste the actual output — truncate if >20 lines but include the verdict-relevant parts]
+[paste the actual output: truncate if >20 lines but include the verdict-relevant parts]
 ```
 
-### 3c — Judge PASS or FAIL
+### 3c: Judge PASS or FAIL
 
 NOW interpret the raw output:
 - Does the output confirm the claim? → PASS
@@ -96,7 +96,7 @@ NOW interpret the raw output:
 
 **The rule:** if you cannot point to a specific line in the raw output that confirms the claim, it's not a PASS. "Looks correct" is never valid evidence.
 
-## Step 4 — Coverage Check (MANDATORY before reporting)
+## Step 4: Coverage Check (MANDATORY before reporting)
 
 Before writing the QA REPORT, verify completeness:
 
@@ -107,7 +107,7 @@ Before writing the QA REPORT, verify completeness:
 
 **If any box is unchecked:** go back and fill the gap. Do not proceed to Step 5.
 
-## Step 5 — Report
+## Step 5: Report
 
 Output the verification report:
 
@@ -118,15 +118,15 @@ Source: [what was being verified]
 
 | # | Claim | Method | Result | Evidence |
 |---|-------|--------|--------|----------|
-| 1 | [claim] | [tool used] | PASS/FAIL | [specific output that proves it — not "looks correct"] |
+| 1 | [claim] | [tool used] | PASS/FAIL | [specific output that proves it: not "looks correct"] |
 | 2 | [claim] | [tool used] | PASS/FAIL | [specific output] |
 
 PASS: [count] / [total]
-FAIL: [count] — [list failed claims]
-MANUAL: [count] — [list claims requiring manual testing]
+FAIL: [count]: [list failed claims]
+MANUAL: [count]: [list claims requiring manual testing]
 
 Untested Surface:
-- [what was NOT tested and why — mandatory]
+- [what was NOT tested and why: mandatory]
 ```
 
 **Evidence column rules:**
@@ -134,18 +134,18 @@ Untested Surface:
 - "Looks correct", "should work", "matches expected" without specific output = INVALID
 - If you can't fill the evidence column with real output, you didn't test it
 
-## Step 6 — Escalate Failures
+## Step 6: Escalate Failures
 
 For each FAIL:
 - Report what was expected vs what was found
-- Do NOT fix it — QA verifies, it does not repair
+- Do NOT fix it: QA verifies, it does not repair
 - The fix goes back to the appropriate process skill (Build for code, Planning for specs)
 - After attempting a fix: re-run the specific failed test (Step 3a-3c) to verify the fix
 
 ## Notes
 
 - QA is empirical, not judgmental. "Does it work?" not "Is it good?"
-- QA can be lightweight — 1 claim, 1 test, 1 result. Not every task needs a 10-item checklist.
+- QA can be lightweight: 1 claim, 1 test, 1 result. Not every task needs a 10-item checklist.
 - The QA compound fires from the classifier when the task produces claims that need verification. If no claims need testing, QA doesn't fire.
-- QA is the LAST step before reporting back — it closes the recursive execution pattern.
-- **The work-verification-check Stop hook will block you if you file a QA REPORT with zero execution tools.** This is not a suggestion — the hook reads the transcript and counts tool_use blocks.
+- QA is the LAST step before reporting back: it closes the recursive execution pattern.
+- **The work-verification-check Stop hook will block you if you file a QA REPORT with zero execution tools.** This is not a suggestion: the hook reads the transcript and counts tool_use blocks.

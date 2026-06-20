@@ -135,7 +135,7 @@ class TestHasWikiTag:
         assert has_wiki_tag(content) is False
 
     def test_multiline_wikilink_no_false_positive(self):
-        """'- wikilink' must NOT match — spec-named negative case (exact match only)."""
+        """'- wikilink' must NOT match: spec-named negative case (exact match only)."""
         content = "---\ntags:\n  - wikilink\n  - moc\n---\nbody"
         assert has_wiki_tag(content) is False
 
@@ -282,7 +282,7 @@ class TestFormatFindingsMessage:
 
 
 # ---------------------------------------------------------------------------
-# inline-flow source form (2026-06-01) — '- {path: X, type: Y, anchor: Z}'
+# inline-flow source form (2026-06-01): '- {path: X, type: Y, anchor: Z}'
 # ---------------------------------------------------------------------------
 
 class TestInlineFlowSource:
@@ -303,7 +303,7 @@ class TestInlineFlowSource:
         }]
 
     def test_inline_flow_value_with_colon_preserved(self):
-        # timestamp value contains colons — split on FIRST colon only
+        # timestamp value contains colons: split on FIRST colon only
         content = (
             "---\nsource:\n"
             "- {path: a.md, ingested_at: '2026-05-10T21:42:04Z'}\n---\n"
@@ -323,7 +323,7 @@ class TestInlineFlowSource:
 
 
 # ---------------------------------------------------------------------------
-# type: schema-doctrine — skip SHA, enforce anchor existence (2026-06-01)
+# type: schema-doctrine: skip SHA, enforce anchor existence (2026-06-01)
 # ---------------------------------------------------------------------------
 
 class TestSchemaDoctrineSource:

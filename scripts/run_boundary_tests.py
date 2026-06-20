@@ -26,7 +26,7 @@ HOOK_DIR = Path(os.path.normpath(
 ))
 
 # BLOCK-class hooks (decision:block / exit 2). These are the ones that MUST carry
-# FP-guard coverage — a false positive here interrupts real work. Kept in sync
+# FP-guard coverage: a false positive here interrupts real work. Kept in sync
 # with the design Appendix B fire-rate table. WARN/LOGGING hooks are advisory.
 BLOCK_CLASS_HOOKS = {
     "dispatch_compliance_check", "dispatch-compliance-check",

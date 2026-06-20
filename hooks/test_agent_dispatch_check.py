@@ -1,5 +1,5 @@
 """
-Unit tests for agent-dispatch-check.py — Iteration 1 bug fix (2026-04-10).
+Unit tests for agent-dispatch-check.py: Iteration 1 bug fix (2026-04-10).
 
 Covers:
 - SKILL_AGENT_ALIASES mapping: pm → pm-orchestrator, architect-review → architect-reviewer
@@ -127,7 +127,7 @@ class TestSkillAgentAliases(unittest.TestCase):
         self.assertEqual(allowed, {"verify"})
 
     def test_empty_must_dispatch(self):
-        """Empty list stays empty — caller handles the 'allow all' case."""
+        """Empty list stays empty: caller handles the 'allow all' case."""
         allowed = resolve_allowed([])
         self.assertEqual(allowed, set())
 

@@ -38,13 +38,13 @@ You receive a decision, plan, design, or recommendation. Your task is to constru
 ### Findings
 
 For each finding, assign a severity:
-- **CRITICAL** — invalidates the decision if true; must be resolved before proceeding
-- **WARNING** — significant flaw that degrades quality; should be addressed
-- **GAP** — missing information or alternative; worth investigating
-- **NOTE** — minor observation; no action required
+- **CRITICAL**: invalidates the decision if true; must be resolved before proceeding
+- **WARNING**: significant flaw that degrades quality; should be addressed
+- **GAP**: missing information or alternative; worth investigating
+- **NOTE**: minor observation; no action required
 
 Format each as:
-`[SEVERITY] [category]: [finding] — [why it matters]`
+`[SEVERITY] [category]: [finding]: [why it matters]`
 
 Categories: Unstated Assumption, Counterargument, Missed Alternative, Silent Failure Mode, Evidence Gap
 

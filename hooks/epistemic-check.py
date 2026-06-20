@@ -80,7 +80,7 @@ def main():
 RESPONSE TO EVALUATE:
 {response_snippet}
 
-EVALUATION CRITERIA — block if ANY of these are true:
+EVALUATION CRITERIA: block if ANY of these are true:
 1. Presents a conclusion or recommendation without stating what assumptions it depends on
 2. Picks one direction without naming what would be lost by going another way
 3. Claims something is true or confirmed without citing specific evidence
@@ -94,7 +94,7 @@ ALLOW only if:
 - OR the response already acknowledges what it doesn't know
 
 Return ONLY this JSON, nothing else:
-{{"decision": "allow" or "block", "reason": "one sentence — what specifically is overconfident or missing"}}
+{{"decision": "allow" or "block", "reason": "one sentence: what specifically is overconfident or missing"}}
 
 When in doubt, BLOCK. It is better to force one moment of reflection than to let overconfidence through unchallenged."""
 

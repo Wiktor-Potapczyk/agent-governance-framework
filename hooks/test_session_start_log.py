@@ -1,5 +1,5 @@
 """
-Unit tests for session-start-log.py — P1-B (2026-04-09).
+Unit tests for session-start-log.py: P1-B (2026-04-09).
 
 Covers:
 - Session ID extraction from payload.session_id (priority)

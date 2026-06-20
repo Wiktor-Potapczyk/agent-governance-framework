@@ -12,8 +12,8 @@ Throttle state at .claude/hooks/_state/last-state-inject.json:
 
 Output contract: stdout JSON per UserPromptSubmit spec.
 Skip rules:
-  - Subagent invocation (agent_id or agent_type set): skip — sub-context, no need
-  - Trivial prompts (yes/no/ok/continue/etc.): skip — keep ack-only turns clean
+  - Subagent invocation (agent_id or agent_type set): skip: sub-context, no need
+  - Trivial prompts (yes/no/ok/continue/etc.): skip: keep ack-only turns clean
   - No active project found: skip
 """
 import json
@@ -104,7 +104,7 @@ def load_throttle_state():
 
 
 def save_throttle_state(state):
-    """Atomic write — temp file + os.replace handles concurrent sessions on NTFS."""
+    """Atomic write: temp file + os.replace handles concurrent sessions on NTFS."""
     try:
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         tmp = THROTTLE_FILE.with_suffix(f".tmp.{os.getpid()}")
@@ -115,7 +115,7 @@ def save_throttle_state(state):
 
 
 def should_emit(project, state_mtime, throttle_state):
-    """Return (bool, reason) — fire if mtime changed OR >30min elapsed OR project changed."""
+    """Return (bool, reason): fire if mtime changed OR >30min elapsed OR project changed."""
     last_ts = throttle_state.get("last_emit_ts", 0)
     last_mtime = throttle_state.get("last_state_mtime", 0)
     last_project = throttle_state.get("last_project", "")
@@ -134,7 +134,7 @@ def build_orientation(project, state_path, plan_path, reason):
     state_text = ""
     if state_path:
         try:
-            # Size guard — read at most 512KB (any real STATE.md is well under this)
+            # Size guard: read at most 512KB (any real STATE.md is well under this)
             sp = Path(state_path)
             sz = sp.stat().st_size
             cap = 512_000
@@ -171,7 +171,7 @@ def build_orientation(project, state_path, plan_path, reason):
             pass
 
     ts = datetime.now().strftime("%H:%M")
-    parts = [f"[STATE REMINDER {ts} — trigger: {reason}]"]
+    parts = [f"[STATE REMINDER {ts}: trigger: {reason}]"]
     parts.append(f"Active project: {project}")
     if status:
         parts.append(f"Status: {status}")
@@ -182,7 +182,7 @@ def build_orientation(project, state_path, plan_path, reason):
         for t in open_tasks:
             parts.append(f"  - {t}")
     parts.append(
-        "Re-read STATE.md / task_plan.md from disk before acting on project-specific work — this is orientation only."
+        "Re-read STATE.md / task_plan.md from disk before acting on project-specific work: this is orientation only."
     )
     return "\n".join(parts)
 
@@ -261,7 +261,7 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        # Never break the prompt submission — emit empty on any failure
+        # Never break the prompt submission: emit empty on any failure
         try:
             emit_empty()
         except Exception:

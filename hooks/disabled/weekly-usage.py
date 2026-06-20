@@ -1,4 +1,4 @@
-"""Weekly usage summary — resets Friday 8PM local time."""
+"""Weekly usage summary: resets Friday 8PM local time."""
 
 from datetime import datetime, timedelta
 from claude_monitor.data.reader import load_usage_entries

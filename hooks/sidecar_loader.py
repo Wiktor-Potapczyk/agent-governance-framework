@@ -1,5 +1,5 @@
 """
-Sidecar loader — H11 proof-of-concept (2026-04-18).
+Sidecar loader: H11 proof-of-concept (2026-04-18).
 
 Provides `load_dispatches(skill_name)` for hooks that need to consult a process
 skill's DISPATCHES.json as fallback ground truth when transcript classification
@@ -17,7 +17,7 @@ Design notes:
   framework-repo layout. The loader tries both locations so the same file
   works in both environments without per-deployment patching.
 - If the sidecar is missing at all candidate paths, return a sentinel (empty
-  dict) — caller decides whether absence is valid (most process skills will
+  dict): caller decides whether absence is valid (most process skills will
   eventually have a sidecar; skills without one fall back to prose-only contract).
 - Silent-on-malformed: log warn to governance-log but don't crash the hook.
   Caller treats missing/malformed as "no sidecar available".
@@ -28,7 +28,7 @@ from datetime import datetime
 
 
 _PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Try both layouts — flat (vault) and nested-under-core (framework-repo).
+# Try both layouts: flat (vault) and nested-under-core (framework-repo).
 SKILLS_ROOT_CANDIDATES = [
     os.path.join(_PARENT, "skills"),
     os.path.join(_PARENT, "skills", "core"),
@@ -114,7 +114,7 @@ def all_allowed_agent_names(skill_name):
 
 
 if __name__ == "__main__":
-    # POC self-test — verify the sidecar file can be read
+    # POC self-test: verify the sidecar file can be read
     import sys
     skill = sys.argv[1] if len(sys.argv) > 1 else "process-build"
     data = load_dispatches(skill)

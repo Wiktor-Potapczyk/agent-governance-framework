@@ -1,16 +1,16 @@
 """
-Observability database — SQLite analytics cache for governance monitoring.
+Observability database: SQLite analytics cache for governance monitoring.
 
 Architecture: hooks → JSONL (append-only, canonical) → session-summary.py → observability.db (derived)
 If observability.db corrupts, regenerate from JSONL sources.
 
-Schema: 4 tables — sessions, kpi_values, tool_calls, agent_dispatches
+Schema: 4 tables: sessions, kpi_values, tool_calls, agent_dispatches
 """
 
 import os
 import sqlite3
 
-# Default DB path — can be overridden
+# Default DB path: can be overridden
 DEFAULT_DB_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "observability.db"
 )

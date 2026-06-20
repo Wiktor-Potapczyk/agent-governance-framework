@@ -2,7 +2,7 @@
 Governance Log - Stop Hook
 Captures classification, dispatch, and agent activity per response.
 Appends one JSON line to governance-log.jsonl per response.
-Does NOT block — logging only.
+Does NOT block: logging only.
 
 Regex hardening (2026-03-22):
 - 200KB window (up from 80KB) to capture large agent outputs
@@ -23,7 +23,7 @@ LOG_PATH = os.path.join(
     "governance-log.jsonl"
 )
 
-# 200KB window — covers even 10+ agent outputs per turn
+# 200KB window: covers even 10+ agent outputs per turn
 READ_BYTES = 204800
 
 VALID_TYPES = re.compile(
@@ -47,7 +47,7 @@ KNOWN_DISPATCH_NAMES = {
     "prompt-engineer", "query-clarifier", "report-generator", "research-analyst",
     "research-coordinator", "research-orchestrator", "research-synthesizer",
     "technical-researcher", "vault-keeper", "workflow-orchestrator",
-    # Skills (from .claude/skills/) — only process/governance skills likely in MUST DISPATCH
+    # Skills (from .claude/skills/): only process/governance skills likely in MUST DISPATCH
     "process-qa", "process-analysis", "process-build", "process-planning",
     "process-research", "process-pentest", "pm", "task-classifier", "verify",
     "ensemble", "architect-loop", "save", "maintain", "index",
@@ -72,7 +72,7 @@ def extract_dispatch_names(raw_text):
     found = []
     for segment in raw_text.split(","):
         segment = segment.strip()
-        # The name might be followed by reasoning text — try matching the first word(s)
+        # The name might be followed by reasoning text: try matching the first word(s)
         # that form a known name (handles multi-word like "architect-review")
         words = segment.split()
         for i in range(min(3, len(words)), 0, -1):
@@ -103,7 +103,7 @@ def main():
     if payload.get("stop_hook_active"):
         return
 
-    # effort.level — Week-19 2026 hook-payload field. Telemetry only; recorded
+    # effort.level: Week-19 2026 hook-payload field. Telemetry only; recorded
     # so the analytics layer can correlate effort tier with dispatch compliance,
     # Quick-classification rate, and token usage. Absent on pre-Week-19 payloads.
     effort = payload.get("effort")
@@ -221,7 +221,7 @@ def main():
     log_entry = {
         "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "schema": 2,  # P1-E: schema version field (2026-04-09)
-        "event": "turn_summary",  # 2026-05-08 — schema consistency fix; was bare row producing dashboard `legacy_classification` fallback
+        "event": "turn_summary",  # 2026-05-08: schema consistency fix; was bare row producing dashboard `legacy_classification` fallback
         "hook": "governance-log",
         "session": session_id,  # Full UUID (P1-D fix 2026-04-09)
         "type": last_type,

@@ -2,7 +2,7 @@
 """Generate agent+skill registry from local .claude/ and plugin cache.
 
 Scans all agent .md files and skill SKILL.md files, extracts metadata,
-and produces .claude/registry.json — the single source of truth for
+and produces .claude/registry.json: the single source of truth for
 what agents and skills are available.
 
 Usage:
@@ -218,26 +218,26 @@ def load_installed_plugins() -> list[dict]:
     Each key may have multiple installs (e.g. per-scope); we take the last element
     of the array (most-recently installed) as the canonical entry.
 
-    Returns [] and prints a warning on any read/parse failure — never raises.
+    Returns [] and prints a warning on any read/parse failure: never raises.
     """
     if not INSTALLED_PLUGINS_JSON.exists():
-        print(f"  [WARN] installed_plugins.json not found at {INSTALLED_PLUGINS_JSON} — plugins list will be empty")
+        print(f"  [WARN] installed_plugins.json not found at {INSTALLED_PLUGINS_JSON}: plugins list will be empty")
         return []
 
     try:
         with open(INSTALLED_PLUGINS_JSON, "r", encoding="utf-8") as f:
             raw = json.load(f)
     except Exception as exc:
-        print(f"  [WARN] Could not parse installed_plugins.json: {exc} — plugins list will be empty")
+        print(f"  [WARN] Could not parse installed_plugins.json: {exc}: plugins list will be empty")
         return []
 
     plugins_map = raw.get("plugins")
     if not isinstance(plugins_map, dict):
-        print(f"  [WARN] installed_plugins.json has unexpected structure (no 'plugins' dict) — plugins list will be empty")
+        print(f"  [WARN] installed_plugins.json has unexpected structure (no 'plugins' dict): plugins list will be empty")
         return []
 
     # Enabled/disabled state is NOT in installed_plugins.json (that is an install
-    # manifest — disabled plugins remain listed). The authoritative source is the
+    # manifest: disabled plugins remain listed). The authoritative source is the
     # `enabledPlugins` map in ~/.claude/settings.json, keyed by the same
     # "<name>@<source>" string. Default to True when a key is absent (present but
     # not explicitly disabled). Falls back to all-True if settings.json is unreadable.
@@ -247,7 +247,7 @@ def load_installed_plugins() -> list[dict]:
         with open(settings_path, "r", encoding="utf-8") as sf:
             enabled_map = json.load(sf).get("enabledPlugins", {}) or {}
     except Exception as exc:
-        print(f"  [WARN] Could not read enabledPlugins from settings.json: {exc} — assuming all enabled")
+        print(f"  [WARN] Could not read enabledPlugins from settings.json: {exc}: assuming all enabled")
 
     results = []
     for key, installs in plugins_map.items():
@@ -266,7 +266,7 @@ def load_installed_plugins() -> list[dict]:
             marketplace = ""
 
         version = install.get("version", "unknown")
-        # Treat "unknown" versions as non-semver strings — still valid, just emit as-is
+        # Treat "unknown" versions as non-semver strings: still valid, just emit as-is
         enabled = bool(enabled_map.get(key, True))  # authoritative: settings.json enabledPlugins; default True if unlisted
 
         entry: dict = {
@@ -331,11 +331,11 @@ def main():
         f"{len(plugins)} plugins ({plugins_enabled} enabled) -> {OUTPUT}"
     )
 
-    # Hook-liveness summary (GOV-2). Informational only — read the silent-zero
+    # Hook-liveness summary (GOV-2). Informational only: read the silent-zero
     # instrument (hook-activity.jsonl) at the natural "framework state changed"
     # moment and surface the registered-but-unmeasured count. Print-only; never
     # affects exit code. This is the cadence the reader's docstring intended
-    # ("called at CMDB refresh time") — previously it was manual-only.
+    # ("called at CMDB refresh time"): previously it was manual-only.
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         from hook_activity_report import report_dict
@@ -350,8 +350,8 @@ def main():
     except Exception as e:
         print(f"  [WARN] hook-liveness summary did not run: {e}")
 
-    # Structural enforcement gates (Phase D dim4 C1/C2/C3). Run at every regen —
-    # the moment framework state changes — and propagate a nonzero exit on hard
+    # Structural enforcement gates (Phase D dim4 C1/C2/C3). Run at every regen 
+    # the moment framework state changes: and propagate a nonzero exit on hard
     # findings (dispatch-name drift, missing registered hook file). Pass
     # --no-validate to regenerate the registry without gating.
     if "--no-validate" not in sys.argv:

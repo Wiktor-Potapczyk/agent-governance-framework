@@ -6,7 +6,7 @@ from first classification entry).
 
 Input: stdin with CC hook payload JSON (contains session_id, source, transcript_path)
 Output: None (append-only write to governance-log.jsonl)
-Does NOT block — logging only. Errors silently swallowed to avoid breaking session start.
+Does NOT block: logging only. Errors silently swallowed to avoid breaking session start.
 """
 
 import sys

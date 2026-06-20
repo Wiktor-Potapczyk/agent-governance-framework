@@ -3,8 +3,11 @@
 ## Prerequisites
 
 - **Claude Code CLI** installed and authenticated (`claude --version` should return a version string)
-- **Python 3.10+** on your system PATH (`python --version` to verify)
-- On Windows: Python must be accessible as `python` from the shell you use with Claude Code. If only `python3` is on PATH, either add an alias or update the hook commands in settings accordingly.
+- **Python 3.10+** on your system PATH (`python --version` to verify). On Windows, Python must be accessible as `python` from the shell you use with Claude Code. If only `python3` is on PATH, either add an alias or update the hook commands in settings accordingly.
+- **Node.js 18+** on your system PATH (`node --version` to verify). Required by the workflow scripts (`workflows/*.js`) and by hook commands in `settings.json.template` that invoke `node` directly (the `Bash(node:*)` permission entries).
+- **jq** on your system PATH (`jq --version` to verify). Required by certain hook commands in `settings.json.template` (the `Bash(jq:*)` permission entries). Install via your package manager (e.g., `brew install jq`, `apt install jq`, or download from https://jqlang.github.io/jq/).
+- **Hook dependencies:** all hooks in `hooks/*.py` are pure Python standard-library. No `pip install` or `requirements.txt` is needed for the hooks themselves.
+- **Test suite:** `hooks/test_*.py` files are present and can be run with `python -m pytest hooks/` or `python hooks/test_<name>.py` directly. They are not wired into any CI configuration in this repo; running them is optional but recommended after install to verify your path setup.
 
 ## 1. Clone the Repository
 
@@ -53,13 +56,25 @@ Core skills include: `task-classifier`, `process-research`, `process-analysis`, 
 
 ## 5. Configure Settings
 
-Copy the example settings file:
+**Two settings templates ship with this repo: choose the right one:**
+
+- `settings/settings.json.example` and `settings/settings.local.json.example` register **6 hooks** (a minimal starter subset). Good for a quick first install.
+- `settings/settings.json.template` registers **all 35 hooks** (the full framework). This is the recommended production starting point. See `settings/settings.json.template.README.md` for the automated substitution one-liner that replaces `{{VAULT_ROOT}}` and `{{HOME_OR_VAULT}}` placeholders across the template.
+
+Copy the example settings file (minimal 6-hook subset):
 
 ```bash
 cp settings/settings.json.example /your/project/.claude/settings.local.json
 ```
 
-Open the file and replace every `/path/to/your/hooks/` placeholder with the absolute path to the directory where you copied the hooks in step 3.
+Or copy the full 35-hook template and run the substitution documented in `settings/settings.json.template.README.md`:
+
+```bash
+cp settings/settings.json.template /your/project/.claude/settings.json
+# then substitute {{VAULT_ROOT}} and {{HOME_OR_VAULT}} per the README
+```
+
+Open the file and replace every `/path/to/your/hooks/` placeholder (or the `{{VAULT_ROOT}}` tokens if using the full template) with the absolute path to the directory where you copied the hooks in step 3.
 
 **Example (macOS/Linux):**
 ```json
@@ -118,7 +133,7 @@ Project-level settings take precedence over global settings for conflicting keys
 
 The `CLAUDE.md` file is the model's operating manual. It is loaded into every session as system context.
 
-A template is not included in this repository because CLAUDE.md is highly environment-specific. Use the structure from the companion research repository as a reference, then write your own covering:
+The repo root includes a `CLAUDE.md` that is already genericized (owner name, role, and company appear as `[Your Name]`, `[Your Role]`, `[Your Company]` placeholders). Use it as your starting template: copy it to your project root and fill in the placeholders. You will still need to customise the sections below for your specific setup:
 
 - Your working philosophy and principles
 - Directory structure and file conventions
@@ -169,7 +184,26 @@ cp -r skills/domain-examples/n8n/* /your/project/.claude/skills/
 
 ## Workflow scripts (procedure-layer enforcement)
 
-Copy `workflows/*.js` into your `.claude/workflows/`. Then edit the six process-skill `SKILL.md` stubs: replace `{{VAULT_ROOT}}` in each `scriptPath` with YOUR absolute vault path (the Workflow tool needs an absolute path). Two rules from live operation: always invoke by `scriptPath`, never by name (named invocation resolves from a session cache, so mid-session script edits are silently ignored), and pass `args` as a JSON object (the scripts also tolerate a stringified object via a parse-if-string guard).
+Copy `workflows/*.js` into your `.claude/workflows/`. Then replace `{{VAULT_ROOT}}` in the six process-skill `SKILL.md` stubs (the `scriptPath` field in each). The Workflow tool requires an absolute path, so this substitution is mandatory before the skills will work.
+
+**Automated substitution (bash):**
+```bash
+VAULT_ROOT="/absolute/path/to/your/vault"
+for f in skills/core/process-*/SKILL.md; do
+  sed -i "s|{{VAULT_ROOT}}|${VAULT_ROOT}|g" "$f"
+done
+```
+
+**Automated substitution (PowerShell):**
+```powershell
+$VaultRoot = "C:\Users\you\Vault"
+Get-ChildItem -Path "skills\core\process-*\SKILL.md" | ForEach-Object {
+  (Get-Content $_.FullName) -replace '\{\{VAULT_ROOT\}\}', $VaultRoot |
+  Set-Content $_.FullName
+}
+```
+
+Two rules from live operation: always invoke by `scriptPath`, never by name (named invocation resolves from a session cache, so mid-session script edits are silently ignored), and pass `args` as a JSON object (the scripts also tolerate a stringified object via a parse-if-string guard).
 
 ## Troubleshooting
 
@@ -179,4 +213,4 @@ Copy `workflows/*.js` into your `.claude/workflows/`. Then edit the six process-
 
 **Classifier enforcement blocking every response:** The `classifier-field-check.py` Stop hook looks for classifier output fields in the transcript. If you have not invoked the `task-classifier` skill, the hook will log a block. Invoke `/task-classifier` at the start of any non-trivial task to satisfy it.
 
-**Subagent quality check failing on short outputs:** The `subagent-quality-check.py` hook blocks empty outputs (under 5 characters) and short outputs that contain a refusal keyword — but a short *negative finding* (e.g. "I cannot reproduce the bug; it works on the main branch") is exempted when it carries a result-signal token, so legitimate short findings pass. It also flags long outputs with no structure, where `Label: value` report blocks and known REPORT headers (QA/PENTEST/PM CHECKPOINT) count as structure. A genuine empty or pure-refusal output is the expected block — prompt the agent to produce a structured result.
+**Subagent quality check failing on short outputs:** The `subagent-quality-check.py` hook blocks empty outputs (under 5 characters) and short outputs that contain a refusal keyword: but a short *negative finding* (e.g. "I cannot reproduce the bug; it works on the main branch") is exempted when it carries a result-signal token, so legitimate short findings pass. It also flags long outputs with no structure, where `Label: value` report blocks and known REPORT headers (QA/PENTEST/PM CHECKPOINT) count as structure. A genuine empty or pure-refusal output is the expected block: prompt the agent to produce a structured result.

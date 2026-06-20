@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse hook (matcher: Write) — check for near-duplicate memory files.
+"""PreToolUse hook (matcher: Write): check for near-duplicate memory files.
 
 Fires on ALL Write operations. Immediately exits if the target file is not
 in the memory directory. For new memory files, compares the description against
@@ -52,7 +52,7 @@ def extract_description_from_file(filepath):
     """Extract the description field from an existing file on disk."""
     try:
         with open(filepath, "r", encoding="utf-8") as f:
-            # Only read first 500 chars — frontmatter is at the top
+            # Only read first 500 chars: frontmatter is at the top
             head = f.read(500)
     except (OSError, UnicodeDecodeError):
         return ""

@@ -1,8 +1,8 @@
 """
-Shared hook self-logging helper (E1 — silent-zero instrumentation fix, 2026-05-30).
+Shared hook self-logging helper (E1: silent-zero instrumentation fix, 2026-05-30).
 
 Purpose: governance-log.py (Stop hook) only records Agent/Skill tool_use + the
-turn classification. It is BLIND to hook firings — so registered, actively-firing
+turn classification. It is BLIND to hook firings: so registered, actively-firing
 hooks (e.g. prose-codes-check) show 0 events in any utilization audit. This is the
 empirically-confirmed "silent-zero" finding
 (finding_governance_log_under_logs_silent_zero.md): "0 events" != unused.
@@ -15,7 +15,7 @@ When it fires: only when a host hook explicitly calls log_fire(...). This module
 does nothing on its own.
 
 Failure-tolerance: log_fire NEVER raises. A logging failure must never crash the
-host hook (crashing a hook crashes the turn — per CLAUDE.md / code-simplifier
+host hook (crashing a hook crashes the turn: per CLAUDE.md / code-simplifier
 Python-hook conventions). Every path is wrapped; on any error it silently no-ops.
 
 Adoption snippet for a host hook (place after imports, before main logic):
@@ -42,10 +42,10 @@ _LOG_PATH = os.path.join(
 def log_fire(hook, decision=None, detail=None, session=None):
     """Append one hook-firing record to hook-activity.jsonl. Never raises.
 
-    hook:     str  — the host hook's name (e.g. "prose-codes-check")
-    decision: str  — optional outcome ("block", "allow", "warn", None)
-    detail:   any  — optional short context (truncated to 200 chars)
-    session:  str  — optional session id if the host hook has it
+    hook:     str : the host hook's name (e.g. "prose-codes-check")
+    decision: str : optional outcome ("block", "allow", "warn", None)
+    detail:   any : optional short context (truncated to 200 chars)
+    session:  str : optional session id if the host hook has it
     """
     try:
         record = {

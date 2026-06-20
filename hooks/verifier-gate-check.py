@@ -7,7 +7,7 @@ was dispatched.
 SCOPING DECISION (deliberate, documented):
 This hook fires ONLY when the `verification-gated-research` skill was actually
 invoked. It does NOT attempt to force every Research/depth task through a
-verifier — that broader ambition is a false-positive minefield (normal
+verifier: that broader ambition is a false-positive minefield (normal
 process-research dispatches research-synthesizer/report-generator, which are
 not verifiers, and blocking those would be wrong). Instead this hook enforces
 the skill's OWN internal contract: you cannot invoke the verification-gated
@@ -18,7 +18,7 @@ concern, not this hook's job.
 Detection:
 - skill invoked  = a Skill tool_use with skill == "verification-gated-research"
 - verifier present = an Agent tool_use whose `description` contains "verifier",
-  appearing AFTER the skill invocation in the transcript (ordering guard — a
+  appearing AFTER the skill invocation in the transcript (ordering guard: a
   pre-existing "verifier"-described agent earlier in the session does not count).
   The skill mandates the verifier dispatch's description carry that word.
 
@@ -26,7 +26,7 @@ Block condition: skill invoked AND no post-skill verifier dispatch found.
 
 Known limitation (accepted): the check keys off the description convention, not
 the agent's subagent_type. It cannot structurally prove the verifier is a
-different agent than the workers — and it deliberately does NOT try to: a
+different agent than the workers: and it deliberately does NOT try to: a
 verifier legitimately CAN be the same agent type as a worker (e.g.,
 technical-researcher used for both investigation and verification, in different
 dispatches with different tasks). The separation that matters is generator-
@@ -42,7 +42,7 @@ import json
 import os
 
 _HOOK_DIR = os.path.dirname(os.path.abspath(__file__))
-READ_BYTES = 204800  # 200KB transcript tail — matches dispatch-compliance-check.py
+READ_BYTES = 204800  # 200KB transcript tail: matches dispatch-compliance-check.py
 
 SKILL_NAME = "verification-gated-research"
 
@@ -118,7 +118,7 @@ def main():
         "separate verifier agent was dispatched. The harness requires a distinct "
         "Agent dispatch (description containing \"verifier\") that is neither a "
         "worker nor the orchestrator. Dispatch the verifier and let it gate the "
-        "backlog ledger before completing — completion is the ledger state, not "
+        "backlog ledger before completing: completion is the ledger state, not "
         "your assertion."
     )
     print(json.dumps({"decision": "block", "reason": reason}))

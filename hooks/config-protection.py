@@ -1,13 +1,13 @@
 """
-config-protection.py — PreToolUse Write/Edit/MultiEdit guard (ECC-LEARN-A3)
+config-protection.py: PreToolUse Write/Edit/MultiEdit guard (ECC-LEARN-A3)
 
 Hard-blocks edits to vault load-bearing config files unless an explicit override
 env var is set. Inspired by ECC's `config-protection.js`.
 
 Protected paths (any path whose basename matches one of these, anywhere on disk):
-  - .claude/settings.local.json     — agent allow/deny + hook chain registration
-  - .claude/registry.json           — agent/skill registry catalog
-  - MEMORY.md                       — root memory-index file
+  - .claude/settings.local.json    : agent allow/deny + hook chain registration
+  - .claude/registry.json          : agent/skill registry catalog
+  - MEMORY.md                      : root memory-index file
 
 Override mechanism:
   - Set env var CONFIG_PROTECTION_ALLOW=1 in the parent shell to permit subsequent
@@ -33,7 +33,7 @@ Schema:
                               "permissionDecisionReason": "..."}}
   - output (pass): silent (no stdout)
 
-Exit codes: 0 always. Hook never crashes the parent session — fail-open.
+Exit codes: 0 always. Hook never crashes the parent session: fail-open.
 
 Logging: appends one line per deny to `.claude/hooks/governance-log.jsonl` with
 schema=2, event="deny", hook="config-protection".
@@ -56,7 +56,7 @@ PROTECTED_BASENAMES = frozenset({
 # Additional containment: for settings.local.json and registry.json, only block if the
 # parent directory is '.claude' (so a project-specific 'settings.local.json' inside an
 # unrelated tooling directory isn't accidentally protected). MEMORY.md has no parent
-# constraint — any MEMORY.md anywhere is treated as the index.
+# constraint: any MEMORY.md anywhere is treated as the index.
 PARENT_CONSTRAINED = {
     "settings.local.json": ".claude",
     "registry.json": ".claude",
@@ -85,7 +85,7 @@ def _is_protected(file_path: str) -> tuple[bool, str]:
 
     settings.local.json and registry.json additionally require the parent dir name
     to be `.claude` (avoids blocking unrelated tooling files of the same name).
-    MEMORY.md is protected anywhere — there is only ever one MEMORY index file.
+    MEMORY.md is protected anywhere: there is only ever one MEMORY index file.
     """
     if not file_path:
         return (False, "")
@@ -142,7 +142,7 @@ def _emit_deny(basename: str, file_path: str, tool_name: str) -> None:
         f"CONFIG PROTECTION: Blocked {tool_name} to '{basename}'. "
         f"This file is load-bearing for vault behavior. "
         f"To proceed, set the env var {OVERRIDE_ENV_VAR}=1 in the parent shell, "
-        f"then re-run the action. The override is SESSION-SCOPED — it stays in effect "
+        f"then re-run the action. The override is SESSION-SCOPED: it stays in effect "
         f"until you `unset {OVERRIDE_ENV_VAR}` or restart the shell. "
         f"Target was: {file_path}"
     )
@@ -177,7 +177,7 @@ def main() -> int:
         return 0
 
     if _is_overridden():
-        # Override active — let it through (and log the override for observability)
+        # Override active: let it through (and log the override for observability)
         try:
             log_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),

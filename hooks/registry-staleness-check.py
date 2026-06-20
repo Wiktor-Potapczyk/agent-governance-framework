@@ -8,7 +8,7 @@ When the registry is fresh the hook emits nothing (zero noise). When the
 registry is MISSING it emits a one-line gentle note to generate it (useful on
 first run), never an alarm. All failure paths swallow errors and exit 0.
 
-Output contract: stdout JSON per SessionStart hook spec.  Never blocks —
+Output contract: stdout JSON per SessionStart hook spec.  Never blocks 
 errors silently swallowed, clean exit 0 on every failure path.
 """
 import json
@@ -64,14 +64,14 @@ def build_warning() -> str:
     age_days = _registry_age_days()
 
     if age_days is None:
-        # Registry does not exist at all — gentle note, not an alarm
+        # Registry does not exist at all: gentle note, not an alarm
         return (
             "[REGISTRY] registry.json not found. "
             "Run `python .claude/scripts/generate_registry.py` to build the asset inventory."
         )
 
     if age_days <= THRESHOLD_DAYS:
-        return ""  # Fresh — silent
+        return ""  # Fresh: silent
 
     age_int = int(age_days)
     return (
@@ -93,7 +93,7 @@ def main() -> None:
         warning = ""
 
     if not warning:
-        return  # Fresh registry — emit nothing, zero noise
+        return  # Fresh registry: emit nothing, zero noise
 
     output = {
         "hookSpecificOutput": {

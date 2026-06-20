@@ -1,5 +1,5 @@
 """
-Session Summary — Three-layer analytics for CC Agent Governance Framework.
+Session Summary: Three-layer analytics for CC Agent Governance Framework.
 
 Computes 9 KPIs across 3 layers (governance, work patterns, cost) for a given
 session. Produces: one-liner → session-log.txt, JSON → work/, SQLite → observability.db.
@@ -28,7 +28,7 @@ from observability_db import get_connection, upsert_session, upsert_kpi, upsert_
 
 # --- Configuration ---
 
-# Session JSONL directory — set CC_SESSIONS_DIR env var, or auto-detect from
+# Session JSONL directory: set CC_SESSIONS_DIR env var, or auto-detect from
 # ~/.claude/projects/ (picks the directory with most .jsonl files)
 def _detect_sessions_dir():
     env = os.environ.get("CC_SESSIONS_DIR")
@@ -57,7 +57,7 @@ GOVERNANCE_LOG = os.path.join(VAULT_ROOT, ".claude", "hooks", "governance-log.js
 SESSION_LOG = os.path.join(SCRIPTS_DIR, "..", "session-log.txt")
 WORK_DIR = os.path.join(SCRIPTS_DIR, "..", "work")
 
-# Per-million-token pricing (USD) — update when models change
+# Per-million-token pricing (USD): update when models change
 PRICING = {
     "claude-sonnet-4-6": {"input": 3.00, "output": 15.00, "cache_read": 0.30, "cache_create": 3.75},
     "claude-opus-4-6": {"input": 15.00, "output": 75.00, "cache_read": 1.50, "cache_create": 18.75},
@@ -70,7 +70,7 @@ PRICING = {
 # GHS weights
 GHS_WEIGHTS = {"dar": 0.30, "hsr": 0.25, "dzur": 0.20, "hor": 0.15, "sc_eff": 0.10}
 GHS_RALPH_WEIGHTS = {"dzur": 0.44, "hor": 0.33, "sc_eff": 0.23}  # renormalized without DAR/HSR (sums to 1.0)
-BUDGET_CAP = 5.00  # provisional — calibrate in Iteration 3
+BUDGET_CAP = 5.00  # provisional: calibrate in Iteration 3
 
 # GHS tiers
 def ghs_tier(score):
@@ -157,12 +157,12 @@ def parse_governance(session_id):
     dc_total = dc_pass + dc_block
     dar = (dc_pass / dc_total * 100) if dc_total > 0 else None
 
-    # HSR: compliance events only (block, deny, pass, warn) — W1 fix
+    # HSR: compliance events only (block, deny, pass, warn): W1 fix
     compliance_events = [e for e in entries if e.get("event") in ("block", "deny", "pass", "warn")]
     enforcement_count = sum(1 for e in compliance_events if e.get("event") in ("block", "deny"))
     hsr = (enforcement_count / len(compliance_events)) if compliance_events else None
 
-    # DZUR: dark-zone entries only — W2 fix
+    # DZUR: dark-zone entries only: W2 fix
     dz_entries = [e for e in entries if e.get("event") == "dark-zone"]
     if dz_entries:
         non_high = sum(1 for e in dz_entries if e.get("severity", "low") != "high")
@@ -210,7 +210,7 @@ def parse_work_patterns(session_id):
         for entry in parse_jsonl(path):
             entry_type = entry.get("type", "")
 
-            # WP-2: human turns — main session only
+            # WP-2: human turns: main session only
             if is_main and entry_type == "user":
                 content = entry.get("message", {}).get("content", "")
                 # Filter: keep only real human text messages
@@ -366,7 +366,7 @@ def parse_cost(session_id):
 def detect_ralph_loop(session_id):
     """Detect if session is a Ralph Loop.
     Threshold-based: architect-loop must be >50% of all Skill invocations,
-    not just present once (C1 fix — prevents false positives on long sessions)."""
+    not just present once (C1 fix: prevents false positives on long sessions)."""
     main_path = resolve_session_path(session_id)
     if not main_path:
         return False
@@ -586,7 +586,7 @@ def summarize_session(session_id, db_path=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Session summary — three-layer governance analytics")
+    parser = argparse.ArgumentParser(description="Session summary: three-layer governance analytics")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("session_id", nargs="?", help="Session UUID (full or partial)")
     group.add_argument("--latest", action="store_true", help="Analyze the most recent session")

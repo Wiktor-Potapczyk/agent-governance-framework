@@ -11,9 +11,9 @@ This skill's procedure is enforced by construction: on invocation for a non-Quic
 
 **Decomposition mode:** when the scope agent returns `mode: 'decomposition'`, the workflow HALTs with `status: 'decomposition-hand-back'` and returns the numbered sub-task list. The main session must then invoke the appropriate process skill for each sub-task via the prose path. A workflow cannot invoke skills; the HALT is the designed hand-back mechanism.
 
-**Path must be absolute** on the installing machine — replace `{{VAULT_ROOT}}` with the absolute path to your project root. After editing this file mid-session, invoke the script by `scriptPath` (not by name) because the name-to-path mapping is session-cached and will not pick up edits until the next session restart.
+**Path must be absolute** on the installing machine: replace `{{VAULT_ROOT}}` with the absolute path to your project root. After editing this file mid-session, invoke the script by `scriptPath` (not by name) because the name-to-path mapping is session-cached and will not pick up edits until the next session restart.
 
-The prose below remains (a) the procedure spec of record and (b) the FALLBACK path — use it only when the Workflow tool is unavailable (sub-agent context, degraded session) and say so explicitly. `DISPATCHES.json` is untouched and remains the read-only H11 verification source.
+The prose below remains (a) the procedure spec of record and (b) the FALLBACK path: use it only when the Workflow tool is unavailable (sub-agent context, degraded session) and say so explicitly. `DISPATCHES.json` is untouched and remains the read-only H11 verification source.
 
 ---
 
@@ -21,11 +21,11 @@ You have been routed here by the task-classifier. The task type is Analysis.
 
 Analysis covers three modes:
 
-**Evaluation mode** — assessing an artifact against a rubric or quality standard
-**Investigation mode** — diagnosing causes, tracing behavior, reasoning about why something works (or doesn't)
-**Decomposition mode** — breaking a Compound task into sub-tasks with classifications and dependencies
+**Evaluation mode**: assessing an artifact against a rubric or quality standard
+**Investigation mode**: diagnosing causes, tracing behavior, reasoning about why something works (or doesn't)
+**Decomposition mode**: breaking a Compound task into sub-tasks with classifications and dependencies
 
-## Step 1 — Define Scope
+## Step 1: Define Scope
 
 Before any work, write this block:
 
@@ -39,10 +39,10 @@ Output path: Projects/[Name]/work/YYYY-MM-DD-[subject]-analysis.md (only if outp
 ```
 
 For **Evaluation mode**: if no rubric exists, define one before proceeding.
-For **Investigation mode**: state the question clearly. If the answer is a single fact, this should have been Quick — investigation means multi-step reasoning.
-For **Decomposition mode**: break the compound request into numbered sub-tasks. For each: state TYPE + DOMAIN, identify dependencies (parallel vs sequential), then invoke each sub-task's process skill in order, passing output from one as input to the next. Cap at 1 level — if a sub-task looks Compound, flatten it.
+For **Investigation mode**: state the question clearly. If the answer is a single fact, this should have been Quick: investigation means multi-step reasoning.
+For **Decomposition mode**: break the compound request into numbered sub-tasks. For each: state TYPE + DOMAIN, identify dependencies (parallel vs sequential), then invoke each sub-task's process skill in order, passing output from one as input to the next. Cap at 1 level: if a sub-task looks Compound, flatten it.
 
-## Step 2 — Assign Specialist
+## Step 2: Assign Specialist
 
 Delegate to the appropriate specialist based on what is being evaluated:
 
@@ -58,12 +58,12 @@ Delegate to the appropriate specialist based on what is being evaluated:
 | Multiple of the above | Run applicable agents in parallel |
 
 Delegation rules:
-- Include the full rubric in each agent prompt — do not assume the agent knows the standard
+- Include the full rubric in each agent prompt: do not assume the agent knows the standard
 - Include the artifact to evaluate (paste content or provide file paths)
-- State observable facts only — never pre-judge the result
+- State observable facts only: never pre-judge the result
 - Each agent prompt must be fully self-contained
 
-## Step 3 — Synthesize (MANDATORY if multiple agents)
+## Step 3: Synthesize (MANDATORY if multiple agents)
 
 If only one agent was used, skip to Step 4.
 
@@ -73,7 +73,7 @@ Pass all findings to the **research-synthesizer** agent:
 - Include all evaluation results
 - Instruction: merge findings, resolve any contradictions between specialist assessments, produce a unified evaluation
 
-## Step 4 — Report
+## Step 4: Report
 
 Write or delegate the final assessment:
 - For simple single-agent evaluations: the agent's output may be sufficient as-is
@@ -81,7 +81,7 @@ Write or delegate the final assessment:
 
 Save output to the path from the scope block.
 
-## Step 5 — Quality Check
+## Step 5: Quality Check
 
 Before marking analysis complete:
 
@@ -102,6 +102,6 @@ If any check fails: identify which criteria are missing, run targeted follow-up 
 
 ## Notes
 
-- Analysis is evaluation, not building. If the analysis reveals something that needs fixing, report it — do not fix it inline.
+- Analysis is evaluation, not building. If the analysis reveals something that needs fixing, report it: do not fix it inline.
 - The rubric is non-negotiable. If the user provides a rubric, evaluate against it exactly. Do not substitute your own criteria.
 - When evaluating LLM outputs: compare against the system prompt's stated behavior, not against what you think the output "should" say.

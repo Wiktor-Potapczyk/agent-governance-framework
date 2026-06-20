@@ -52,7 +52,7 @@ PM CHECKPOINT REPORT
 Project: [name]
 Phase: [0-4]
 Viability: PASS | HOLD | KILL
-Blockers: [count] — [list or "none"]
+Blockers: [count]: [list or "none"]
 Next: [recommended next action]
 ```
 

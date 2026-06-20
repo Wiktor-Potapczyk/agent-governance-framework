@@ -49,10 +49,10 @@ Skill content here. This is injected when the skill is invoked.
 
 ## Hooks
 
-All hooks read JSON from stdin and write JSON to stdout. The framework uses three response patterns — **the block format is event-specific; using the wrong one makes the hook a silent no-op** (Claude Code ignores the unrecognized field and allows the action):
+All hooks read JSON from stdin and write JSON to stdout. The framework uses three response patterns: **the block format is event-specific; using the wrong one makes the hook a silent no-op** (Claude Code ignores the unrecognized field and allows the action):
 
 1. **Allow** (default): exit with no output or exit code 0
-2. **Block — depends on the event:**
+2. **Block: depends on the event:**
    - `PreToolUse`: output `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "..."}}` (see `hooks/bash-safety-guard.py` for a live example). The legacy `{"decision": "block"}` form does NOT block PreToolUse.
    - `Stop` / `SubagentStop`: output `{"decision": "block", "reason": "..."}`
 3. **Inject context**: output `{"hookSpecificOutput": {"additionalContext": "..."}}`
@@ -64,16 +64,16 @@ All hooks read JSON from stdin and write JSON to stdout. The framework uses thre
 3. Test with: `echo '{"prompt":"test"}' | python your-hook.py`
 
 **Hook events available:**
-- `PreToolUse` — before a tool is called (can block)
-- `PostToolUse` — after a tool returns (can inject context)
-- `Stop` — before the assistant's response is shown (can block)
-- `SubagentStart` — when a subagent is spawned (can inject context)
-- `SubagentStop` — when a subagent finishes (can block)
-- `UserPromptSubmit` — when the user sends a message (can inject context)
-- `SessionStart` — when a Claude Code session begins (can inject context)
-- `PreCompact` — before context compaction (can inject context)
-- `PostCompact` — after context compaction completes (can inject context)
-- `SessionEnd` — when a session ends (logging only; transcript is not available)
+- `PreToolUse`: before a tool is called (can block)
+- `PostToolUse`: after a tool returns (can inject context)
+- `Stop`: before the assistant's response is shown (can block)
+- `SubagentStart`: when a subagent is spawned (can inject context)
+- `SubagentStop`: when a subagent finishes (can block)
+- `UserPromptSubmit`: when the user sends a message (can inject context)
+- `SessionStart`: when a Claude Code session begins (can inject context)
+- `PreCompact`: before context compaction (can inject context)
+- `PostCompact`: after context compaction completes (can inject context)
+- `SessionEnd`: when a session ends (logging only; transcript is not available)
 
 ## CLAUDE.md
 
@@ -84,7 +84,7 @@ The template `CLAUDE.md` in the repo root contains the governance philosophy and
 - **Agent Registry**: list your actual agents
 - **Tool & Environment Quirks**: your specific environment
 
-Keep the **CRITICAL RULE** sections intact — they encode the governance principles that make the hooks effective.
+Keep the **CRITICAL RULE** sections intact: they encode the governance principles that make the hooks effective.
 
 ## Removing Components
 

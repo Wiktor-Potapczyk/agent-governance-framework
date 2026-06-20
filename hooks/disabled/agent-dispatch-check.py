@@ -118,7 +118,7 @@ def main():
             pass
         return
 
-    # Agent is in the list — allow
+    # Agent is in the list: allow
     return
 
 

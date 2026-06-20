@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 
 # Pure detection logic lives in the sibling module (extracted 2026-06-02 for
-# boundary-testability — see _subagent_quality_logic.py). Make it importable.
+# boundary-testability: see _subagent_quality_logic.py). Make it importable.
 _HOOK_DIR = os.path.dirname(os.path.abspath(__file__))
 if _HOOK_DIR not in sys.path:
     sys.path.insert(0, _HOOK_DIR)
@@ -50,7 +50,7 @@ def main():
 
     def log_and_block(result, check_failed, reason):
         # 2026-05-10: capture violation excerpt so log entries are auditable
-        # (per finding_must_dispatch_compliance_53pct.md — 11 unauditable blocks/week pre-fix)
+        # (per finding_must_dispatch_compliance_53pct.md: 11 unauditable blocks/week pre-fix)
         violation_excerpt = (message[:200] + "...") if message_len > 200 else message
         violation_excerpt = violation_excerpt.replace("\n", " ").replace("\r", " ").strip()
 
@@ -85,7 +85,7 @@ def main():
         print(json.dumps(response))
         sys.exit(0)
 
-    # Structural quality checks (CHECK 1/2/3) — extracted to
+    # Structural quality checks (CHECK 1/2/3): extracted to
     # _subagent_quality_logic.classify_subagent_output 2026-06-02 for
     # boundary-testability; behavior preserved exactly.
     blocked, check_failed, reason = classify_subagent_output(message)

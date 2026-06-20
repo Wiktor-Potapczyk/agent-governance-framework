@@ -21,7 +21,7 @@ import json
 import os
 import re
 
-# 200KB window — matches other hardened hooks
+# 200KB window: matches other hardened hooks
 READ_BYTES = 204800
 
 # Expected SCOPE block per process skill
@@ -81,7 +81,7 @@ def check_pm_checkpoint_report(lines):
 
     Rubber-stamp hardening (B2 fix 2026-04-13, originally failing test_pm_without_orchestrator_inline_report_blocked;
     implemented 2026-04-18 as part of Opus-4.7 adversarial review of H1 sprint):
-    The /pm Skill MUST dispatch pm-orchestrator — otherwise the checkpoint is an inline
+    The /pm Skill MUST dispatch pm-orchestrator: otherwise the checkpoint is an inline
     rubber stamp, defeating the whole point of having a PM orchestrator agent.
     """
     pm_invoked = False
@@ -112,7 +112,7 @@ def check_pm_checkpoint_report(lines):
                 skill = (inp.get("skill") or "").lower()
                 if skill == "pm":
                     pm_invoked = True
-                    pm_orchestrator_dispatched = False  # Reset — track dispatch after latest /pm
+                    pm_orchestrator_dispatched = False  # Reset: track dispatch after latest /pm
                     text_after_pm = []
 
             # Track pm-orchestrator Agent dispatches that happen AFTER /pm was invoked
@@ -131,7 +131,7 @@ def check_pm_checkpoint_report(lines):
                 text_after_pm.append(block.get("text", ""))
 
     if not pm_invoked:
-        return True, ""  # /pm not invoked — nothing to check
+        return True, ""  # /pm not invoked: nothing to check
 
     has_report = any(
         "PM CHECKPOINT REPORT" in text and re.search(r'Viability:\s*(?:PASS|HOLD|KILL)', text)
@@ -186,7 +186,7 @@ def check_agent_dispatch(process_skill, agents):
 
 def check_pm_after_increment(lines):
     """HARD: Multi-step increments (2+ TaskCreate) require /pm after all tasks complete + pentest.
-    Independent of process skill invocations — runs on every Stop event."""
+    Independent of process skill invocations: runs on every Stop event."""
     task_creates = 0
     task_completes = 0
     pentest_seen = False
@@ -249,11 +249,11 @@ def check_pm_after_increment(lines):
     if task_completes < task_creates:
         return True, ""
 
-    # Pentest not done yet — pentest enforcement handles this separately
+    # Pentest not done yet: pentest enforcement handles this separately
     if not pentest_seen:
         return True, ""
 
-    # All tasks done + pentest done — PM should have been invoked (which resets task_creates).
+    # All tasks done + pentest done: PM should have been invoked (which resets task_creates).
     # If we reach here, task_creates >= 2 means PM was NOT invoked for this increment.
     return False, f"Increment complete ({task_creates} tasks + pentest) but /pm checkpoint not invoked"
 
@@ -302,11 +302,11 @@ def main():
         # B-1b fix (2026-06-11): Turn-boundary reset must fire only on REAL user
         # messages, not on tool_result wrapper entries. A Workflow invocation lands
         # as three transcript entries:
-        #   1. assistant  — Workflow tool_use
-        #   2. user       — tool_result wrapper  ← NOT a real user turn
-        #   3. assistant  — relay text (contains SCOPE/QA REPORT)
+        #   1. assistant : Workflow tool_use
+        #   2. user      : tool_result wrapper  ← NOT a real user turn
+        #   3. assistant : relay text (contains SCOPE/QA REPORT)
         # If we reset on entry 2, found_skill is False before the relay text (entry 3)
-        # arrives, and the SCOPE/QA-REPORT check silently skips — B-1a without B-1b
+        # arrives, and the SCOPE/QA-REPORT check silently skips: B-1a without B-1b
         # has zero enforcement effect.
         # Real user message: content is a plain string, or a list containing a "text"
         # block that is not all-tool_result. Ported from work-verification-check.py
@@ -329,7 +329,7 @@ def main():
                     is_real_user = True
             if is_real_user:
                 # The previous turn had a process skill. A real user message means
-                # that turn completed — reset state so we don't re-check on future turns.
+                # that turn completed: reset state so we don't re-check on future turns.
                 last_process_skill = None
                 text_after_skill = []
                 agents_after_skill = []
@@ -449,7 +449,7 @@ def main():
         return
 
     if not last_process_skill or not found_skill:
-        return  # No process skill invoked this turn — nothing to check
+        return  # No process skill invoked this turn: nothing to check
 
     # --- HARD checks (block on failure) ---
     hard_failures = []

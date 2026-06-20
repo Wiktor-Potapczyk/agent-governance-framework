@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""wiki-citation-check.py — PostToolUse Write hook (M2 Layer 2).
+"""wiki-citation-check.py: PostToolUse Write hook (M2 Layer 2).
 
 Karpathy LLM-Wiki adoption fabrication mitigation. Validates that any Write to a
 wiki-layer file (Resources/KB/, Notes/ with #wiki tag, Projects/*/archive/ with
@@ -18,14 +18,14 @@ Behavior:
 Exit codes:
 - 0 = pass
 - 0 with additionalContext = soft warning
-- 2 = hard block (currently DISABLED — too risky for v1; activate after empirical baseline)
+- 2 = hard block (currently DISABLED: too risky for v1; activate after empirical baseline)
 
 Schema:
 - input: PostToolUse hook payload via stdin
 - output: stdout JSON {hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: str}}
 
 Refactored 2026-05-14 (CC-AUTOMATION-LEARN Step 1): pure logic now lives in
-`_wiki_citation_logic.py`. This file is the thin I/O wrapper — stdin parsing,
+`_wiki_citation_logic.py`. This file is the thin I/O wrapper: stdin parsing,
 filesystem reads of the written file, governance-log writing, stdout emission.
 """
 import json

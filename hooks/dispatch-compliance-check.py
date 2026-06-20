@@ -28,13 +28,13 @@ try:
 except ImportError:
     _SIDECAR_AVAILABLE = False
 
-# 200KB window — covers even 10+ agent outputs per turn
+# 200KB window: covers even 10+ agent outputs per turn
 READ_BYTES = 204800
 
 # Field labels used as delimiters for multiline capture
 FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
 
-# Known agent/skill names — same set as governance-log.py (P0 fix 2026-04-09)
+# Known agent/skill names: same set as governance-log.py (P0 fix 2026-04-09)
 # Used to filter must_dispatch raw text to valid names only, discarding
 # trailing reasoning text that would otherwise cause false-positive blocks.
 KNOWN_DISPATCH_NAMES = {
@@ -61,10 +61,25 @@ KNOWN_DISPATCH_NAMES = {
 SKILL_AGENT_ALIASES = {
     "pm": {"pm-orchestrator"},
     "architect-review": {"architect-reviewer"},
-    "process-planning": {"implementation-plan", "adversarial-reviewer"},
-    "process-build": {"blueprint-mode", "architect-reviewer", "implementation-plan"},
-    "process-research": {"research-orchestrator", "technical-researcher", "research-analyst"},
-    "process-analysis": {"architect-reviewer", "adversarial-reviewer"},
+    "process-research": {
+        "research-orchestrator", "technical-researcher", "research-analyst",
+        "research-synthesizer", "report-generator",
+    },
+    "process-analysis": {
+        "architect-reviewer", "adversarial-reviewer",
+        "prompt-engineer", "debugger", "api-designer",
+        "data-engineer", "workflow-orchestrator", "api-security-audit",
+        "research-synthesizer", "report-generator",
+    },
+    "process-planning": {
+        "implementation-plan", "adversarial-reviewer", "architect-reviewer",
+        "technical-researcher", "research-analyst", "api-designer",
+        "llm-architect", "data-engineer", "prompt-engineer",
+    },
+    "process-build": {
+        "blueprint-mode", "architect-reviewer", "implementation-plan",
+        "prompt-engineer", "debugger",
+    },
     "process-qa": {"debugger"},
     "process-pentest": {"debugger"},
     "architect-loop": {"architect-reviewer", "adversarial-reviewer"},
@@ -140,7 +155,7 @@ def main():
     # H11 integration (2026-04-19): unconditional tracking for post-compaction
     # sidecar fallback. `all_dispatched` mirrors `dispatched` but is populated
     # regardless of `found_contract`. `recent_process_skill` is the last-seen
-    # process-* / task-classifier Skill invocation — used to identify the active
+    # process-* / task-classifier Skill invocation: used to identify the active
     # skill when no classification block survives in the window.
     all_dispatched = set()
     recent_process_skill = None
@@ -200,7 +215,7 @@ def main():
             # Track Skill and Agent dispatches. Two trackers:
             # - `dispatched`: gated on `found_contract` (existing behavior for
             #   enforcement against the current classification's MUST DISPATCH)
-            # - `all_dispatched`: unconditional — feeds H11 post-compaction fallback
+            # - `all_dispatched`: unconditional: feeds H11 post-compaction fallback
             if block.get("type") == "tool_use":
                 name = block.get("name", "")
                 inp = block.get("input", {})
@@ -214,7 +229,7 @@ def main():
                 if name == "Skill":
                     dispatched_name = (inp.get("skill") or "").lower()
                     # H11: track most-recent NON-TERMINAL process-* skill invocation for fallback.
-                    # Exclude terminal skills (process-qa, process-pentest) — they have empty
+                    # Exclude terminal skills (process-qa, process-pentest): they have empty
                     # mandatory lists, so letting them overwrite recent_process_skill nullifies
                     # enforcement for the earlier process-build/process-planning/etc.
                     # (2026-04-19 architect-reviewer Q4 fix: close exploitable nullification gap.)
@@ -236,7 +251,7 @@ def main():
     # mandatory-dispatch contract from the skill's DISPATCHES.json sidecar.
     # This closes the post-compaction enforcement blind spot surfaced by audit
     # finding H11 (2026-04-18). Acts only when the existing transcript scan
-    # found nothing — normal contract-present flow is unchanged.
+    # found nothing: normal contract-present flow is unchanged.
     if not found_contract and recent_process_skill and _SIDECAR_AVAILABLE:
         try:
             sidecar_mandatory = mandatory_agent_names(recent_process_skill)
@@ -266,7 +281,7 @@ def main():
             except Exception:
                 pass
         # If sidecar exists but has no mandatory dispatches (e.g. process-qa/pentest
-        # — terminal skills), fall through to the normal `if not found_contract` return.
+        #: terminal skills), fall through to the normal `if not found_contract` return.
         # If sidecar is missing entirely, also fall through (no enforcement possible).
 
     if not found_contract:
@@ -274,7 +289,7 @@ def main():
 
     # H3 fix (2026-04-18): reject empty MUST DISPATCH on non-Quick tasks.
     # The classifier spec states "none is ONLY valid for Quick tasks." Previously
-    # this hook accepted any empty must_dispatch silently — the composed B1+B2+B3
+    # this hook accepted any empty must_dispatch silently: the composed B1+B2+B3
     # bypass relied on this. Block non-Quick MUST DISPATCH: none at the contract
     # level before any dispatch checks run.
     # "task_type_str" is lowercase already (line 152); Quick literal is "quick".
@@ -304,7 +319,7 @@ def main():
             except Exception:
                 pass
             return
-        # Quick or unknown type with empty MUST DISPATCH — valid, no enforcement needed
+        # Quick or unknown type with empty MUST DISPATCH: valid, no enforcement needed
         return
 
     # Alias-aware missing check (2026-04-12 coherence fix):
@@ -336,7 +351,7 @@ def main():
             pass
 
         # Fix 3 (2026-04-14): general-purpose substitution soft warning.
-        # Pure observability — does NOT change block/pass behavior, only writes
+        # Pure observability: does NOT change block/pass behavior, only writes
         # an additional JSONL line so we can see how often the assistant
         # substitutes general-purpose for a declared specialist.
         try:
@@ -370,7 +385,7 @@ def main():
         # satisfied via SKILL_AGENT_ALIASES (e.g., architect-review → architect-reviewer)
         # are correctly counted. Previously this used raw set intersection which
         # recorded matched=[], matched_count=0 for every legitimate alias-satisfied
-        # Build/Planning pass — silently corrupting DAR analytics for the two
+        # Build/Planning pass: silently corrupting DAR analytics for the two
         # highest-frequency task types.
         try:
             from datetime import datetime

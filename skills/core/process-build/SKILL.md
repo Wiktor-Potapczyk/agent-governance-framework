@@ -9,29 +9,29 @@ description: Build process template. Follow this procedure for all Build-type ta
 
 This skill's procedure is enforced by construction: on invocation for a non-Quick task, execute it by calling the **Workflow tool** with `{scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-build.js"}`, passing the task brief as `args: {project, spec, constraints?, llm_prompts?, n8n_domain?}`. The script drives the dispatch sequence (scope → implementation-plan → blueprint-mode → mandatory parallel review: architect-reviewer + adversarial-reviewer [+ prompt-engineer if llm_prompts] → capped revise → quality gate); agents reason freely inside each step.
 
-**Path must be absolute** on the installing machine — replace `{{VAULT_ROOT}}` with the absolute path to your project root. After editing this file mid-session, invoke the script by `scriptPath` (not by name) because the name-to-path mapping is session-cached and will not pick up edits until the next session restart.
+**Path must be absolute** on the installing machine: replace `{{VAULT_ROOT}}` with the absolute path to your project root. After editing this file mid-session, invoke the script by `scriptPath` (not by name) because the name-to-path mapping is session-cached and will not pick up edits until the next session restart.
 
-The prose below remains (a) the procedure spec of record and (b) the FALLBACK path — use it only when the Workflow tool is unavailable (sub-agent context, degraded session) and say so explicitly. `DISPATCHES.json` is untouched and remains the read-only H11 verification source.
+The prose below remains (a) the procedure spec of record and (b) the FALLBACK path: use it only when the Workflow tool is unavailable (sub-agent context, degraded session) and say so explicitly. `DISPATCHES.json` is untouched and remains the read-only H11 verification source.
 
 ---
 
 You have been routed here by the task-classifier. The task type is Build.
 
-## Step 1 — Define Scope
+## Step 1: Define Scope
 
 Before any work, write this block:
 
 ```
 BUILD SCOPE
-Goal: [what is being built — one sentence]
+Goal: [what is being built: one sentence]
 Inputs: [specs, designs, or requirements this builds from]
-Tech: [language, platform, framework — e.g., n8n workflow JSON, JavaScript, Python]
+Tech: [language, platform, framework: e.g., n8n workflow JSON, JavaScript, Python]
 Output path: Projects/[Name]/work/YYYY-MM-DD-[artifact-name].[ext]
 ```
 
 If scope is unclear or no spec/requirements exist, stop and route to Planning first.
 
-## Step 2 — Plan
+## Step 2: Plan
 
 Delegate to the **implementation-plan** agent.
 
@@ -42,7 +42,7 @@ Include in the prompt:
 
 Review the plan before proceeding. If the plan reveals missing requirements, route back to Research or Planning.
 
-## Step 3 — Build
+## Step 3: Build
 
 Delegate to the **blueprint-mode** agent.
 
@@ -53,14 +53,14 @@ Include in the prompt:
 
 For n8n workflows:
 - Always fetch the current workflow first (`n8n_get_workflow`)
-- Never apply changes directly — produce the spec/JSON for the user to apply
+- Never apply changes directly: produce the spec/JSON for the user to apply
 - Include node IDs and connection maps in the output
 
 For code:
 - Follow existing patterns in the codebase
 - Include error handling at system boundaries only
 
-## Step 4 — Review (MANDATORY)
+## Step 4: Review (MANDATORY)
 
 **You MUST dispatch architect-reviewer.** Skipping review is a process violation caught by the Stop hook.
 
@@ -73,7 +73,7 @@ Include in the prompt:
 
 If the artifact includes LLM prompts, **you MUST also dispatch prompt-engineer** in parallel for prompt-specific review.
 
-## Step 5 — Quality Check
+## Step 5: Quality Check
 
 Before marking build complete:
 
@@ -81,7 +81,7 @@ Before marking build complete:
 - [ ] Review passed or issues resolved
 - [ ] Output saved to the correct path in Projects/[Name]/work/
 - [ ] No unsolicited changes beyond what was scoped
-- [ ] **Live verification:** If the build produced artifacts that describe or depend on a live system (n8n workflow, deployed service, API), fetch the current live state and confirm the artifact matches reality. If the user deployed some components but not others, update the work file to reflect what actually exists — not what was planned.
+- [ ] **Live verification:** If the build produced artifacts that describe or depend on a live system (n8n workflow, deployed service, API), fetch the current live state and confirm the artifact matches reality. If the user deployed some components but not others, update the work file to reflect what actually exists: not what was planned.
 
 If any check fails: for runtime errors or unexpected behavior, delegate to **debugger** to diagnose first. For implementation issues, fix via the build agent (Step 3), then re-run review (Step 4).
 

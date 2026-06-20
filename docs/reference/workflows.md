@@ -1,7 +1,7 @@
 # Workflows Reference
 
 **Audience:** Operators deploying or adapting the framework.
-**Mode:** Reference — attributes tables, no tutorial prose. **Code is the source of truth** — if a field here disagrees with the `.js` file, the code wins.
+**Mode:** Reference: attributes tables, no tutorial prose. **Code is the source of truth**: if a field here disagrees with the `.js` file, the code wins.
 
 A workflow script is a Claude Code Workflow tool script (`export const meta = {...}`) that encodes the dispatch sequence for one process skill by construction. Each script in `workflows/` corresponds to a core process skill. The prose SKILL.md is the spec-of-record and explicit fallback; the workflow script is the authoritative runtime for operators who use the Workflow tool.
 
@@ -30,11 +30,11 @@ For setup instructions, see `INSTALL.md §Workflows`. For the design rationale, 
 | **Skill** | `process-research` |
 | **Invocation** | `Workflow({scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-research.js", args: {project, question, sources?, constraints?}})` |
 | **Phases** | 1. Scope (query-clarifier or inline) → 2. Research (research-orchestrator pipeline: analyst + technical-researcher in parallel) → 3. Synthesis (research-synthesizer, mandatory when ≥2 agent findings) → 4. Report (report-generator) → 5. Quality (architect-reviewer) |
-| **HALT: ralph-loop-hand-back** | When scope agent returns `ralph_loop_indicated: true` — script returns `{status: "ralph-loop-hand-back", scope_block_for_loop: ...}` and stops. Caller (main session) must initiate the ralph loop manually. |
-| **HALT: halted-malformed-args** | When `args.project` or `args.question` is missing — script returns `{status: "halted-malformed-args", message: ...}` before spawning any agents. |
+| **HALT: ralph-loop-hand-back** | When scope agent returns `ralph_loop_indicated: true`: script returns `{status: "ralph-loop-hand-back", scope_block_for_loop: ...}` and stops. Caller (main session) must initiate the ralph loop manually. |
+| **HALT: halted-malformed-args** | When `args.project` or `args.question` is missing: script returns `{status: "halted-malformed-args", message: ...}` before spawning any agents. |
 | **Typed schemas** | SCOPE_SCHEMA, FINDINGS_SCHEMA, SYNTHESIS_SCHEMA, REPORT_SCHEMA, QUALITY_SCHEMA |
 | **Returns** | `{status: "complete", research_report_text: string, quality_verdict: string}` |
-| **DISPATCHES.json** | `skills/core/process-research/DISPATCHES.json` — retained as H11 read-only audit artifact |
+| **DISPATCHES.json** | `skills/core/process-research/DISPATCHES.json`: retained as H11 read-only audit artifact |
 | **Hook preconditions** | None specific to this script |
 
 ---
@@ -47,12 +47,12 @@ For setup instructions, see `INSTALL.md §Workflows`. For the design rationale, 
 | **Skill** | `process-analysis` |
 | **Invocation** | `Workflow({scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-analysis.js", args: {project, subject, mode?, rubric?, constraints?}})` |
 | **Phases** | 1. Scope (mode detection: evaluation / diagnosis / decomposition / synthesis) → 2. Analyze (specialists in parallel via `parallel()`) → 3. Synthesis → 4. Report (conditional on `scope.complex`) → 5. Quality |
-| **HALT: decomposition-hand-back** | When scope returns `mode: "decomposition"` — script returns `{status: "decomposition-hand-back", decomposition_subtasks: [...]}` and stops. Caller decomposes the task list manually. |
+| **HALT: decomposition-hand-back** | When scope returns `mode: "decomposition"`: script returns `{status: "decomposition-hand-back", decomposition_subtasks: [...]}` and stops. Caller decomposes the task list manually. |
 | **HALT: halted-malformed-args** | When `args.project` or `args.subject` is missing. |
-| **Evaluation mode guard** | When `mode === "evaluation"`, script hard-fails if `args.rubric` is empty — prevents unanchored evaluation. |
+| **Evaluation mode guard** | When `mode === "evaluation"`, script hard-fails if `args.rubric` is empty: prevents unanchored evaluation. |
 | **Typed schemas** | SCOPE_SCHEMA, ANALYSIS_SCHEMA, SYNTHESIS_SCHEMA, REPORT_SCHEMA, QUALITY_SCHEMA |
 | **Returns** | `{status: "complete", analysis_report_text: string, quality_verdict: string}` |
-| **DISPATCHES.json** | `skills/core/process-analysis/DISPATCHES.json` — retained as H11 read-only audit artifact |
+| **DISPATCHES.json** | `skills/core/process-analysis/DISPATCHES.json`: retained as H11 read-only audit artifact |
 
 ---
 
@@ -66,10 +66,10 @@ For setup instructions, see `INSTALL.md §Workflows`. For the design rationale, 
 | **Phases** | 1. Scope → 2. Plan (implementation-plan) → 3. Build (blueprint-mode) → 4. Review (architect-reviewer + adversarial-reviewer in parallel; prompt-engineer added when `args.llm_prompts`) → 5. Quality (process-qa via nested agent) |
 | **HALT: halted-malformed-args** | When `args.project` or `args.spec` is missing. |
 | **FILE CONTRACT** | Build agent receives an explicit FILE CONTRACT specifying the expected output file path; Quality gate reads the file to confirm delivery. |
-| **Review cap** | Adversarial review is capped at 2 rounds (per vault doctrine — `feedback_adversarial_loop_ratchets_past_necessity.md`). |
+| **Review cap** | Adversarial review is capped at 2 rounds (per vault doctrine: `feedback_adversarial_loop_ratchets_past_necessity.md`). |
 | **Typed schemas** | SCOPE_SCHEMA, PLAN_SCHEMA, BUILD_SCHEMA, REVIEW_SCHEMA, QUALITY_SCHEMA |
 | **Returns** | `{status: "complete", build_report_text: string, quality_verdict: string}` |
-| **DISPATCHES.json** | `skills/core/process-build/DISPATCHES.json` — retained as H11 read-only audit artifact |
+| **DISPATCHES.json** | `skills/core/process-build/DISPATCHES.json`: retained as H11 read-only audit artifact |
 
 ---
 
@@ -82,10 +82,10 @@ For setup instructions, see `INSTALL.md §Workflows`. For the design rationale, 
 | **Invocation** | `Workflow({scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-planning.js", args: {project, task_brief, classification_block?}})` |
 | **Phases** | 1. Scope → 2. Research (optional, only when scope indicates unknowns) → 3. Plan (implementation-plan) → 4. Review (mandatory parallel: architect-reviewer + adversarial-reviewer [+ prompt-engineer when LLM prompts present]) → 5. Quality |
 | **HALT: halted-malformed-args** | When `args.project` or `args.task_brief` is missing. |
-| **Review mandatory** | Unlike process-build, architect-review is unconditionally mandatory in process-planning — not conditional on any scope flag. |
+| **Review mandatory** | Unlike process-build, architect-review is unconditionally mandatory in process-planning: not conditional on any scope flag. |
 | **Typed schemas** | SCOPE_SCHEMA, PLAN_SCHEMA, REVIEW_SCHEMA, QUALITY_SCHEMA |
 | **Returns** | `{status: "complete", plan_text: string, quality_verdict: string}` |
-| **DISPATCHES.json** | `skills/core/process-planning/DISPATCHES.json` — retained as H11 read-only audit artifact |
+| **DISPATCHES.json** | `skills/core/process-planning/DISPATCHES.json`: retained as H11 read-only audit artifact |
 
 ---
 
@@ -100,11 +100,11 @@ For setup instructions, see `INSTALL.md §Workflows`. For the design rationale, 
 | **HALT: halted-malformed-args** | When `args.project` is missing or `args.claims` is empty or not an array. |
 | **AUTO-FAIL rule** | Any claim where the execute-agent used only Read/Grep (no Bash or MCP) to verify a behavioral assertion → automatically downgraded to FAIL. Encoded in the typed schema evaluation, not in prose agent judgment. |
 | **Coverage rule** | N claims in → N results out. If results count mismatches claims count, missing results are padded with FAIL. |
-| **TRANSCRIPT RELAY CONTRACT** | Script returns `qa_scope_text` + `qa_report_text` as plain strings. After the Workflow tool returns, the main session MUST relay both verbatim as plain unfenced text — `process-step-check.py` matches these strings after fence-stripping; fenced relay is invisible to the hook. |
+| **TRANSCRIPT RELAY CONTRACT** | Script returns `qa_scope_text` + `qa_report_text` as plain strings. After the Workflow tool returns, the main session MUST relay both verbatim as plain unfenced text: `process-step-check.py` matches these strings after fence-stripping; fenced relay is invisible to the hook. |
 | **Hook preconditions** | `process-step-check.py` B-1a/B-1b (Workflow-aware SCOPE detection) and `work-verification-check.py` B-2/B-3 (Workflow-path execution suppression) must be on disk. |
 | **Typed schemas** | SCOPE_SCHEMA, EXECUTE_SCHEMA, REPORT_SCHEMA, QUALITY_SCHEMA |
 | **Returns** | `{status: "complete", qa_scope_text: string, qa_report_text: string}` |
-| **DISPATCHES.json** | `skills/core/process-qa/DISPATCHES.json` — retained as H11 read-only audit artifact |
+| **DISPATCHES.json** | `skills/core/process-qa/DISPATCHES.json`: retained as H11 read-only audit artifact |
 
 ---
 
@@ -118,10 +118,10 @@ For setup instructions, see `INSTALL.md §Workflows`. For the design rationale, 
 | **Phases** | 1. Scope → 2. Attack enumeration (threat-model agent produces ranked attack list) → 3. Execute (per-attack agents in parallel, each returning raw tool output) → 4. Synthesis (pentest-synthesizer) → 5. Report (PENTEST REPORT with per-finding verdict + Untested Surface + overall recommendation) |
 | **HALT: halted-malformed-args** | When `args.project` or `args.increment_summary` is missing. |
 | **Evidence-only gate** | Per-attack execute agents must return raw tool output in `evidence_raw` field. If `evidence_raw` is empty, the attack result is auto-downgraded to INCONCLUSIVE. |
-| **Recommendation values** | `SHIP` / `FIX` / `ESCALATE` — derived in code from finding severities, not from prose agent verdict. |
+| **Recommendation values** | `SHIP` / `FIX` / `ESCALATE`: derived in code from finding severities, not from prose agent verdict. |
 | **Typed schemas** | SCOPE_SCHEMA, THREAT_SCHEMA, ATTACK_SCHEMA, SYNTHESIS_SCHEMA, REPORT_SCHEMA |
 | **Returns** | `{status: "complete", pentest_report_text: string, recommendation: "SHIP"|"FIX"|"ESCALATE"}` |
-| **DISPATCHES.json** | `skills/core/process-pentest/DISPATCHES.json` — retained as H11 read-only audit artifact |
+| **DISPATCHES.json** | `skills/core/process-pentest/DISPATCHES.json`: retained as H11 read-only audit artifact |
 
 ---
 

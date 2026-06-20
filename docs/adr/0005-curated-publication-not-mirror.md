@@ -17,9 +17,9 @@ The question is: what is the right publication model for a personal framework in
 
 ## Considered Options
 
-1. **Curated subset with pinned counts in a manifest** — publish the domain-neutral core; pin all artifact counts in `.doc-consistency.json`; CI verifies manifest vs on-disk reality on every push.
-2. **Full mirror with redaction** — publish everything, redact sensitive fields.
-3. **Pattern documentation only** — publish docs and templates, no runnable artifacts.
+1. **Curated subset with pinned counts in a manifest**: publish the domain-neutral core; pin all artifact counts in `.doc-consistency.json`; CI verifies manifest vs on-disk reality on every push.
+2. **Full mirror with redaction**: publish everything, redact sensitive fields.
+3. **Pattern documentation only**: publish docs and templates, no runnable artifacts.
 
 ## Decision Outcome
 
@@ -30,13 +30,13 @@ The repository ships:
 - Domain-example artifacts (apify, n8n) as illustrative, not prescriptive.
 - A CLAUDE.md template that adopters fill in for their own context.
 
-All artifact counts are pinned in `.doc-consistency.json`. The CI workflow (`docs.yml`) verifies pinned numbers match on-disk reality on every push. Docs cite the manifest as the single source of truth and do not restate counts inline — per the single-source-of-truth rule in [docs/documentation-standard.md](../documentation-standard.md) §6.1.
+All artifact counts are pinned in `.doc-consistency.json`. The CI workflow (`docs.yml`) verifies pinned numbers match on-disk reality on every push. Docs cite the manifest as the single source of truth and do not restate counts inline: per the single-source-of-truth rule in [docs/documentation-standard.md](../documentation-standard.md) §6.1.
 
 **Consequences:**
 
 - *Positive:* no private information in the public repository.
 - *Positive:* the manifest + CI gate prevents count drift between docs and filesystem.
-- *Positive:* the curated subset is more useful to adopters than a full mirror — they receive patterns, not configurations.
+- *Positive:* the curated subset is more useful to adopters than a full mirror: they receive patterns, not configurations.
 - *Negative:* the curated repo diverges from the private setup over time; the maintainer must decide what to publish per change.
 - *Negative:* the "what to include" decision requires judgment per artifact class.
 
@@ -53,4 +53,4 @@ All artifact counts are pinned in `.doc-consistency.json`. The CI workflow (`doc
 
 **Pattern documentation only**
 - Pro: zero leakage risk.
-- Con: no runnable artifacts — adopters cannot install and use the framework; the value proposition is halved.
+- Con: no runnable artifacts: adopters cannot install and use the framework; the value proposition is halved.

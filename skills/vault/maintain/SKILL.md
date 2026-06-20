@@ -5,12 +5,12 @@ description: Clean up and organize a project's work files. Inventories work/ dir
 
 # Project File Maintenance
 
-**CRITICAL: Delegate the entire maintenance task to an agent.** File maintenance requires reading every file in the work directory, which trashes the main session context. Always spawn an agent to do the work — never read work files inline.
+**CRITICAL: Delegate the entire maintenance task to an agent.** File maintenance requires reading every file in the work directory, which trashes the main session context. Always spawn an agent to do the work: never read work files inline.
 
 ## How to invoke
 
 1. Identify the active project (from conversation context, or ask the user)
-2. Read the project's `STATE.md` (this one read is acceptable — it's small and needed for the delegation prompt)
+2. Read the project's `STATE.md` (this one read is acceptable: it's small and needed for the delegation prompt)
 3. Spawn an agent with the full instructions below
 
 ## Agent delegation prompt
@@ -18,7 +18,7 @@ description: Clean up and organize a project's work files. Inventories work/ dir
 Use the Agent tool with `subagent_type: "general-purpose"`. Include in the prompt:
 
 - The project path (e.g., `Projects/Agent-Suite/`)
-- The current STATE.md content (paste it — the agent can't see our context)
+- The current STATE.md content (paste it: the agent can't see our context)
 - All classification rules and decision rules from below
 - Instruction to present the classification table, execute moves, and update STATE.md
 - Instruction to report back with a summary: files kept, archived, merged, deleted
@@ -34,7 +34,7 @@ STATE.md CONTENT: [paste current STATE.md]
 TASK:
 1. List all files in [project]/work/ with sizes and modification dates
 2. Check if [project]/archive/ exists (create if not)
-3. Read EVERY file — at minimum frontmatter + first 30 lines; read small files (<100 lines) entirely
+3. Read EVERY file: at minimum frontmatter + first 30 lines; read small files (<100 lines) entirely
 4. Classify each file using these categories:
 
 | Category | Criteria | Action |
@@ -58,7 +58,7 @@ Decision rules:
 
 6. Execute: move ARCHIVE files, merge MERGE files, do NOT delete without confirmation
 
-7. Update the Work Files section in STATE.md — organize into logical groups (entry points, research, tools), include counts
+7. Update the Work Files section in STATE.md: organize into logical groups (entry points, research, tools), include counts
 
 8. Report summary: X kept, Y archived, Z merged. New file count in work/.
 ```
@@ -67,4 +67,4 @@ Decision rules:
 
 Review the agent's summary. If it looks correct, you're done. If the agent made questionable classifications, discuss with the user before accepting.
 
-Do NOT re-read the files yourself to verify — trust the agent's classification unless the user flags something.
+Do NOT re-read the files yourself to verify: trust the agent's classification unless the user flags something.

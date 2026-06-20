@@ -2,9 +2,9 @@
 
 **Audience:** operators and contributors who need to understand what each agent does, which skills route to it, and what it produces.
 
-**Mode:** Reference (Diátaxis). This page describes *what each agent IS* — fields, contracts, known failures. For *why* agents are shaped this way, see `docs/concepts/` and `docs/adr/`. For *how to use* them end-to-end, see the skill reference pages.
+**Mode:** Reference (Diátaxis). This page describes *what each agent IS*: fields, contracts, known failures. For *why* agents are shaped this way, see `docs/concepts/` and `docs/adr/`. For *how to use* them end-to-end, see the skill reference pages.
 
-**Coverage:** 31 agents total — 28 from `agents/governance/`, 2 from `agents/domain-examples/n8n/`, 1 top-level (`agents/code-simplifier.md`).
+**Coverage:** 31 agents total: 28 from `agents/governance/`, 2 from `agents/domain-examples/n8n/`, 1 top-level (`agents/code-simplifier.md`).
 
 ---
 
@@ -54,11 +54,11 @@
 |---|---|
 | Domain | Structured adversarial challenge: finds flaws in decisions, plans, designs, and recommendations |
 | Tools | Read, Grep, Glob |
-| Dispatched by | `process-planning` (mandatory — DISPATCHES.json required binding); `process-analysis` (allowed specialist, optional lens); `task-classifier` (every Planning task gets adversarial challenge) |
+| Dispatched by | `process-planning` (mandatory: DISPATCHES.json required binding); `process-analysis` (allowed specialist, optional lens); `task-classifier` (every Planning task gets adversarial challenge) |
 | Model | sonnet |
-| Inputs | The artifact under challenge; evaluation criteria (optional — defaults to internal rubric) |
-| Output contract | `## Adversarial Review` block with `### Findings` (each tagged CRITICAL/WARNING/GAP/NOTE with category and "why it matters") and `### Verdict` (one sentence + confidence 0.0–1.0) |
-| Known failure modes | Agent body states: "If everything genuinely holds up, say 'no significant issues found'… but this should be rare" — over-permissive verdicts are a documented risk |
+| Inputs | The artifact under challenge; evaluation criteria (optional: defaults to internal rubric) |
+| Output contract | `## Adversarial Review` block with `### Findings` (each tagged CRITICAL/WARNING/GAP/NOTE with category and "why it matters") and `### Verdict` (one sentence + confidence 0.0-1.0) |
+| Known failure modes | Agent body states: "If everything genuinely holds up, say 'no significant issues found'… but this should be rare": over-permissive verdicts are a documented risk |
 
 ---
 
@@ -94,7 +94,7 @@
 
 | Field | Value |
 |---|---|
-| Domain | Generate structured, deterministic, AI-executable implementation plans — no code edits |
+| Domain | Generate structured, deterministic, AI-executable implementation plans: no code edits |
 | Tools | search/codebase, search/usages, vscode/vscodeAPI, think, read/problems, search/changes, execute/testFailure, read/terminalSelection, read/terminalLastCommand, vscode/openSimpleBrowser, web/fetch, findTestFiles, search/searchResults, web/githubRepo, vscode/extensions, edit/editFiles, execute/runNotebookCell, read/getNotebookSummary, read/readNotebookCellOutput, search, vscode/getProjectSetupInfo, vscode/installExtension, vscode/newWorkspace, vscode/runCommand, execute/getTerminalOutput, execute/runInTerminal, execute/createAndRunTask, execute/getTaskOutput, execute/runTask |
 | Dispatched by | `process-build` (mandatory planning step, DISPATCHES.json mandatory binding); `process-planning` (mandatory SKILL.md binding) |
 | Model | sonnet |
@@ -156,7 +156,7 @@
 |---|---|
 | Domain | Strategic planning and task allocation for complex research across specialist researchers |
 | Tools | Read, Write, Edit, Task |
-| Dispatched by | direct dispatch — no skill binding in this repo |
+| Dispatched by | direct dispatch: no skill binding in this repo |
 | Model | sonnet |
 | Inputs | Research brief describing scope, domains, and objectives |
 | Output contract | JSON plan with: strategy, iterations_planned, researcher_tasks (per academic/web/technical/data-analyst researcher with assigned bool, priority, tasks, focus_areas, constraints), integration_plan, success_criteria, contingency; followed by AGENT OUTPUT METADATA YAML block |
@@ -215,8 +215,8 @@
 | Dispatched by | `process-research` (DISPATCHES.json mandatory binding when query is ambiguous); invoked by research-orchestrator in Phase 1 |
 | Model | sonnet |
 | Inputs | Research query string |
-| Output contract | JSON object with: needs_clarification (bool), confidence_score (0.0–1.0), analysis, questions (array with question/type/options), refined_query, focus_areas; followed by AGENT OUTPUT METADATA YAML block |
-| Known failure modes | Decision thresholds: >0.8 = proceed, 0.6–0.8 = refine-and-proceed, <0.6 = request clarification |
+| Output contract | JSON object with: needs_clarification (bool), confidence_score (0.0-1.0), analysis, questions (array with question/type/options), refined_query, focus_areas; followed by AGENT OUTPUT METADATA YAML block |
+| Known failure modes | Decision thresholds: >0.8 = proceed, 0.6-0.8 = refine-and-proceed, <0.6 = request clarification |
 
 ---
 
@@ -298,7 +298,7 @@
 |---|---|
 | Domain | Git Flow workflow management: feature/release/hotfix branches, merging, PR generation, changelog |
 | Tools | Read, Bash, Grep, Glob, Edit, Write |
-| Dispatched by | direct dispatch — no skill binding in this repo |
+| Dispatched by | direct dispatch: no skill binding in this repo |
 | Model | sonnet |
 | Inputs | Git Flow operation request (create branch, finish branch, create release, create PR) |
 | Output contract | Structured status output with action taken (checkmarks), current repository status, next steps, warnings; status block format documented in agent body |
@@ -326,7 +326,7 @@
 |---|---|
 | Domain | MCP server discovery across registries, capability assessment, configuration generation, registry publishing |
 | Tools | Read, Write, Edit, WebSearch |
-| Dispatched by | direct dispatch — no skill binding in this repo |
+| Dispatched by | direct dispatch: no skill binding in this repo |
 | Model | sonnet |
 | Inputs | MCP capability requirements; optionally: region, latency, transport preferences |
 | Output contract | Discovery results (structured server list with capabilities); evaluation reports; production-ready configuration templates; integration guides; optimization recommendations |
@@ -396,11 +396,11 @@
 |---|---|
 | Domain | Apply competitive frameworks (SWOT, feature matrix, pricing grid, positioning map, Porter's Five Forces) to pre-gathered research data |
 | Tools | Read, Write, Edit, Grep, Glob, WebFetch, WebSearch |
-| Dispatched by | `task-classifier` (Competitive analysis domain row) — sequential handoff from research-orchestrator or research-analyst |
+| Dispatched by | `task-classifier` (Competitive analysis domain row): sequential handoff from research-orchestrator or research-analyst |
 | Model | sonnet |
 | Inputs | Pre-gathered research data (researcher output, vault notes, briefing docs); analysis goal |
-| Output contract | Framework-applied analysis with confidence levels (High/Medium/Low); 3–5 ranked strategic recommendations; gap report if data insufficient; saved to `Projects/<name>/work/YYYY-MM-DD-competitive-analysis-<topic>.md` |
-| Known failure modes | Agent body states: never fill data gaps by invention — marks gaps as `[NO DATA — needs research: description]`; returns gap report over weak analysis when critical data is missing |
+| Output contract | Framework-applied analysis with confidence levels (High/Medium/Low); 3-5 ranked strategic recommendations; gap report if data insufficient; saved to `Projects/<name>/work/YYYY-MM-DD-competitive-analysis-<topic>.md` |
+| Known failure modes | Agent body states: never fill data gaps by invention: marks gaps as `[NO DATA: needs research: description]`; returns gap report over weak analysis when critical data is missing |
 
 ---
 
@@ -424,15 +424,15 @@
 |---|---|
 | Domain | Obsidian vault organization: inbox triage, daily note creation, file moves/archives, frontmatter fixes, wiki-link health |
 | Tools | Read, Write, Edit, Glob, Grep, Bash |
-| Dispatched by | direct dispatch — no skill binding in this repo |
+| Dispatched by | direct dispatch: no skill binding in this repo |
 | Model | haiku |
 | Inputs | Operation type: inbox processing, daily note, move/archive, health check, or frontmatter/wiki-link fix |
-| Output contract | Phase 1 (Inbox): one line per note — `filename | classification | destination`; Phase 2 (Daily Note): created `Daily Notes/YYYY-MM-DD.md`; Phase 3 (Move/Archive): confirmation of moves with wiki-link updates; Phase 4 (Health Check): fixed items list, flagged items list, items requiring user decision |
-| Known failure modes | Agent reads CLAUDE.md before every operation for vault rules; task router determines phase before executing — routing error produces wrong phase output |
+| Output contract | Phase 1 (Inbox): one line per note: `filename | classification | destination`; Phase 2 (Daily Note): created `Daily Notes/YYYY-MM-DD.md`; Phase 3 (Move/Archive): confirmation of moves with wiki-link updates; Phase 4 (Health Check): fixed items list, flagged items list, items requiring user decision |
+| Known failure modes | Agent reads CLAUDE.md before every operation for vault rules; task router determines phase before executing: routing error produces wrong phase output |
 
 ---
 
-> **`workflow-orchestrator` removed 2026-06-11** — was a deprecated alias of `n8n-workflow-architect`; see [n8n-workflow-architect](#n8n-workflow-architect) under Domain Examples. The name is retained in three hook allowlists as a deprecated-alias safety net (`_DEPRECATED_DISPATCH_ALIASES` — see `hooks/agent-dispatch-check.py`); it does not route to an agent file.
+> **`workflow-orchestrator` removed 2026-06-11**: was a deprecated alias of `n8n-workflow-architect`; see [n8n-workflow-architect](#n8n-workflow-architect) under Domain Examples. The name is retained in three hook allowlists as a deprecated-alias safety net (`_DEPRECATED_DISPATCH_ALIASES`: see `hooks/agent-dispatch-check.py`); it does not route to an agent file.
 
 ---
 
@@ -447,8 +447,8 @@
 | Dispatched by | `pm` skill (mandatory dispatch via Agent tool, SKILL.md binding) |
 | Model | sonnet |
 | Inputs | Project name (or asks if ambiguous); reads PROJECT.md, STATE.md, task_plan.md directly |
-| Output contract | Phase report (current phase, active tasks, blockers, next action); Checkpoint Protocol output (Q1–Q5 all answered from live files) PLUS the mandatory Re-Ranked Next-3-Tickets block (top 3 tickets with one-line justifications; promotions/demotions since last checkpoint — a checkpoint without this block is incomplete); artifact updates to PROJECT.md, STATE.md, task_plan.md; escalations when kill criteria met |
-| Known failure modes | Agent body documents: must Read files, not answer from memory; "no reason" ranking justification is invalid; fewer than 3 open items — list all remaining |
+| Output contract | Phase report (current phase, active tasks, blockers, next action); Checkpoint Protocol output (Q1-Q5 all answered from live files) PLUS the mandatory Re-Ranked Next-3-Tickets block (top 3 tickets with one-line justifications; promotions/demotions since last checkpoint: a checkpoint without this block is incomplete); artifact updates to PROJECT.md, STATE.md, task_plan.md; escalations when kill criteria met |
+| Known failure modes | Agent body documents: must Read files, not answer from memory; "no reason" ranking justification is invalid; fewer than 3 open items: list all remaining |
 
 ---
 
@@ -456,13 +456,13 @@
 
 | Field | Value |
 |---|---|
-| Domain | Mechanical hygiene cleanup on recently modified vault artifacts: n8n workflow JSON, Python hooks, Markdown skills — formatting, dead code, naming consistency, expression-syntax |
+| Domain | Mechanical hygiene cleanup on recently modified vault artifacts: n8n workflow JSON, Python hooks, Markdown skills: formatting, dead code, naming consistency, expression-syntax |
 | Tools | Read (implied); operates as diff-proposal by default, does not write to disk unless explicitly told "apply" |
-| Dispatched by | direct dispatch — no skill binding in this repo; on-demand only, not auto-triggered |
+| Dispatched by | direct dispatch: no skill binding in this repo; on-demand only, not auto-triggered |
 | Model | sonnet |
 | Inputs | Recently modified code/config files in scope: n8n workflow JSON, `.claude/hooks/*.py`, `.claude/skills/<name>/SKILL.md` |
-| Output contract | Per-refinement diff blocks: `File:`, `Why:`, `Before:`, `After:` — does NOT write to disk in default mode; flags architectural smells as `OUT OF SCOPE — route to architect-reviewer:` |
-| Known failure modes | Agent body documents non-overlap with architect-reviewer (verified by inspection 2026-05-11); scope limited to current session's modified files only — not a whole-vault scan |
+| Output contract | Per-refinement diff blocks: `File:`, `Why:`, `Before:`, `After:`: does NOT write to disk in default mode; flags architectural smells as `OUT OF SCOPE: route to architect-reviewer:` |
+| Known failure modes | Agent body documents non-overlap with architect-reviewer (verified by inspection 2026-05-11); scope limited to current session's modified files only: not a whole-vault scan |
 
 ---
 
@@ -474,11 +474,11 @@
 |---|---|
 | Domain | Phase 1 of two-phase n8n orchestration: all discovery, template selection, node selection, architecture decisions; produces blueprint `.md` file |
 | Tools | Read, Write, Edit, Glob, Grep, Bash, WebFetch, WebSearch, plus n8n-mcp tools: tools_documentation, list_nodes, search_nodes, get_node_essentials, get_node_info, get_node_documentation, list_tasks, get_node_for_task, get_templates_for_task, search_templates, list_node_templates, get_template, validate_node_minimal, validate_node_operation, n8n_get_workflow, n8n_get_workflow_structure, n8n_get_workflow_details, n8n_get_workflow_minimal, n8n_list_workflows, n8n_list_executions, n8n_get_execution, n8n_validate_workflow, n8n_health_check, n8n_diagnostic |
-| Dispatched by | direct dispatch — no skill binding in this repo; CLAUDE.md Two-Phase Orchestration doctrine states dispatch before any non-trivial n8n build |
+| Dispatched by | direct dispatch: no skill binding in this repo; CLAUDE.md Two-Phase Orchestration doctrine states dispatch before any non-trivial n8n build |
 | Model | sonnet |
 | Inputs | Workflow requirements; optionally: existing workflow ID (for redesign), execution history |
-| Output contract | Blueprint `.md` file at `Projects/<name>/work/YYYY-MM-DD-blueprint-<workflow>.md` with: DISCOVERY INSIGHTS, SYSTEM ARCHITECTURE, INCREMENTAL BUILD PLAN (milestones of 3–5 nodes with validation checkpoints), CRITICAL CONFIGURATIONS, GUIDELINES COMPLIANCE MATRIX, AUTONOMOUS-LOOP ENTRY CLASSIFICATION, FLAG section (conditional human gate triggers), BUILDER HANDOFF specs |
-| Known failure modes | Anti-Fabrication Rule: verify every file path, workflow ID, and node name via Read/Glob/MCP before citing; do NOT invent — surface as TBD or open question. Milestones >5 nodes are forbidden (Builder rejects). Never modify live workflow |
+| Output contract | Blueprint `.md` file at `Projects/<name>/work/YYYY-MM-DD-blueprint-<workflow>.md` with: DISCOVERY INSIGHTS, SYSTEM ARCHITECTURE, INCREMENTAL BUILD PLAN (milestones of 3-5 nodes with validation checkpoints), CRITICAL CONFIGURATIONS, GUIDELINES COMPLIANCE MATRIX, AUTONOMOUS-LOOP ENTRY CLASSIFICATION, FLAG section (conditional human gate triggers), BUILDER HANDOFF specs |
+| Known failure modes | Anti-Fabrication Rule: verify every file path, workflow ID, and node name via Read/Glob/MCP before citing; do NOT invent: surface as TBD or open question. Milestones >5 nodes are forbidden (Builder rejects). Never modify live workflow |
 
 ---
 
@@ -486,10 +486,10 @@
 
 | Field | Value |
 |---|---|
-| Domain | Phase 2 of two-phase n8n orchestration: implement the architect's blueprint exactly via Spiral pattern (3–5 nodes per milestone, validate between); run autonomous QA loop when eligible |
+| Domain | Phase 2 of two-phase n8n orchestration: implement the architect's blueprint exactly via Spiral pattern (3-5 nodes per milestone, validate between); run autonomous QA loop when eligible |
 | Tools | Read, Write, Edit, Glob, Grep, Bash, TodoWrite, plus n8n-mcp tools: tools_documentation, list_nodes, search_nodes, get_node_essentials, get_node_info, get_node_documentation, search_node_properties, get_property_dependencies, list_tasks, get_node_for_task, get_template, validate_node_minimal, validate_node_operation, validate_workflow, validate_workflow_connections, validate_workflow_expressions, n8n_create_workflow, n8n_update_partial_workflow, n8n_update_full_workflow, n8n_get_workflow, n8n_get_workflow_structure, n8n_get_workflow_details, n8n_get_workflow_minimal, n8n_validate_workflow, n8n_autofix_workflow, n8n_trigger_webhook_workflow, n8n_get_execution, n8n_list_executions, n8n_health_check, n8n_diagnostic, n8n_list_workflows |
 | Dispatched by | direct dispatch from n8n-workflow-architect (when `autonomous_loop_eligible: true`) or user-approved (when blueprint frontmatter is `#approved`); REFUSES dispatch if blueprint status is `#pending-human-review` |
 | Model | sonnet |
 | Inputs | Blueprint `.md` file path from n8n-workflow-architect; blueprint must have status `#pending-builder-dispatch` or `#approved` |
-| Output contract | BUILD PROGRESS milestone report (per-milestone validation status); VALIDATION RESULTS (per checkpoint); AUTONOMOUS LOOP status (iterations, green/cap/deadlock) when eligible; completion statement with workflow ID; NEVER activates workflow — surfaces Promotion Gate to user |
-| Known failure modes | Agent body documents explicit failure table: validate_node_minimal failure before add = do not add + stop; validate_workflow failure after add = autofix only if blueprint authorizes + stop if still fails; deadlock (same error twice on same node) = stop + report; cap hit (10 iterations) = stop + report last 3 diagnostics; never improvises past blueprint gaps — always stops and reports |
+| Output contract | BUILD PROGRESS milestone report (per-milestone validation status); VALIDATION RESULTS (per checkpoint); AUTONOMOUS LOOP status (iterations, green/cap/deadlock) when eligible; completion statement with workflow ID; NEVER activates workflow: surfaces Promotion Gate to user |
+| Known failure modes | Agent body documents explicit failure table: validate_node_minimal failure before add = do not add + stop; validate_workflow failure after add = autofix only if blueprint authorizes + stop if still fails; deadlock (same error twice on same node) = stop + report; cap hit (10 iterations) = stop + report last 3 diagnostics; never improvises past blueprint gaps: always stops and reports |

@@ -1,5 +1,5 @@
 """
-Unused Resource Detection — identifies agents/skills never dispatched.
+Unused Resource Detection: identifies agents/skills never dispatched.
 
 Scans governance-log.jsonl for all dispatched agent/skill names, cross-references
 against KNOWN_DISPATCH_NAMES, reports days-since-last-dispatch for each.
@@ -126,7 +126,7 @@ def main():
     stale = sum(1 for r in results if r[1] == "STALE")
     active = sum(1 for r in results if r[1] == "ACTIVE")
 
-    print(f"\nUnused Resource Report — {len(KNOWN_DISPATCH_NAMES)} known agents/skills")
+    print(f"\nUnused Resource Report: {len(KNOWN_DISPATCH_NAMES)} known agents/skills")
     print(f"ACTIVE: {active} | STALE (>14d): {stale} | NEVER: {never}")
     print(f"{'='*70}\n")
 

@@ -16,7 +16,7 @@ The framework operationalizes three research-backed principles: classify before 
 
 ## Architecture
 
-The framework operates across four layers, with 28 active enforcement hooks (plus four shared libraries):
+The framework operates across four layers, with 35 active enforcement hooks (distinct scripts registered in the settings template, plus four shared libraries):
 
 | Layer | What it does | Hook events |
 |---|---|---|
@@ -80,25 +80,25 @@ See [docs/customization.md](docs/customization.md) for guidance on adapting the 
 
 Core and vault skills follow a standardized 3-section format:
 
-- **Use-when** — when to invoke this skill
-- **Do-NOT-use-when** — boundaries (with skip-rules referencing equivalent skills)
-- **Gotchas** — common failure modes specific to this skill
+- **Use-when**: when to invoke this skill
+- **Do-NOT-use-when**: boundaries (with skip-rules referencing equivalent skills)
+- **Gotchas**: common failure modes specific to this skill
 
-The format makes skill-routing decisions auditable from the SKILL.md alone — a model can read the three sections and decide whether to invoke without loading the full skill body. New skills should follow this format; see any of the `skills/core/process-*/SKILL.md` files for examples.
+The format makes skill-routing decisions auditable from the SKILL.md alone: a model can read the three sections and decide whether to invoke without loading the full skill body. New skills should follow this format; see any of the `skills/core/process-*/SKILL.md` files for examples.
 
 ## Documentation
 
-This framework documents itself by a single, followable standard — derived from established industry practice (Diátaxis, ADR/MADR, Keep a Changelog, docs-as-code) and adapted to a repository whose artifacts are skills, hooks, and agent definitions rather than conventional code:
+This framework documents itself by a single, followable standard: derived from established industry practice (Diátaxis, ADR/MADR, Keep a Changelog, docs-as-code) and adapted to a repository whose artifacts are skills, hooks, and agent definitions rather than conventional code:
 
-- **[The Documentation Standard](docs/documentation-standard.md)** — Diátaxis mode-routing, the per-artifact attributes-table reference schema, the MADR decision-log single-authority rule, the maintainability rules, and the add/change/remove checklist that keeps the docs complete and current.
-- **[Setup Inventory](docs/reference/setup-inventory.md)** — the reference catalogue of every artifact class (agents, skills, hooks, workflows) and how the repository is organized.
-- **Per-artifact reference** — every artifact documented with the standard's attributes-table schema: **[Hooks Reference](docs/reference/hooks.md)** (event, matcher, action, inputs, side-effects, logical paths, failure mode — per hook), **[Agents Reference](docs/reference/agents.md)** (domain, tools, dispatch bindings, output contract — per agent), **[Skills Reference](docs/reference/skills.md)** (routing contract, dispatches, outputs, enforcing hook — per skill), **[Workflows Reference](docs/reference/workflows.md)** (phases, HALT paths, typed schemas, shared invariants — per script).
-- **[Architecture](docs/architecture.md)** — the layer model and how the pieces fit.
-- **[Decision Log (ADRs)](docs/adr/0001-record-architecture-decisions.md)** — MADR decision records for significant, costly, or hard-to-reverse choices: why hooks over prompts, why three-tier QA, why routing-as-code, why curated publication.
-- **[Concepts](docs/concepts/task-classification.md)** — explanation-quadrant pages on the framework's three core mental models: task classification, enforcement layers, and falsification QA.
-- **[Contributing](CONTRIBUTING.md)** — fork-and-adapt model, how to add/modify agents/skills/hooks, documentation rule, CI checks you can run locally.
+- **[The Documentation Standard](docs/documentation-standard.md)**: Diátaxis mode-routing, the per-artifact attributes-table reference schema, the MADR decision-log single-authority rule, the maintainability rules, and the add/change/remove checklist that keeps the docs complete and current.
+- **[Setup Inventory](docs/reference/setup-inventory.md)**: the reference catalogue of every artifact class (agents, skills, hooks, workflows) and how the repository is organized.
+- **Per-artifact reference**: every artifact documented with the standard's attributes-table schema: **[Hooks Reference](docs/reference/hooks.md)** (event, matcher, action, inputs, side-effects, logical paths, failure mode: per hook), **[Agents Reference](docs/reference/agents.md)** (domain, tools, dispatch bindings, output contract: per agent), **[Skills Reference](docs/reference/skills.md)** (routing contract, dispatches, outputs, enforcing hook: per skill), **[Workflows Reference](docs/reference/workflows.md)** (phases, HALT paths, typed schemas, shared invariants: per script).
+- **[Architecture](docs/architecture.md)**: the layer model and how the pieces fit.
+- **[Decision Log (ADRs)](docs/adr/0001-record-architecture-decisions.md)**: MADR decision records for significant, costly, or hard-to-reverse choices: why hooks over prompts, why three-tier QA, why routing-as-code, why curated publication.
+- **[Concepts](docs/concepts/task-classification.md)**: explanation-quadrant pages on the framework's three core mental models: task classification, enforcement layers, and falsification QA.
+- **[Contributing](CONTRIBUTING.md)**: fork-and-adapt model, how to add/modify agents/skills/hooks, documentation rule, CI checks you can run locally.
 
-The standard's bar for "documented" is *every functionality and every logical path*, checked at publish time by the `doc-consistency` gate — not a surface mention.
+The standard's bar for "documented" is *every functionality and every logical path*, checked at publish time by the `doc-consistency` gate: not a surface mention.
 
 ## Research
 

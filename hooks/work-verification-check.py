@@ -8,7 +8,7 @@ THREE CHECKS:
 2. Premature Escalation (HARD): If response asks the user for help/decision AND
    fewer than 3 tool_use blocks were used this turn → block with self-interrogation.
 3. Zero-Work Non-Quick (SOFT): If non-Quick classification + zero tool_use of any kind
-   in this turn → log warning (not block — some analysis is legitimately text-heavy).
+   in this turn → log warning (not block: some analysis is legitimately text-heavy).
 
 The self-interrogation questions (injected on block):
 - Did I actually RUN what I built/changed?
@@ -24,7 +24,7 @@ import re
 
 READ_BYTES = 204800  # 200KB window
 
-# Keywords that indicate a behavioral claim — i.e. "the artifact DOES something"
+# Keywords that indicate a behavioral claim: i.e. "the artifact DOES something"
 # rather than "the file EXISTS" or "the config IS present". When a QA/pentest report
 # is filed with only Read/Grep tool usage and the work-item text contains one of
 # these verbs, a WARN is emitted to stderr (non-blocking).
@@ -39,7 +39,7 @@ BEHAVIORAL_CLAIM_KEYWORDS = {
 # the detection mechanism: Write-tool-trace absence + path-existence check +
 # tool_result-block parsing (to catch sub-agent claims, not just main session).
 # Q8 (PRD §9) resolved the framing: "ergonomic automation" of ls -la, not a
-# safety-critical gap closure — so prefer false-negative (miss some) over
+# safety-critical gap closure: so prefer false-negative (miss some) over
 # false-positive (block legitimate work).
 WRITE_CLAIM_PATTERNS = [
     # Past-tense Write claims with explicit path-shape token (./path, /path, path/file, file.ext)
@@ -50,7 +50,7 @@ WRITE_CLAIM_PATTERNS = [
     # "I have written ... to /path"
     r'\b(?:I\s+(?:have\s+)?(?:wrote|saved|created|written|stored)|now\s+(?:wrote|saved|created|written))\s+(?:.{0,80}?)\s+(?:to|at|in)\s+[`"\']?(\S+\.\w+|\S+/\S+)',
 ]
-# Failure-language guard (adversarial CR #1) — if Write-claim is within this many
+# Failure-language guard (adversarial CR #1): if Write-claim is within this many
 # chars of failure language, treat as legitimate failure report, not a fabrication.
 FAILURE_LANGUAGE_WINDOW_CHARS = 100
 FAILURE_LANGUAGE_PATTERNS = [
@@ -59,7 +59,7 @@ FAILURE_LANGUAGE_PATTERNS = [
 # Vault-root for path-existence resolution. Hook fires from .claude/hooks/, so
 # vault root is two levels up.
 VAULT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# Note: broader verbs (creates, returns, works, updates) deliberately excluded —
+# Note: broader verbs (creates, returns, works, updates) deliberately excluded 
 # they appear in legitimate static-analysis QA claims that Read can verify
 # (e.g., "verified the function returns a string"). Architect-reviewer
 # 2026-05-25 flagged false-positive risk; tightened to strong-behavioral verbs only.
@@ -117,7 +117,7 @@ def main():
     # B-2/B-3 flags (2026-06-11): set when QA/pentest ran inside a Workflow invocation.
     # The workflow's Bash/MCP calls run inside the subagent and never appear in the
     # main transcript's tool list, so the execution_tools list is empty on the relay
-    # turn. B-3 suppresses CHECK 1's zero-execution-tools block when the flag is set —
+    # turn. B-3 suppresses CHECK 1's zero-execution-tools block when the flag is set 
     # the execution-evidence obligation moves into the workflow script's typed per-claim
     # fields (Part C process-qa note). The suppression is keyed on the workflow-invocation
     # flag specifically, never on mere presence of any Workflow tool_use.
@@ -144,9 +144,9 @@ def main():
     # B-2/B-3 pre-scan (2026-06-11): find the real last user message boundary to detect
     # Workflow tool_use blocks that precede the tool_result wrapper entry.
     # The Workflow transcript shape is three entries:
-    #   1. assistant — Workflow tool_use       ← we need to see this
-    #   2. user      — tool_result wrapper     ← last_user_idx points HERE
-    #   3. assistant — relay text (QA REPORT)  ← last_user_idx+1 scan starts here
+    #   1. assistant: Workflow tool_use       ← we need to see this
+    #   2. user     : tool_result wrapper     ← last_user_idx points HERE
+    #   3. assistant: relay text (QA REPORT)  ← last_user_idx+1 scan starts here
     # The Workflow tool_use (entry 1) is before last_user_idx, so the main scan misses it.
     # We use the real-last-user-idx (same logic as CHECK 4 below) to scan from the
     # real user boundary, catching the Workflow tool_use between the real user turn
@@ -253,7 +253,7 @@ def main():
                 name = block.get("name", "")
                 last_turn_tools.append(name)
 
-                # Track QA/pentest skill invocation — via Skill tool (existing path)
+                # Track QA/pentest skill invocation: via Skill tool (existing path)
                 if name == "Skill":
                     inp = block.get("input", {})
                     if isinstance(inp, str):
@@ -285,7 +285,7 @@ def main():
     # the workflow's Bash/MCP calls run in the subagent and are invisible to the main
     # transcript's execution_tools list (built from main-transcript tool_use only).
     # The zero-execution-tools block is suppressed when qa_via_workflow or
-    # pentest_via_workflow is True — the execution-evidence obligation has moved into
+    # pentest_via_workflow is True: the execution-evidence obligation has moved into
     # the workflow script's typed per-claim fields. The suppression is keyed on the
     # workflow-invocation flag specifically, not on mere Workflow presence in the turn,
     # so Skill-path process-qa with zero execution tools is still blocked normally.
@@ -297,7 +297,7 @@ def main():
             if len(read_tools) == 0:
                 reason = (
                     "WORK VERIFICATION: QA/Pentest report filed with ZERO tool usage. "
-                    "You did not execute any tests — no Bash, no MCP, not even Read. "
+                    "You did not execute any tests: no Bash, no MCP, not even Read. "
                     "Before reporting results, ask yourself:\n"
                     "- Did I actually RUN what I built/changed?\n"
                     "- Did I pipe test inputs through the hook/script?\n"
@@ -307,11 +307,11 @@ def main():
                 )
                 print(json.dumps({"decision": "block", "reason": reason}))
                 return
-            # Read/Grep used but no Bash/MCP — softer warning for non-execution QA.
+            # Read/Grep used but no Bash/MCP: softer warning for non-execution QA.
             # Detects behavioral-claim QA filed with Read-only tool use:
             # if the work-item text contains a verb from BEHAVIORAL_CLAIM_KEYWORDS
             # (e.g. "fires", "runs", "triggers"), the claim asserts runtime behavior
-            # that Read/Grep cannot verify — emit WARN to stderr (non-blocking).
+            # that Read/Grep cannot verify: emit WARN to stderr (non-blocking).
             # Non-behavioral items (existence checks, config presence) pass silently.
             work_text_lower = full_text.lower()
             matched_keyword = next(
@@ -320,7 +320,7 @@ def main():
             )
             if matched_keyword is not None:
                 print(
-                    f"WARN: behavioral claim without execution tool — found keyword "
+                    f"WARN: behavioral claim without execution tool: found keyword "
                     f"'{matched_keyword}' in work item; consider running Bash/MCP to "
                     f"actually exercise the artifact, not just read it.",
                     file=sys.stderr,
@@ -338,7 +338,7 @@ def main():
                 "WORK VERIFICATION: QA REPORT block produced on a non-Quick task "
                 "without invoking /process-qa (or /process-pentest). Writing a "
                 "QA verdict inline bypasses the QA process. Invoke the /process-qa "
-                "skill properly — it structures scope, execution, and reporting. "
+                "skill properly: it structures scope, execution, and reporting. "
                 "Inline QA reports are not valid evidence of verification."
             )
             print(json.dumps({"decision": "block", "reason": reason}))
@@ -385,11 +385,11 @@ def main():
             return
 
     # --- CHECK 4 (SA-4 file-existence / fabrication detection): ---
-    # PRD Item 1 (Sprint A) — detect agent claims of "I wrote/saved/created X"
+    # PRD Item 1 (Sprint A): detect agent claims of "I wrote/saved/created X"
     # where path X was NOT actually written via Write/Edit/MultiEdit tool_use in
     # this turn AND does NOT exist on disk. Per Q9 (PRD §9): combine Write-trace
     # absence + path-existence + tool_result block parsing (catches sub-agent
-    # fabrications, not just main-session). Per Q8: ergonomic automation framing —
+    # fabrications, not just main-session). Per Q8: ergonomic automation framing 
     # prefer false-negative (miss some) over false-positive (block legitimate).
     #
     # Walks the same last-turn window already collected above. Also rescans for
@@ -426,7 +426,7 @@ def main():
 
     # Second pass: collect text from both assistant blocks AND tool_result blocks
     # (sub-agent output appears as tool_result in main-session transcript).
-    # IMPORTANT: tool_result blocks are wrapped in user-type entries — the
+    # IMPORTANT: tool_result blocks are wrapped in user-type entries: the
     # last_user_idx logic above stops walking at the LAST user-type entry, which
     # in transcripts with sub-agent dispatches IS the tool_result wrapper itself.
     # So we re-find the "last real user message" by looking for user entries
@@ -494,7 +494,7 @@ def main():
         for pattern in WRITE_CLAIM_PATTERNS:
             for m in re.finditer(pattern, text, re.IGNORECASE):
                 claimed = m.group(1).strip("`\"'.,;:)]}")
-                # Failure-language guard — skip if claim is near "failed/error/tried/etc"
+                # Failure-language guard: skip if claim is near "failed/error/tried/etc"
                 start = max(0, m.start() - FAILURE_LANGUAGE_WINDOW_CHARS)
                 end = min(len(text), m.end() + FAILURE_LANGUAGE_WINDOW_CHARS)
                 window = text[start:end]
@@ -591,7 +591,7 @@ def main():
         print(json.dumps({"decision": "block", "reason": reason}))
         return
 
-    # --- CHECK 3: Zero-Work Non-Quick (SOFT — log only) ---
+    # --- CHECK 3: Zero-Work Non-Quick (SOFT: log only) ---
     # INFO-4 fix (2026-04-09): Track whether warn was emitted to prevent
     # double-logging (warn + pass on same turn would corrupt analytics).
     warn_emitted = False
@@ -681,7 +681,7 @@ def main():
 
     # --- Observability v2: event 26 qa_fail_reported ---
     # Fires when a QA REPORT block contains at least one FAIL: line with a non-empty
-    # (non-"none") claim. Independent of block/pass decision — pure telemetry.
+    # (non-"none") claim. Independent of block/pass decision: pure telemetry.
     if has_qa_report and emit_event is not None:
         fail_lines = []
         for m in re.finditer(r'(?:^|\n)\s*FAIL:\s*([^\n]+)', full_text, re.IGNORECASE):

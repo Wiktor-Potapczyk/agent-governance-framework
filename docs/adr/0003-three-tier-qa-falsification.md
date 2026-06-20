@@ -17,27 +17,27 @@ The `work-verification-check.py` hook closes the "filed QA report without runnin
 
 ## Considered Options
 
-1. **Three-tier model with mandatory Untested Surface** — per-task (`process-qa`), per-increment adversarial (`process-pentest`), per-milestone eval suite.
-2. **Single-tier: QA report per task** — one process skill, one report format.
-3. **Continuous testing only** — assertion suites run on every commit; no per-task QA gate.
+1. **Three-tier model with mandatory Untested Surface**: per-task (`process-qa`), per-increment adversarial (`process-pentest`), per-milestone eval suite.
+2. **Single-tier: QA report per task**: one process skill, one report format.
+3. **Continuous testing only**: assertion suites run on every commit; no per-task QA gate.
 
 ## Decision Outcome
 
 **Chosen option: three-tier model with mandatory Untested Surface.**
 
-- **Tier 1 (`process-qa`):** every non-Quick task. Uses the 3a/3b/3c pattern — 3a: run the test (tool call), 3b: show raw output (quote before interpreting), 3c: judge PASS/FAIL based on specific output lines. "Looks correct" without quoting actual output is explicitly invalid evidence.
+- **Tier 1 (`process-qa`):** every non-Quick task. Uses the 3a/3b/3c pattern: 3a: run the test (tool call), 3b: show raw output (quote before interpreting), 3c: judge PASS/FAIL based on specific output lines. "Looks correct" without quoting actual output is explicitly invalid evidence.
 - **Tier 2 (`process-pentest`):** per-increment, adversarial. Boundary inputs, malformed data, regression checks, integration failures. Tier 1 is prerequisite.
 - **Tier 3 (promptfoo or equivalent):** human-triggered, per-milestone. Tests prompts/components directly via assertion suites. Tier 2 is prerequisite.
 
-Every report at every tier must declare **Untested Surface** — what was not tested and why.
+Every report at every tier must declare **Untested Surface**: what was not tested and why.
 
 **Consequences:**
 
-- *Positive:* `work-verification-check.py` blocks QA reports filed with zero execution tools — bypass closed at the enforcement layer.
+- *Positive:* `work-verification-check.py` blocks QA reports filed with zero execution tools: bypass closed at the enforcement layer.
 - *Positive:* Untested Surface makes the gap visible for human judgment (the irreducible Layer 4).
 - *Positive:* tier separation matches the tools and cadence appropriate to each failure surface.
 - *Negative:* three tiers add overhead; per-task QA on every small task risks ceremony outweighing value (mitigated by the Quick fast path).
-- *Negative:* "could not break it" is not an absolute guarantee — the model's adversarial creativity is the ceiling.
+- *Negative:* "could not break it" is not an absolute guarantee: the model's adversarial creativity is the ceiling.
 
 ## Pros and Cons of the Options
 

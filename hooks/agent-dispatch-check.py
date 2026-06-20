@@ -17,7 +17,7 @@ import os
 import re
 
 
-# 200KB window — matches other hardened hooks (agent-dispatch bump 2026-04-09)
+# 200KB window: matches other hardened hooks (agent-dispatch bump 2026-04-09)
 READ_BYTES = 204800
 
 # Agent types that are always allowed (infrastructure, not specialist routing)
@@ -26,13 +26,13 @@ ALWAYS_ALLOWED = {"general-purpose", "explore", "plan", "bash"}
 # Process skills that legitimately route to multiple specialists not pre-enumerated
 # in classifier MUST DISPATCH. When ANY of these appears in MUST DISPATCH, the main
 # session is delegating routing to the skill; any agent in registry.json should be
-# allowed through (2026-04-18 fix — architectural bug where allowlist was exclusive).
+# allowed through (2026-04-18 fix: architectural bug where allowlist was exclusive).
 PROCESS_ROUTING_SKILLS = {
     "process-research", "process-analysis", "process-build",
     "process-planning", "process-qa", "process-pentest",
 }
 
-# Registry path — loaded lazily to list all valid agents (local + plugin)
+# Registry path: loaded lazily to list all valid agents (local + plugin)
 REGISTRY_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "registry.json"
@@ -70,21 +70,32 @@ SKILL_AGENT_ALIASES = {
     # Skills that dispatch agents with different names
     "pm": {"pm-orchestrator"},
     "architect-review": {"architect-reviewer"},
-    # Process skills dispatch their primary agents
-    "process-planning": {"implementation-plan", "adversarial-reviewer"},
-    "process-build": {"blueprint-mode", "architect-reviewer", "implementation-plan"},
-    "process-research": {"research-orchestrator", "technical-researcher", "research-analyst"},
-    "process-analysis": {"architect-reviewer", "adversarial-reviewer"},
-    # PRE-I2-A (2026-04-12): 3 additional aliases from plan v2 audit
+    # Process skills dispatch their specialists (S3 fix 2026-04-13)
+    "process-research": {
+        "research-orchestrator", "technical-researcher", "research-analyst",
+        "research-synthesizer", "report-generator",
+    },
+    "process-analysis": {
+        "architect-reviewer", "adversarial-reviewer",
+        "prompt-engineer", "debugger", "api-designer",
+        "data-engineer", "workflow-orchestrator", "api-security-audit",
+        "research-synthesizer", "report-generator",
+    },
+    "process-planning": {
+        "implementation-plan", "adversarial-reviewer", "architect-reviewer",
+        "technical-researcher", "research-analyst", "api-designer",
+        "llm-architect", "data-engineer", "prompt-engineer",
+    },
+    "process-build": {
+        "blueprint-mode", "architect-reviewer", "implementation-plan",
+        "prompt-engineer", "debugger",
+    },
     "process-qa": {"debugger"},  # dispatched conditionally on QA failure
-    "process-pentest": {"debugger"},  # pentest dispatches debugger on findings, not architect-reviewer (skill says "execute yourself")
+    "process-pentest": {"debugger"},  # pentest dispatches debugger on findings
     "architect-loop": {"architect-reviewer", "adversarial-reviewer"},  # Ralph Loop dispatches reviewers
-    # NOTE: process-research does NOT alias research-synthesizer/report-generator —
-    # those are dispatched by research-orchestrator internally, not by the main session.
-    # Direct dispatch of downstream agents without process-research is a process violation.
 }
 
-# Known agent/skill names — same set as governance-log.py and dispatch-compliance-check.py
+# Known agent/skill names: same set as governance-log.py and dispatch-compliance-check.py
 # (P0 fix 2026-04-09). Filters must_dispatch raw text to valid names only,
 # discarding trailing reasoning text that would otherwise cause false DENIES.
 KNOWN_DISPATCH_NAMES = {
@@ -212,7 +223,7 @@ def main():
 
     # Check if this agent is in the MUST DISPATCH list (or aliased from it)
     if agent_type not in allowed:
-        # B: conditional exemption — if MUST DISPATCH contains any process-* routing
+        # B: conditional exemption: if MUST DISPATCH contains any process-* routing
         # skill, the session is legitimately delegating routing to the skill. Any
         # agent listed in registry.json is valid in that context.
         has_process_skill = any(d in PROCESS_ROUTING_SKILLS for d in must_dispatch)
@@ -237,7 +248,7 @@ def main():
                 pass
             return  # Allowed via process-skill routing exemption
 
-        # A: warn-downgrade — not blocked, but logged and surfaced to stderr.
+        # A: warn-downgrade: not blocked, but logged and surfaced to stderr.
         # Preserves observability of off-contract dispatches without breaking flow.
         # Original deny mode was too strict (2026-04-18 fix).
         reason = (
@@ -264,9 +275,9 @@ def main():
                 f.write(entry + "\n")
         except Exception:
             pass
-        return  # No deny — advisory only
+        return  # No deny: advisory only
 
-    # Agent is in the list — allow
+    # Agent is in the list: allow
     return
 
 

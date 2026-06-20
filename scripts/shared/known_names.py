@@ -1,5 +1,5 @@
 """
-Canonical KNOWN_DISPATCH_NAMES and SKILL_AGENT_ALIASES — single source of truth.
+Canonical KNOWN_DISPATCH_NAMES and SKILL_AGENT_ALIASES: single source of truth.
 
 KNOWN_DISPATCH_NAMES: All agent/skill names that can appear in MUST DISPATCH fields.
 SKILL_AGENT_ALIASES: Maps skill/short names to the set of agent runtime names they
@@ -18,15 +18,16 @@ all copies match this canonical set.
 
 When adding new agents, skills, or aliases:
 1. Add to this file first
-2. Add to all 3 hook files (or 2 for SKILL_AGENT_ALIASES — governance-log.py does not use it)
+2. Add to all 3 hook files (or 2 for SKILL_AGENT_ALIASES: governance-log.py does not use it)
 3. Run test_known_dispatch_names_drift.py to confirm consistency
 """
 
-# Canonical set — 44 entries (30 agents + 14 skills)
+# Canonical set: 45 entries (31 agents + 14 skills)
 KNOWN_DISPATCH_NAMES = {
     # Agents
     "adversarial-reviewer", "api-designer", "api-security-audit",
-    "architect-review",  # declared name (MUST DISPATCH). Runtime name = "architect-reviewer" (via SKILL_AGENT_ALIASES)
+    "architect-review",  # declared name (MUST DISPATCH)
+    "architect-reviewer",  # runtime name (dispatched); both are valid in transcripts
     "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
     "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
     "mcp-developer", "mcp-registry-navigator", "mcp-server-architect", "n8n-reviewer",
@@ -40,7 +41,7 @@ KNOWN_DISPATCH_NAMES = {
     "ensemble", "architect-loop", "save", "maintain", "index",
 }
 
-# Canonical SKILL_AGENT_ALIASES — maps skill/short names to allowed agent runtime names.
+# Canonical SKILL_AGENT_ALIASES: maps skill/short names to allowed agent runtime names.
 # Used by agent-dispatch-check.py and dispatch-compliance-check.py.
 # governance-log.py does NOT use this (logging only, no alias resolution needed).
 SKILL_AGENT_ALIASES = {
@@ -69,3 +70,6 @@ SKILL_AGENT_ALIASES = {
     "process-pentest": {"debugger"},
     "architect-loop": {"architect-reviewer", "adversarial-reviewer"},
 }
+# NOTE: SKILL_AGENT_ALIASES values may include "architect-reviewer" which is
+# also now in KNOWN_DISPATCH_NAMES. The alias model stays coherent: canonical
+# lists architect-reviewer as a runtime name alongside the declared name.

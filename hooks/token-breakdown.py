@@ -2,20 +2,20 @@
 Token Breakdown - Stop Hook
 Aggregates token usage for the current turn: main session + per-subagent breakdown.
 Emits a single 'token_breakdown' event to governance-log.jsonl via _event_emit.py.
-Does NOT block — telemetry only.
+Does NOT block: telemetry only.
 
 Schema v2 event fields (extra dict passed to emit_event):
-  turn_total_tokens           int   — RAW sum of all four token fields (input+output+cache_read+cache_creation)
+  turn_total_tokens           int  : RAW sum of all four token fields (input+output+cache_read+cache_creation)
                                        plus subagent totalTokens. Fields are non-overlapping per Anthropic API
                                        (input_tokens is fresh-only, cache_read_input_tokens is separate),
-                                       so this is a workload-size proxy — NOT equivalent to billable cost
+                                       so this is a workload-size proxy: NOT equivalent to billable cost
                                        (cache-read tokens are priced differently).
-  main_session                dict  — aggregated message.usage across all assistant entries in turn
-  by_subagent                 list  — one entry per Agent tool call, resolved from toolUseResult.usage.
+  main_session                dict : aggregated message.usage across all assistant entries in turn
+  by_subagent                 list : one entry per Agent tool call, resolved from toolUseResult.usage.
                                        Entries with no matching Agent dispatch in the current turn are SKIPPED
                                        (prevents cross-turn attribution pollution).
-  tool_calls                  dict  — {tool_name: count} for every tool_use block this turn
-  skill_names                 list  — (only if Skill calls > 0) list of invoked skill names
+  tool_calls                  dict : {tool_name: count} for every tool_use block this turn
+  skill_names                 list : (only if Skill calls > 0) list of invoked skill names
 """
 
 import sys
@@ -34,7 +34,7 @@ try:
 except Exception:
     emit_event = None  # type: ignore
 
-# Read last 200 KB — same window as other Stop hooks
+# Read last 200 KB: same window as other Stop hooks
 READ_BYTES = 204800
 
 LOG_PATH = os.path.join(
@@ -108,9 +108,9 @@ def aggregate_turn(lines: list) -> dict:
     Everything from that index onward is 'this turn'.
 
     Two-pass within the turn slice:
-      Pass 1 — assistant entries: build agent_map {tool_use_id -> subagent_type},
+      Pass 1: assistant entries: build agent_map {tool_use_id -> subagent_type},
                accumulate main_session usage, count tool calls.
-      Pass 2 — user entries: match toolUseResult to agent_map via tool_use_id found
+      Pass 2: user entries: match toolUseResult to agent_map via tool_use_id found
                in message.content[0] (first tool_result block's tool_use_id).
     """
     # ------------------------------------------------------------------
@@ -152,7 +152,7 @@ def aggregate_turn(lines: list) -> dict:
     turn_entries = entries[turn_start_idx:]
 
     # ------------------------------------------------------------------
-    # Step 3: Pass 1 — scan assistant entries in the turn slice
+    # Step 3: Pass 1: scan assistant entries in the turn slice
     # ------------------------------------------------------------------
     agent_map: dict = {}           # tool_use_id -> subagent_type
     main_session = {
@@ -213,7 +213,7 @@ def aggregate_turn(lines: list) -> dict:
                 skill_names.append(skill)
 
     # ------------------------------------------------------------------
-    # Step 4: Pass 2 — scan user entries for toolUseResult
+    # Step 4: Pass 2: scan user entries for toolUseResult
     # ------------------------------------------------------------------
     by_subagent: list = []
 
@@ -240,7 +240,7 @@ def aggregate_turn(lines: list) -> dict:
                 break  # Take first block only (RISK-P2-B)
 
         # Skip entries whose tool_use_id doesn't map to an Agent dispatch in this turn.
-        # This can happen when an Agent dispatched in a prior turn returns in this turn —
+        # This can happen when an Agent dispatched in a prior turn returns in this turn 
         # attributing those tokens to the current turn with subagent_type="unknown" would
         # pollute by_subagent. Better to lose the data point than corrupt attribution.
         if matched_tool_use_id is None or matched_tool_use_id not in agent_map:
@@ -317,7 +317,7 @@ def main():
     lines = tail.split("\n")
 
     # ------------------------------------------------------------------
-    # Aggregation — wrapped in try/except per spec; log on exception
+    # Aggregation: wrapped in try/except per spec; log on exception
     # ------------------------------------------------------------------
     try:
         result = aggregate_turn(lines)
@@ -337,7 +337,7 @@ def main():
     if all_zero and not result["by_subagent"]:
         return
 
-    # Build extra dict — omit skill_names if no Skill calls
+    # Build extra dict: omit skill_names if no Skill calls
     extra = {
         "turn_total_tokens": result["turn_total_tokens"],
         "main_session": result["main_session"],

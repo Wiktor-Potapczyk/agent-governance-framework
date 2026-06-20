@@ -158,7 +158,7 @@
     {
       "id": "active-enforcement-hooks",
       "expect": {
-        "literal": "28"
+        "literal": "35"
       },
       "asserted_in": [
         {

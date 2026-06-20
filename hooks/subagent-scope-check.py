@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""subagent-scope-check.py — SubagentStart + SubagentStop scope-extension instrumentation.
+"""subagent-scope-check.py: SubagentStart + SubagentStop scope-extension instrumentation.
 
 Empirical trigger (2026-05-26 W-D2 ensemble, loop iter 2):
 - prompt-engineer sub-agent self-extended scope to mark its own task_plan ticket
-  AND made a tag-policy decision (ensemble → unclassified-pending) — both outside
+  AND made a tag-policy decision (ensemble → unclassified-pending): both outside
   the design-only ticket scope.
 - Substance was accurate; scope was wrong. Documented as the first scope-extension
   event in [[finding_subagent_reviewer_write_grant_pattern]].
@@ -13,7 +13,7 @@ V1 mechanism (this hook):
 - At SubagentStop: re-capture git status, diff against baseline, log new modifications
 - Emit one JSONL entry per stop event to .claude/hooks/subagent-scope-log.jsonl
 
-Does NOT block. Pure instrumentation — main session can grep the log post-dispatch
+Does NOT block. Pure instrumentation: main session can grep the log post-dispatch
 to see if a sub-agent modified files outside its declared output path.
 
 V2 future work (not in this hook): parse the sub-agent's dispatch prompt for the
@@ -128,7 +128,7 @@ def main() -> int:
         }
         _log(log_entry)
 
-        # Emit WARN to stderr only if there are NEW changes — main session can
+        # Emit WARN to stderr only if there are NEW changes: main session can
         # see them in the conversation. Resolved changes are positive (agent
         # cleaned up); silent log only.
         if new_changes:
@@ -140,7 +140,7 @@ def main() -> int:
             )
         return 0
 
-    # Unknown event — silent no-op
+    # Unknown event: silent no-op
     return 0
 
 

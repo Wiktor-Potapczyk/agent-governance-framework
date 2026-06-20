@@ -1,8 +1,8 @@
-"""Tests for structural_gates C5 — dispatch-name -> registry resolution gate.
+"""Tests for structural_gates C5: dispatch-name -> registry resolution gate.
 
 C5 fails only on TRUE phantoms (dispatch names resolving to nothing). Its
 exemptions (registered agents/skills, SKILL_AGENT_ALIASES keys, documented
-deprecation aliases) are the FP-guards — without them C5 false-positives on
+deprecation aliases) are the FP-guards: without them C5 false-positives on
 deliberate entries (architect-review alias, workflow-orchestrator deprecation).
 """
 
@@ -32,7 +32,7 @@ class C5LiveTests(unittest.TestCase):
         self.assertEqual(r["severity"], "WARN")
 
     def test_run_gates_exit_unaffected_by_warn(self):
-        """C5 is WARN-class — even a finding must not flip the HARD exit code."""
+        """C5 is WARN-class: even a finding must not flip the HARD exit code."""
         import io
         from contextlib import redirect_stdout
         with redirect_stdout(io.StringIO()):
@@ -56,7 +56,7 @@ class C5BoundaryTests(unittest.TestCase):
     def test_fp_deprecation_alias_not_phantom(self):
         """FP-C5-02 boundary_axis: 'documented deprecation alias vs live agent'.
         workflow-orchestrator is a deprecated alias (CLAUDE.md safety net), exempt
-        via _DEPRECATED_DISPATCH_ALIASES — must NOT be flagged."""
+        via _DEPRECATED_DISPATCH_ALIASES: must NOT be flagged."""
         self.assertIn("workflow-orchestrator", sg._DEPRECATED_DISPATCH_ALIASES)
         r = sg.check_c5_dispatch_name_resolution()
         self.assertNotIn("workflow-orchestrator", " ".join(r["findings"]))

@@ -1,5 +1,5 @@
 """
-Tests for process-step-check.py — PM rubber-stamp hardening (B2 fix 2026-04-13).
+Tests for process-step-check.py: PM rubber-stamp hardening (B2 fix 2026-04-13).
 """
 
 import json
@@ -81,7 +81,7 @@ class TestPmRubberStampHardening(unittest.TestCase):
 
 class ProcessStepBoundaryTests(unittest.TestCase):
     """Named FP-guards (boundary-test harness sprint 7). Each docstring names its
-    boundary_axis. Covers the adjacent-safe region for the HARD checks — the
+    boundary_axis. Covers the adjacent-safe region for the HARD checks: the
     documented misfire was process-step-check firing on Quick/small tasks that
     legitimately skip process skills + /pm."""
 
@@ -168,9 +168,9 @@ class ProcessStepBoundaryTests(unittest.TestCase):
 def make_workflow_three_entry(wf_name: str, relay_text: str) -> list[str]:
     """Return the full three-entry Workflow transcript shape as JSONL lines.
 
-    Entry 1: assistant — Workflow tool_use
-    Entry 2: user     — tool_result wrapper (NOT a real user turn)
-    Entry 3: assistant — relay text (contains SCOPE / QA REPORT blocks)
+    Entry 1: assistant: Workflow tool_use
+    Entry 2: user    : tool_result wrapper (NOT a real user turn)
+    Entry 3: assistant: relay text (contains SCOPE / QA REPORT blocks)
 
     Acceptance criterion (plan Step 2 item i): fixtures MUST contain all three entries
     so tests cannot false-pass against the unfixed reset (B-1b dead-code detection).
@@ -240,7 +240,7 @@ def make_workflow_three_entry_scriptpath(script_path: str, relay_text: str) -> l
 
 
 def make_real_user_message(text: str = "next task") -> str:
-    """A real user message (string content) — must trigger turn-boundary reset (B-1b regression)."""
+    """A real user message (string content): must trigger turn-boundary reset (B-1b regression)."""
     return json.dumps({
         "type": "user",
         "message": {"role": "user", "content": text},
@@ -295,7 +295,7 @@ class WorkflowProcessSkillDetectionTests(unittest.TestCase):
         self.assertIn("RESEARCH SCOPE", msg)
 
     def test_b1a_three_entry_workflow_process_build_scope_enforced(self):
-        """Acceptance item (i): three-entry fixture for process-build — last_process_skill
+        """Acceptance item (i): three-entry fixture for process-build: last_process_skill
         MUST be set to 'process-build' after parsing; relay text without BUILD SCOPE
         must produce a SCOPE check failure (not silent skip).
 
@@ -368,7 +368,7 @@ class WorkflowProcessSkillDetectionTests(unittest.TestCase):
         self.assertTrue(found_skill,
                         "B-1b: found_skill must still be True after the tool_result wrapper entry; "
                         "if False, the reset incorrectly fired on the wrapper")
-        # Now run the scope check — must fail (no BUILD SCOPE in relay text)
+        # Now run the scope check: must fail (no BUILD SCOPE in relay text)
         passed, msg = mod.check_scope("process-build", text_after_skill)
         self.assertFalse(passed,
                          "SCOPE enforcement must fire (block) when relay text lacks BUILD SCOPE; "
@@ -499,7 +499,7 @@ class WorkflowProcessSkillDetectionTests(unittest.TestCase):
         self.assertTrue(passed)
 
     def test_b1b_real_user_message_resets_state(self):
-        """Acceptance item (ii) — B-1b regression: a REAL user message (string content)
+        """Acceptance item (ii): B-1b regression: a REAL user message (string content)
         after a process-skill turn MUST reset state. Turn-boundary semantics survive
         for genuine new turns. If the reset fires correctly, last_process_skill is None."""
         # Simulate: Skill process-research turn → real user message → next scan
@@ -566,7 +566,7 @@ class WorkflowProcessSkillDetectionTests(unittest.TestCase):
         three-entry Workflow shape) must NOT reset found_skill.
 
         If the reset fires on the wrapper, text_after_skill is empty when the relay
-        text (entry 3) arrives — found_skill=False means relay text is never collected,
+        text (entry 3) arrives: found_skill=False means relay text is never collected,
         scope check silently skips, B-1a is dead code."""
         lines = self._lines(
             make_workflow_three_entry("process-research", "RESEARCH SCOPE\nQuestion: Y\n\nDone.")
@@ -631,7 +631,7 @@ class WorkflowProcessSkillDetectionTests(unittest.TestCase):
 
     def test_b1a_pentest_workflow_recognition_unchanged(self):
         """Regression: the existing pentest Workflow recognition (check_pm_after_increment
-        lines 233-242 in original) is the model for B-1a — it must still work. Verify
+        lines 233-242 in original) is the model for B-1a: it must still work. Verify
         that check_pm_after_increment correctly sets pentest_seen for a Workflow
         process-pentest invocation."""
         mod = self.mod
@@ -642,7 +642,7 @@ class WorkflowProcessSkillDetectionTests(unittest.TestCase):
             {"type": "tool_use", "name": "TaskUpdate", "input": {"status": "completed"}},
             # Pentest via Workflow (not Skill)
             {"type": "tool_use", "name": "Workflow", "input": {"name": "process-pentest"}},
-            # No pm — should still block
+            # No pm: should still block
         ])
         ok, msg = mod.check_pm_after_increment(lines)
         self.assertFalse(ok, "check_pm_after_increment must fire even when pentest ran as Workflow")

@@ -1,5 +1,5 @@
 """
-Unit tests for dispatch-compliance-check.py — Iteration 1 changes (2026-04-09).
+Unit tests for dispatch-compliance-check.py: Iteration 1 changes (2026-04-09).
 
 Covers:
 - P0 fix: extract_dispatch_names filters trailing reasoning text from MUST DISPATCH
@@ -26,7 +26,7 @@ SKILL_AGENT_ALIASES = mod.SKILL_AGENT_ALIASES
 
 
 class TestExtractDispatchNames(unittest.TestCase):
-    """P0 fix regression tests — same parsing bug as governance-log.py had."""
+    """P0 fix regression tests: same parsing bug as governance-log.py had."""
 
     def test_single_name(self):
         self.assertEqual(extract_dispatch_names("process-qa"), ["process-qa"])
@@ -69,7 +69,7 @@ class TestExtractDispatchNames(unittest.TestCase):
         self.assertEqual(extract_dispatch_names(raw), ["process-build", "process-qa"])
 
     def test_known_names_completeness(self):
-        # Sanity check — common names must be present
+        # Sanity check: common names must be present
         for name in ["process-qa", "pm", "architect-review", "adversarial-reviewer",
                      "blueprint-mode", "technical-researcher", "implementation-plan"]:
             self.assertIn(name, KNOWN_DISPATCH_NAMES, f"{name} missing")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SubagentStart hook — inject Blind Analysis Rule reminder into evaluator agents."""
+"""SubagentStart hook: inject Blind Analysis Rule reminder into evaluator agents."""
 import json
 import sys
 

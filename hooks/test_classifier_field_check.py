@@ -1,5 +1,5 @@
 """
-Tests for classifier-field-check.py — Stop hook that verifies classifier fields.
+Tests for classifier-field-check.py: Stop hook that verifies classifier fields.
 Step 3.1 (2026-04-13): JUSTIFICATION enforcement for Quick.
 """
 

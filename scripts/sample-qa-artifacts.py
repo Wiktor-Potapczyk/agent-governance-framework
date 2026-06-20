@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""sample-qa-artifacts.py — Action 0.1 calibration sampler (CAL-1).
+"""sample-qa-artifacts.py: Action 0.1 calibration sampler (CAL-1).
 
 Samples QA-PASS artifacts from Projects/*/work/ over a configurable lookback
 window. Output is a per-artifact block with path, recent commit, and any
 embedded QA REPORT or PM CHECKPOINT REPORT block extracted from the file.
 
-Wiktor opens each sampled artifact, reads it, and judges it against the
+The owner opens each sampled artifact, reads it, and judges it against the
 3-axis calibration rubric in [[2026-05-26-action-0-1-calibration-protocol]].
 
 Usage:

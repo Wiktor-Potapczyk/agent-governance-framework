@@ -1,5 +1,5 @@
 """
-Unit tests for governance-log.py — specifically extract_dispatch_names().
+Unit tests for governance-log.py: specifically extract_dispatch_names().
 
 P0 fix (2026-04-09): must_dispatch field was capturing trailing reasoning text
 after comma-separated agent/skill names. extract_dispatch_names() filters to
@@ -85,7 +85,7 @@ class TestExtractDispatchNames(unittest.TestCase):
     def test_trailing_reasoning_long(self):
         raw = (
             "process-build, process-qa This is too many files to edit inline "
-            "— it would destroy context. Let me use parallel agents."
+            ",  it would destroy context. Let me use parallel agents."
         )
         self.assertEqual(extract_dispatch_names(raw), "process-build, process-qa")
 
@@ -141,7 +141,7 @@ class TestExtractDispatchNames(unittest.TestCase):
             self.assertIn(name, KNOWN_DISPATCH_NAMES, f"{name} missing from KNOWN_DISPATCH_NAMES")
 
     def test_pm_in_known(self):
-        """pm is in MUST DISPATCH for every non-Quick task — must be known."""
+        """pm is in MUST DISPATCH for every non-Quick task: must be known."""
         self.assertIn("pm", KNOWN_DISPATCH_NAMES)
 
     # --- Real data from governance-log.jsonl (regression tests) ---
@@ -149,7 +149,7 @@ class TestExtractDispatchNames(unittest.TestCase):
     def test_real_data_long_reasoning_1(self):
         raw = (
             "process-qa Let me build a structured research findings document "
-            "from the calculation files — tracing every claim to its source."
+            "from the calculation files: tracing every claim to its source."
         )
         self.assertEqual(extract_dispatch_names(raw), "process-qa")
 

@@ -1,5 +1,5 @@
 """
-Drift Guard Test — KNOWN_DISPATCH_NAMES consistency across hooks + shared module (2026-04-12)
+Drift Guard Test: KNOWN_DISPATCH_NAMES consistency across hooks + shared module (2026-04-12)
 
 The same KNOWN_DISPATCH_NAMES set is duplicated in 3 hook files (hooks must be self-contained):
 - governance-log.py
@@ -25,8 +25,9 @@ import unittest
 
 
 HOOKS_DIR = os.path.dirname(os.path.abspath(__file__))
-# Add scripts/ to path so we can import the shared canonical set
-SCRIPTS_DIR = os.path.join(HOOKS_DIR, "..", "..", "Projects", "Agent-Governance-Research", "scripts")
+# Add scripts/ to path so we can import the shared canonical set.
+# hooks/ and scripts/ are siblings at the repo root, so one level up suffices.
+SCRIPTS_DIR = os.path.join(HOOKS_DIR, "..", "scripts")
 sys.path.insert(0, os.path.normpath(SCRIPTS_DIR))
 
 

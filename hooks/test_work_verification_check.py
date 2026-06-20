@@ -1,4 +1,4 @@
-"""Smoke tests for work-verification-check.py — Stop hook.
+"""Smoke tests for work-verification-check.py: Stop hook.
 
 Three checks:
 1. QA/Pentest skill invoked + report present + zero execution tools → block.
@@ -58,7 +58,7 @@ def _run(payload: dict) -> str:
     with mock.patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
          mock.patch.object(wvc, "emit_event", None), \
          redirect_stdout(captured):
-        # Patch open() for the log_path append — but that's in main(); fine as-is,
+        # Patch open() for the log_path append: but that's in main(); fine as-is,
         # log writes are wrapped in try/except so they're harmless during tests.
         wvc.main()
     return captured.getvalue()
@@ -129,7 +129,7 @@ class Check1ProcessQAExecutionTests(unittest.TestCase):
             self.assertIn("ZERO tool usage", result["reason"])
 
     def test_qa_skill_with_read_only_passes_check1(self):
-        # Read/Grep fallback is acceptable for some claim types — should NOT block
+        # Read/Grep fallback is acceptable for some claim types: should NOT block
         with tempfile.TemporaryDirectory() as td:
             tp = _write_transcript(Path(td), [
                 _user(),
@@ -140,7 +140,7 @@ class Check1ProcessQAExecutionTests(unittest.TestCase):
                 ]),
             ])
             out = _run({"transcript_path": tp})
-            # Acceptable — check1 doesn't block when Read/Grep present
+            # Acceptable: check1 doesn't block when Read/Grep present
             self.assertEqual(out, "")
 
     def test_qa_skill_with_bash_passes(self):
@@ -178,7 +178,7 @@ class Check1BehavioralClaimWarnTests(unittest.TestCase):
                 ]),
             ])
             stdout, stderr = _run_with_stderr({"transcript_path": tp})
-            # Hook must NOT block — no JSON decision on stdout
+            # Hook must NOT block: no JSON decision on stdout
             self.assertEqual(stdout, "", "Expected no stdout (no block decision)")
             # Hook MUST emit the behavioral-claim WARN on stderr
             self.assertIn(
@@ -295,7 +295,7 @@ class Check2PrematureEscalationTests(unittest.TestCase):
             self.assertEqual(out, "")
 
     def test_asks_user_quick_low_tools_passes(self):
-        # Quick + asks user is fine — soft path, no enforcement
+        # Quick + asks user is fine: soft path, no enforcement
         with tempfile.TemporaryDirectory() as td:
             tp = _write_transcript(Path(td), [
                 _user(),
@@ -309,7 +309,7 @@ class Check2PrematureEscalationTests(unittest.TestCase):
 
 class Check3ZeroWorkSoftWarnTests(unittest.TestCase):
     def test_non_quick_zero_tools_does_not_block(self):
-        # Soft check — emits warn log entry but doesn't block
+        # Soft check: emits warn log entry but doesn't block
         with tempfile.TemporaryDirectory() as td:
             tp = _write_transcript(Path(td), [
                 _user(),
@@ -337,7 +337,7 @@ class HappyPathTests(unittest.TestCase):
 
 # --- CHECK 4 (SA-4 file-existence / fabrication detection) tests ---
 # Sprint A AC1.1 / AC1.2 / AC1.3. PRD §9 Q9 mechanism: Write-trace + path-existence
-# + tool_result block parsing. Non-blocking per Q8 ergonomic framing — fires WARN
+# + tool_result block parsing. Non-blocking per Q8 ergonomic framing: fires WARN
 # to stderr, never blocks. CHECK 4 is a stderr-only signal; we detect it by running
 # the hook as a subprocess and reading stderr, since main() doesn't return stderr.
 
@@ -395,11 +395,11 @@ class Check1bWorkflowQANotBlockedTests(unittest.TestCase):
             tp = _write_transcript(Path(td), [
                 # Real user message (classification turn)
                 _user(),
-                # Workflow tool_use  — entry 1
+                # Workflow tool_use : entry 1
                 _workflow_tool_use_entry("process-qa"),
-                # tool_result wrapper — entry 2 (not a real user turn)
+                # tool_result wrapper: entry 2 (not a real user turn)
                 _tool_result_wrapper_entry(),
-                # Relay text — entry 3 (contains QA REPORT + non-Quick classification)
+                # Relay text: entry 3 (contains QA REPORT + non-Quick classification)
                 _assistant([
                     _text(
                         "TASK TYPE: Build\n\n"
@@ -438,7 +438,7 @@ class Check1WorkflowQAZeroToolsNotBlockedTests(unittest.TestCase):
     execution tools must NOT be blocked by CHECK 1 (zero-tool-call path).
 
     The workflow's Bash/MCP calls run inside the subagent and are invisible to the main
-    transcript's execution_tools list — the zero-execution-tools block must be suppressed.
+    transcript's execution_tools list: the zero-execution-tools block must be suppressed.
 
     Plan Step 2 acceptance criteria (iv) and (v).
     """
@@ -449,7 +449,7 @@ class Check1WorkflowQAZeroToolsNotBlockedTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             tp = _write_transcript(Path(td), [
                 _user(),
-                # Three-entry Workflow shape — no Bash/MCP/Read in any of the three entries
+                # Three-entry Workflow shape: no Bash/MCP/Read in any of the three entries
                 _workflow_tool_use_entry("process-qa"),
                 _tool_result_wrapper_entry(),
                 _assistant([
@@ -482,7 +482,7 @@ class Check1GuardIntegrityTests(unittest.TestCase):
                 _user(),
                 _assistant([
                     _tool("Skill", {"skill": "process-qa"}),
-                    # No Bash / MCP / Read — pure text output
+                    # No Bash / MCP / Read: pure text output
                     _text("QA REPORT\nPASS: 1 / 1\nFAIL: none\nUntested: none deliberately"),
                 ]),
             ])
@@ -534,7 +534,7 @@ class Check1GuardIntegrityTests(unittest.TestCase):
 
 
 class Check4FileExistenceTests(unittest.TestCase):
-    """CHECK 4 — fabrication detection. WARN to stderr, no block."""
+    """CHECK 4: fabrication detection. WARN to stderr, no block."""
 
     def test_tp_fabricated_tmp_path_fires_fabrication_detected(self):
         """TP1: agent claims Write to /tmp/nonexistent path → FABRICATION_DETECTED."""

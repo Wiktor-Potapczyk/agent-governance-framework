@@ -1,4 +1,4 @@
-"""Smoke tests for subagent-quality-check.py — SubagentStop hook.
+"""Smoke tests for subagent-quality-check.py: SubagentStop hook.
 
 Covers the three block checks (empty output, error-refusal short output,
 substantial-output-without-structure), the pass path on a well-structured
@@ -27,7 +27,7 @@ _spec = importlib.util.spec_from_file_location(
 sqc = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(sqc)
 
-# Pure detection logic (extracted 2026-06-02) — the boundary tests below exercise
+# Pure detection logic (extracted 2026-06-02): the boundary tests below exercise
 # it directly (no I/O, no log writes).
 from _subagent_quality_logic import classify_subagent_output  # noqa: E402
 
@@ -108,7 +108,7 @@ class CheckErrorRefusalTests(unittest.TestCase):
                 "last_assistant_message": msg,
                 "transcript_path": "",
             }, Path(td))
-            # Should pass — message > 100 chars AND has structure (# header + bullets)
+            # Should pass: message > 100 chars AND has structure (# header + bullets)
             self.assertEqual(out, "")
 
 
@@ -169,7 +169,7 @@ class CheckNoStructureTests(unittest.TestCase):
 
 class PassThroughTests(unittest.TestCase):
     def test_short_normal_passes(self):
-        # >5 chars, no error keywords, <500 chars — passes all 3 checks
+        # >5 chars, no error keywords, <500 chars: passes all 3 checks
         with tempfile.TemporaryDirectory() as td:
             rc, out = _run({
                 "agent_type": "test",
@@ -229,13 +229,13 @@ class SubagentQualityBoundaryTests(unittest.TestCase):
         """FP-SQ-04 boundary_axis: 'refusal vs valid short NEGATIVE FINDING with refusal keyword'.
         FIXED 2026-06-02 (finding_subagent_quality_check_overfires): CHECK 2 now skips
         when a result-signal token ('reproduce', 'works', ...) co-occurs with the refusal
-        keyword — a finding, not a refusal. Real refusals (no result-signal) still block."""
+        keyword: a finding, not a refusal. Real refusals (no result-signal) still block."""
         self.assertFalse(_blocked("I cannot reproduce the bug; it works on main."))
 
     def test_fp_long_colon_structured_report_silent(self):
         """FP-SQ-05 boundary_axis: 'no markup vs label:value report (no markdown)'.
         FIXED 2026-06-02 (finding_subagent_quality_check_overfires): CHECK 3 now counts
-        >=3 'Label: value' lines OR a known REPORT header as structure — the unfenced
+        >=3 'Label: value' lines OR a known REPORT header as structure: the unfenced
         QA/PENTEST/PM report format CLAUDE.md mandates. Plain prose (no labels) still blocks.
         Addresses the format-pushback misfire (reference_subagent_stop_hook_causes_format_pushback)."""
         report = (

@@ -28,7 +28,7 @@ ROUTING = {
 # Process skills that are subject to routing validation
 PROCESS_SKILLS = set(ROUTING.values())
 
-# 200KB window — covers even 10+ agent outputs per turn
+# 200KB window: covers even 10+ agent outputs per turn
 READ_BYTES = 204800
 
 
@@ -72,7 +72,7 @@ def main():
     if skill_name not in PROCESS_SKILLS:
         return
 
-    # It IS a process skill — check if it matches the last classification
+    # It IS a process skill: check if it matches the last classification
     transcript_path = payload.get("transcript_path")
     if not transcript_path or not os.path.exists(transcript_path):
         return  # Can't verify, allow
@@ -87,7 +87,7 @@ def main():
 
     # Workflow-boundary reset (B-0 fix, 2026-06-11):
     # A Workflow tool_use whose name maps to a process skill is a routing-context
-    # reset — it consumed the TASK TYPE classification that triggered it. Any Skill
+    # reset: it consumed the TASK TYPE classification that triggered it. Any Skill
     # invocation that follows should not be blocked by that stale classification.
     # We track the LAST routing event: either a TASK TYPE assertion (text) or a
     # Workflow dispatch (tool_use name="Workflow"). If the most recent routing event
@@ -145,7 +145,7 @@ def main():
                     base = os.path.basename(sp)
                     wf_name = base[:-3] if base.endswith(".js") else base
                 if _wf_name_is_process(wf_name):
-                    # This Workflow consumed the last TASK TYPE — mark as reset
+                    # This Workflow consumed the last TASK TYPE: mark as reset
                     last_workflow_routing_reset = True
 
     # If the most-recent routing event was a Workflow dispatch, the classification
@@ -189,7 +189,7 @@ def main():
             pass
         return
 
-    # Correct routing — allow
+    # Correct routing: allow
     return
 
 

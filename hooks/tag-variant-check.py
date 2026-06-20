@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tag-variant-check.py — PostToolUse Write hook (ADVISORY v1, 2026-05-11).
+"""tag-variant-check.py: PostToolUse Write hook (ADVISORY v1, 2026-05-11).
 
 Wave 1.6 pre-migration enforcement for Vault-Maintenance Phase 5 Sticky Structure spec.
 
@@ -32,7 +32,7 @@ LOG_PATH = LOG_DIR / "tag-variant-check.log"
 DISABLED = os.environ.get("TAG_VARIANT_CHECK_DISABLED", "0") == "1"
 VERBOSE = os.environ.get("TAG_VARIANT_CHECK_VERBOSE", "0") == "1"
 
-# Source of truth: Projects/Vault-Maintenance/work/2026-05-11-target-structure-spec.md § R4
+# Source of truth: your tag taxonomy spec (see your vault's structure spec § R4)
 CANONICAL_TAGS = {
     "idea", "research", "analysis", "planning", "task", "personal",
     "moc", "wiki", "vault", "vault-log",
@@ -46,7 +46,7 @@ CANONICAL_TAGS = {
     "automation", "learning", "pitch", "dataview", "monitoring",
 }
 
-# Known aliases — map variant to canonical (from spec R4 v2 alias table)
+# Known aliases: map variant to canonical (from spec R4 v2 alias table)
 ALIASES = {
     "awards-automation": "project/awards-automation",
     "complete": "done",
@@ -142,7 +142,7 @@ def emit_advisory(suggestions, file_path):
     if not suggestions:
         return
     short_path = str(file_path).replace(str(VAULT) + os.sep, "").replace("\\", "/")
-    msg = f"[TAG-VARIANT-CHECK — ADVISORY] {short_path}\n"
+    msg = f"[TAG-VARIANT-CHECK: ADVISORY] {short_path}\n"
     msg += "Non-canonical tags detected:\n"
     for variant, canonical_suggest in suggestions:
         if canonical_suggest == "":
@@ -152,7 +152,7 @@ def emit_advisory(suggestions, file_path):
         else:
             msg += f"  - `{variant}` → use `{canonical_suggest}` (canonical)\n"
     msg += (
-        "\nReference: Projects/Vault-Maintenance/work/2026-05-11-target-structure-spec.md § R4 "
+        "\nReference: your tag taxonomy spec (the structure spec § R4 section) "
         "for the full canonical taxonomy + alias table."
     )
     try:

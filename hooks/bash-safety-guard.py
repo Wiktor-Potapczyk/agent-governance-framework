@@ -23,10 +23,10 @@ _INERT_CONTEXT_PATTERNS = [
     # `bash -c "…"` / `sh -c "…"` / `cmd -c` etc
     (re.compile(r'\b(?:bash|sh|zsh|cmd)\s+-c\s+"(?:\\.|[^"\\])*"'), "sh -c (double)"),
     (re.compile(r"\b(?:bash|sh|zsh|cmd)\s+-c\s+'(?:\\.|[^'\\])*'"), "sh -c (single)"),
-    # `grep 'pattern'` / `grep -E "pattern"` etc — pattern is not a command
+    # `grep 'pattern'` / `grep -E "pattern"` etc: pattern is not a command
     (re.compile(r'\bgrep(?:\s+-[a-zA-Z]+)*\s+"(?:\\.|[^"\\])*"'), "grep (double)"),
     (re.compile(r"\bgrep(?:\s+-[a-zA-Z]+)*\s+'(?:\\.|[^'\\])*'"), "grep (single)"),
-    # `echo "…"` / `printf "…"` — output, not execution
+    # `echo "…"` / `printf "…"`: output, not execution
     (re.compile(r'\b(?:echo|printf)\s+"(?:\\.|[^"\\])*"'), "echo/printf (double)"),
     (re.compile(r"\b(?:echo|printf)\s+'(?:\\.|[^'\\])*'"), "echo/printf (single)"),
     # Heredocs: <<EOF … EOF (common delimiters)
@@ -44,7 +44,7 @@ def strip_inert_contexts(command):
     return cleaned
 
 
-# Windows reserved device names — creating these breaks OneDrive sync (Issue #16604)
+# Windows reserved device names: creating these breaks OneDrive sync (Issue #16604)
 WINDOWS_RESERVED_NAMES = {
     "nul", "con", "prn", "aux",
     "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
@@ -181,7 +181,7 @@ def main():
                 pass
             return
 
-    # Command is safe — allow silently
+    # Command is safe: allow silently
     return
 
 

@@ -1,8 +1,8 @@
 """
-routing-table-validation.py — PreToolUse Edit|Write|MultiEdit hook (opt-in)
+routing-table-validation.py: PreToolUse Edit|Write|MultiEdit hook (opt-in)
 
 Denies edits to CLAUDE.md or any .claude/skills/*/SKILL.md that would introduce
-a broken dispatch-name reference — an agent name in a clear dispatch position that
+a broken dispatch-name reference: an agent name in a clear dispatch position that
 does not resolve to any entry in registry.json.
 
 This hook ships UNREGISTERED (disabled by default). To arm it, copy it to your
@@ -14,7 +14,7 @@ DESIGN CONTRACT:
   - Low false-positive: only DENY when ALL four gates (a/b/c/d) pass.
   - Deny protocol: emit the hookSpecificOutput/permissionDecision:deny JSON form.
     The {"decision":"block"} form is the SubagentStop protocol and is SILENTLY IGNORED
-    on PreToolUse — do NOT use it.
+    on PreToolUse: do NOT use it.
   - To allow: print nothing, exit 0.
   - Exit 0 always.
 
@@ -25,12 +25,12 @@ Gate summary (ALL must hold to deny):
   (d) Token resolves to nothing in registry.json agents union DEPRECATED_ALLOWLIST.
 
 Dispatch positions recognised (case-insensitive):
-  - "MUST DISPATCH: ..." — comma-separated names after the colon
+  - "MUST DISPATCH: ...": comma-separated names after the colon
   - Markdown routing-table row "| ... | <name> | ... |" in agent/dispatch context
   - subagent_type: "<name>" or subagent_type=<name>
 
 NOT a dispatch position (and therefore never blocked):
-  - Free prose sentences, including "dispatches to X" verb phrases — these are
+  - Free prose sentences, including "dispatches to X" verb phrases: these are
     indistinguishable from ordinary English and were a systematic false-positive
     source on CLAUDE.md (removed: _DISPATCH_PHRASE_RE detector).
   - Content inside fenced code blocks (``` ... ```)
@@ -85,7 +85,7 @@ _SUBAGENT_TYPE_RE = re.compile(
 
 # Markdown routing-table row: | ... | <candidate> | ... |
 # Only matches rows where we can detect an agent/dispatch table context
-# (header contains "agent" or "dispatch" — applied at caller, not here).
+# (header contains "agent" or "dispatch": applied at caller, not here).
 _MD_TABLE_CELL_RE = re.compile(
     r'^\s*\|(?:[^|]*\|)+\s*$'
 )
@@ -124,8 +124,8 @@ def _registry_path() -> str:
     #   Disabled:  <root>/.claude/hooks/disabled/routing-table-validation.py
     #
     # Registry may sit at:
-    #   <root>/.claude/registry.json   — standard (generate_registry.py output)
-    #   <root>/registry.json           — non-standard flat layout
+    #   <root>/.claude/registry.json  : standard (generate_registry.py output)
+    #   <root>/registry.json          : non-standard flat layout
     #
     # Walk up at most 4 levels; try both locations at each level.
     probe = here.parent
@@ -146,7 +146,7 @@ def _registry_path() -> str:
 def _load_registry_agents() -> set[str] | None:
     """
     Return lowercase set of valid dispatch targets from registry.json, or None on
-    failure (fail-open). Includes both 'agents' and 'skills' keys — MUST DISPATCH
+    failure (fail-open). Includes both 'agents' and 'skills' keys: MUST DISPATCH
     legitimately lists skill names (e.g. process-qa, pm) as well as agent names.
     """
     rp = _registry_path()
@@ -244,7 +244,7 @@ def _extract_dispatch_tokens_from_line(line: str, surrounding_lines: list[str]) 
         tokens.append(m.group(1).lower())
         return tokens
 
-    # Markdown table row — only if surrounding context mentions agent/dispatch
+    # Markdown table row: only if surrounding context mentions agent/dispatch
     if _MD_TABLE_CELL_RE.match(line):
         context_text = " ".join(surrounding_lines).lower()
         if "agent" in context_text or "dispatch" in context_text or "routing" in context_text:
@@ -298,7 +298,7 @@ def _validate_text(text: str, registry_agents: set[str]) -> list[str]:
                 continue
             if token in registry_agents:
                 continue
-            # All gates passed — broken reference
+            # All gates passed: broken reference
             if token not in broken:
                 broken.append(token)
 
@@ -319,7 +319,7 @@ def _get_new_strings_write(tool_input: dict) -> tuple[str, str]:
 def _get_new_strings_edit(tool_input: dict) -> tuple[str, str]:
     """
     For Edit: return (new_string, file_path).
-    Only validate tokens in new_string — pre-existing broken refs elsewhere
+    Only validate tokens in new_string: pre-existing broken refs elsewhere
     must not block an unrelated edit.
     """
     new_string = tool_input.get("new_string") or ""
@@ -401,7 +401,7 @@ def main() -> int:
         if not text_to_validate:
             return 0
 
-        # Load registry — fail-open on failure
+        # Load registry: fail-open on failure
         registry_agents = _load_registry_agents()
         if registry_agents is None:
             return 0  # cannot validate -> allow

@@ -21,19 +21,19 @@ Known limitations (v1.3):
 - Outcome labels: hit | miss | error | timeout | invalid_output | cli_absent | interrupted.
   The docstring in _invoke_haiku_fallback is authoritative. "error" = non-zero exit (MED-1);
   "interrupted" = user Ctrl-C, sink entry recorded then re-raised (MED-3). No selftest for
-  KeyboardInterrupt — re-raise semantics make inline testing impractical.
+  KeyboardInterrupt: re-raise semantics make inline testing impractical.
 - Write path: both regex and Haiku paths share _execute_sync(). Logs now emit
   `SYNCED (regex)` / `SYNCED (haiku)` for attribution. The regex path previously emitted
-  `SYNCED` without a label — this minor log-format change is intentional (v1.3).
+  `SYNCED` without a label: this minor log-format change is intentional (v1.3).
 - HAIKU_SINK rotation: rotates at 1 MB or 30 days mtime age; dated suffix
-  (e.g. h4-haiku-fallback.jsonl.2026-05-11). Rotation is best-effort — any exception
+  (e.g. h4-haiku-fallback.jsonl.2026-05-11). Rotation is best-effort: any exception
   is logged and swallowed; the append always proceeds.
 - Haiku excerpt: prefers the QA block (extract_qa_block) over head-slice so the relevant
   TASK-ID context is always in the excerpt even when the QA REPORT starts after EXCERPT_MAX.
 - Selftest isolation: all T-SM-HAIKU-MOCK sub-tests run inside a _write_haiku_sink no-op
   context manager; pre/post HAIKU_SINK byte count is asserted equal (T-SM-HAIKU-MOCK-ISOLATION).
 - T-SM-RESIDUAL-date-handle: date injection does not handle lines that already carry a
-  date suffix — rewrite appends a duplicate date. Low-priority; filed in backlog.
+  date suffix: rewrite appends a duplicate date. Low-priority; filed in backlog.
 - Multi-candidate guard takes only the first match if more than one ID survives extraction;
   this can miss the intended ID if a QA REPORT mentions multiple task IDs in prose.
   SCOPE-first extraction is the primary mitigation.
@@ -81,7 +81,7 @@ HAIKU_SINK = Path(__file__).parent / "aggregates" / "h4-haiku-fallback.jsonl"
 HAIKU_SINK_MAX_BYTES = 1_048_576       # 1 MB
 HAIKU_SINK_MAX_AGE_DAYS = 30
 
-# Validates bare TASK-ID output from Haiku (no ** boundary required — Haiku outputs raw ID)
+# Validates bare TASK-ID output from Haiku (no ** boundary required: Haiku outputs raw ID)
 PATTERN_BARE_TASK_ID = re.compile(r'^([A-Z][A-Z0-9]{0,9}(?:-[A-Z0-9]+)+)$')
 
 PATTERN_QA_REPORT = re.compile(r'QA REPORT', re.IGNORECASE)
@@ -234,7 +234,7 @@ def compose_summary(assistant_text: str) -> str:
     m = PATTERN_SCOPE.search(qa)
     if m:
         scope = m.group(1).strip()
-        summary = f"QA PASS — {scope}"
+        summary = f"QA PASS: {scope}"
         return summary[:SUMMARY_MAX]
     # Try simple-format counts (process-qa skill's actual output uses `PASS: N / total`)
     m = PATTERN_QA_PASS_SIMPLE.search(qa)
@@ -418,13 +418,13 @@ def _invoke_haiku_fallback(prose: str) -> tuple:
     Invoke `claude -p --model haiku` to extract a TASK-ID from *prose*.
 
     Returns (extracted_id_or_None, outcome_string) where outcome is one of:
-      "hit"            — ID extracted, validated against PATTERN_TASK_ID
-      "miss"           — Haiku returned NONE or empty
-      "error"          — Haiku subprocess returned non-zero exit code
-      "timeout"        — subprocess.TimeoutExpired (6-sec budget)
-      "invalid_output" — Haiku output doesn't match PATTERN_TASK_ID or is unparseable
-      "cli_absent"     — `claude` binary not on PATH
-      "interrupted"    — User-initiated Ctrl-C during Haiku subprocess; sink entry recorded, then re-raised
+      "hit"           : ID extracted, validated against PATTERN_TASK_ID
+      "miss"          : Haiku returned NONE or empty
+      "error"         : Haiku subprocess returned non-zero exit code
+      "timeout"       : subprocess.TimeoutExpired (6-sec budget)
+      "invalid_output": Haiku output doesn't match PATTERN_TASK_ID or is unparseable
+      "cli_absent"    : `claude` binary not on PATH
+      "interrupted"   : User-initiated Ctrl-C during Haiku subprocess; sink entry recorded, then re-raised
 
     Caller MUST call regex_match() against task_plan.md before using the result to
     distinguish "hit + in plan" from "hit + not in plan". This function validates
@@ -435,7 +435,7 @@ def _invoke_haiku_fallback(prose: str) -> tuple:
         "Read the following QA REPORT excerpt and output ONLY the TASK-ID "
         "(format: UPPERCASE letters/digits, hyphen-separated segments, e.g. PROJ-TASK-001) "
         "found in it. If no TASK-ID is present, output the single word NONE. "
-        "Do not output anything else — no explanation, no punctuation, no markdown.\n\n"
+        "Do not output anything else: no explanation, no punctuation, no markdown.\n\n"
         f"QA REPORT EXCERPT:\n{prose}"
     )
 
@@ -535,7 +535,7 @@ def _write_haiku_sink(entry: dict) -> None:
                         os.replace(HAIKU_SINK, rotated)
                         log(f"haiku sink rotated to {rotated.name}")
                     except OSError:
-                        # Destination already exists (parallel rotation on same date) — proceed
+                        # Destination already exists (parallel rotation on same date): proceed
                         pass
         except Exception as rot_exc:
             log(f"haiku sink rotation failed (best-effort, continuing): {rot_exc}")
@@ -554,7 +554,7 @@ def _execute_sync(match: dict, assistant_text: str, source_label: str = "regex")
 
     Returns True if a write landed, False on any skip path (dedup, DRY_RUN, undo-fail,
     apply-fail, or verify-fail). *source_label* appears in the SYNCED log line for
-    path attribution — "regex" for the static-regex path, "haiku" for the Haiku branch.
+    path attribution: "regex" for the static-regex path, "haiku" for the Haiku branch.
 
     NOTE: both paths now emit `SYNCED (regex)` / `SYNCED (haiku)` in the log. The
     regex path previously emitted `SYNCED` without a label; this minor format change is
@@ -566,7 +566,7 @@ def _execute_sync(match: dict, assistant_text: str, source_label: str = "regex")
         return False
 
     summary = compose_summary(assistant_text)
-    # Replacement is single-line — embed summary inline (no newline) to keep file line indices stable
+    # Replacement is single-line: embed summary inline (no newline) to keep file line indices stable
     replacement_line = match["original_line"].replace("- [ ]", "- [x]", 1)
     if summary:
         replacement_line = replacement_line.rstrip() + f"  ← {summary}"
@@ -624,7 +624,7 @@ def main():
         scope_text = scope_match.group(1)
         scope_ids = list(dict.fromkeys(PATTERN_TASK_ID.findall(scope_text)))
         if scope_ids:
-            candidate_ids = scope_ids  # SCOPE field provided IDs — these are authoritative
+            candidate_ids = scope_ids  # SCOPE field provided IDs: these are authoritative
         else:
             candidate_ids = list(dict.fromkeys(PATTERN_TASK_ID.findall(assistant_text)))  # fallback
     else:
@@ -632,7 +632,7 @@ def main():
 
     # Multi-candidate guard: if more than one ID survives extraction, log + take only the first
     if len(candidate_ids) > 1:
-        log(f"Multi-candidate TIDs {candidate_ids}; using first only ({candidate_ids[0]}) — rest may be prose mentions of completed work")
+        log(f"Multi-candidate TIDs {candidate_ids}; using first only ({candidate_ids[0]}): rest may be prose mentions of completed work")
         candidate_ids = candidate_ids[:1]
 
     if not candidate_ids:
@@ -661,7 +661,7 @@ def main():
                         "extracted_id": haiku_id,
                         "outcome": "not_in_plan",
                     })
-                    log(f"haiku ID {haiku_id!r} not in any open [ ] line — skipping")
+                    log(f"haiku ID {haiku_id!r} not in any open [ ] line: skipping")
         return  # no candidate IDs (regex miss, Haiku disabled or also missed)
 
     active = detect_active_project()
@@ -681,15 +681,15 @@ def main():
 def selftest():
     """Smoke-test PATTERN_TASK_ID against fixture inputs.
     Cases:
-      T-SM-1   (existing, single-segment numeric trailing) — H-4
-      T-SM-2   (existing, multi-char prefix + digit) — TKT123-EXAMPLE-BUILD
-      T-SM-3   (existing, with trailing space variant) — H-4 phrase
-      T-SM-OBS (v1.1 NEW, alpha trailing) — OBS-V2-A
-      T-SM-ECC (v1.1 NEW, 5+ char prefix + multi-segment) — ECC-LEARN-A2
-      T-SM-FP-section  (regression: prose mention, no **) — "section 5-A"
-      T-SM-FP-task     (regression: prose mention, no **) — "task 12-B"
-      T-SM-no-id (existing, no ID present) — "QA REPORT PASS: 5/5"
-      T-SM-FP-date     (regression: bare date string) — "**2026-05-10**"
+      T-SM-1   (existing, single-segment numeric trailing): H-4
+      T-SM-2   (existing, multi-char prefix + digit): TKT123-EXAMPLE-BUILD
+      T-SM-3   (existing, with trailing space variant): H-4 phrase
+      T-SM-OBS (v1.1 NEW, alpha trailing): OBS-V2-A
+      T-SM-ECC (v1.1 NEW, 5+ char prefix + multi-segment): ECC-LEARN-A2
+      T-SM-FP-section  (regression: prose mention, no **): "section 5-A"
+      T-SM-FP-task     (regression: prose mention, no **): "task 12-B"
+      T-SM-no-id (existing, no ID present): "QA REPORT PASS: 5/5"
+      T-SM-FP-date     (regression: bare date string): "**2026-05-10**"
     """
     cases = [
         ("T-SM-1",   "Built **H-4** under the audit-driven directive.",                      "H-4"),
@@ -705,7 +705,7 @@ def selftest():
         # KNOWN RESIDUAL: letter-prefixed date-style handles like **H-2026-05** match the new
         # regex (all segments are alphanumeric). Mitigated at runtime by regex_match() requiring
         # the ID to appear in an open `[ ]` task line. Documented here so the residual is
-        # explicit; ID extraction is intentionally permissive — open-line filter is the gate.
+        # explicit; ID extraction is intentionally permissive: open-line filter is the gate.
         ("T-SM-RESIDUAL-date-handle", "Sprint **H-2026-05** in scope.",                      "H-2026-05"),
     ]
     passed = 0
@@ -731,7 +731,7 @@ def selftest():
     import unittest.mock as _mock
     import tempfile as _tmpmod
 
-    # MED-4: production-JSONL isolation — capture pre-test HAIKU_SINK size so we can
+    # MED-4: production-JSONL isolation: capture pre-test HAIKU_SINK size so we can
     # assert no bytes were written by any MOCK sub-test. All five A/B/C/D/E sub-tests
     # run inside a single _write_haiku_sink no-op context so none can leak to disk.
     # Use f"{__name__}._write_haiku_sink" so the patch resolves under both

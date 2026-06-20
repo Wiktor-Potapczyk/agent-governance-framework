@@ -1,16 +1,16 @@
 """
-Prose Slop Check - PostToolUse:Write hook  [DORMANT — NOT REGISTERED]
+Prose Slop Check - PostToolUse:Write hook  [DORMANT: NOT REGISTERED]
 
 Sibling to prose-codes-check.py. That hook catches invented shorthand CODES
-(T-C1, AR-F5, B-1). This one catches LLM-register VOCABULARY SLOP — the
+(T-C1, AR-F5, B-1). This one catches LLM-register VOCABULARY SLOP: the
 hallmark words an LLM reaches for that a terse human technical writer never
 does (delve, tapestry, multifaceted, furthermore, ...). The two are disjoint:
 prose-codes-check has zero vocabulary coverage (verified 2026-06-02).
 
-SCOPE: generated prose written to the wiki/work layer —
+SCOPE: generated prose written to the wiki/work layer 
   Resources/KB/**.md  and  Projects/*/work/**.md
 NOT chat responses (those are already terse per CLAUDE.md minimum-length rule)
-and NOT raw-layer files (Inbox/Clippings/Daily Notes — Wiktor- or externally-
+and NOT raw-layer files (Inbox/Clippings/Daily Notes: owner- or externally-
 authored, never LLM-linted).
 
 CALIBRATION (2026-06-02, the pilot's calibration gate):
@@ -19,16 +19,16 @@ CALIBRATION (2026-06-02, the pilot's calibration gate):
   vault prose. `fundamental` (4), `landscape` (3), `leverage` (1), and the
   borderline technical-register words (robust, comprehensive, crucial,
   significant, seamless, pivotal, nuanced, additionally) are DELIBERATELY
-  EXCLUDED — they have legitimate technical uses, so flagging them would
+  EXCLUDED: they have legitimate technical uses, so flagging them would
   produce false positives. Precision-first per feedback_low_false_positive_fixes.
 
 SEVERITY: WARN only (stderr + exit 0). NEVER blocks a Write. Slop is a quality
-nudge, not a correctness gate — a false positive must never interrupt a real
-write. (Contrast: prose-codes-check hard-blocks because Wiktor literally cannot
+nudge, not a correctness gate: a false positive must never interrupt a real
+write. (Contrast: prose-codes-check hard-blocks because the owner literally cannot
 parse the codes.)
 
 STATUS: DORMANT. This file is intentionally NOT registered in any settings*.json.
-It is a ready-to-enable pilot artifact. Activation is Wiktor's call (one
+It is a ready-to-enable pilot artifact. Activation is the owner's call (one
 PostToolUse:Write registration line). Until then it has zero runtime effect.
 Boundary tests: test_prose_slop_check.py (C4 FP-guard coverage).
 
@@ -73,7 +73,7 @@ _TARGET_RE = re.compile(
 
 
 def strip_noise(text):
-    """Remove frontmatter, fenced/inline code, and tables — slop only counts in
+    """Remove frontmatter, fenced/inline code, and tables: slop only counts in
     prose. (Same approach as prose-codes-check.strip_noise.)"""
     text = re.sub(r"^---\n[\s\S]*?\n---\n", "", text, count=1)
     text = re.sub(r"```[\s\S]*?```", "", text)
@@ -85,7 +85,7 @@ def strip_noise(text):
 def find_slop(text):
     """Return (distinct_count, total_count, sorted_hits[(word,count)]) for prose.
 
-    Pure function — no I/O — so test_prose_slop_check.py can exercise it directly."""
+    Pure function: no I/O: so test_prose_slop_check.py can exercise it directly."""
     prose = strip_noise(text)
     counts = {}
     for m in _SLOP_RE.finditer(prose):
@@ -118,7 +118,7 @@ def main():
     file_path = tool_input.get("file_path") or ""
     norm = file_path.replace("\\", "/")
     if not _TARGET_RE.search(norm):
-        return 0  # not a wiki/work .md — out of scope
+        return 0  # not a wiki/work .md: out of scope
 
     # PostToolUse Write carries the written content; Edit carries new_string.
     content = tool_input.get("content")
@@ -144,7 +144,7 @@ def main():
         f"LLM-register slop in prose: {pretty}. Prefer plain technical wording "
         f"(e.g. 'delve into' -> 'examine'; 'foster' -> 'support'; 'underscore' "
         f"-> 'show'; 'furthermore/moreover' -> just continue the sentence). "
-        f"Codes/tables/fences are not checked. (advisory — write was kept.)\n"
+        f"Codes/tables/fences are not checked. (advisory: write was kept.)\n"
     )
     return 0
 

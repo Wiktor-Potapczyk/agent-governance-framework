@@ -9,26 +9,26 @@ description: Planning process template. Follow this procedure for all Planning-t
 
 This skill's procedure is enforced by construction: on invocation for a non-Quick task, execute it by calling the **Workflow tool** with `{scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-planning.js"}`, passing the task brief + classification block via `args`. The script drives the dispatch sequence (scope → optional research → implementation-plan → **mandatory parallel review: architect-reviewer + adversarial-reviewer** (+ prompt-engineer if the plan contains LLM prompts) → capped revise → quality gate); agents reason freely inside each step.
 
-**Path must be absolute** on the installing machine — replace `{{VAULT_ROOT}}` with the absolute path to your project root. After editing this file mid-session, invoke the script by `scriptPath` (not by name) because the name-to-path mapping is session-cached and will not pick up edits until the next session restart.
+**Path must be absolute** on the installing machine: replace `{{VAULT_ROOT}}` with the absolute path to your project root. After editing this file mid-session, invoke the script by `scriptPath` (not by name) because the name-to-path mapping is session-cached and will not pick up edits until the next session restart.
 
-The prose below remains (a) the procedure spec of record and (b) the FALLBACK path — use it only when the Workflow tool is unavailable (sub-agent context, degraded session) and say so explicitly. `DISPATCHES.json` is untouched and remains the read-only H11 verification source.
+The prose below remains (a) the procedure spec of record and (b) the FALLBACK path: use it only when the Workflow tool is unavailable (sub-agent context, degraded session) and say so explicitly. `DISPATCHES.json` is untouched and remains the read-only H11 verification source.
 
 ---
 
 You have been routed here by the task-classifier. The task type is Planning.
 
-## Step 1 — Define Scope
+## Step 1: Define Scope
 
 **Before writing the scope block, check for project context.** If `Projects/[Name]/STATE.md` or `Projects/[Name]/PROJECT.md` exist, read them using the Read tool:
-- Import **appetite** (Small/Medium/Large) from PROJECT.md into Constraints — the plan must fit within it
-- Import **current phase** and **active tasks** from STATE.md into Inputs — the plan must build on current state, not contradict it
-- If neither file exists, proceed without them — project context is optional, not blocking
+- Import **appetite** (Small/Medium/Large) from PROJECT.md into Constraints: the plan must fit within it
+- Import **current phase** and **active tasks** from STATE.md into Inputs: the plan must build on current state, not contradict it
+- If neither file exists, proceed without them: project context is optional, not blocking
 
 Then write this block:
 
 ```
 PLANNING SCOPE
-Goal: [what is being designed or planned — one sentence]
+Goal: [what is being designed or planned: one sentence]
 Constraints: [tech stack, timeline, dependencies, team size, budget, appetite from PROJECT.md if available]
 Inputs: [existing specs, prior research, requirements docs, STATE.md current phase if available]
 Deliverable: [architecture doc, implementation plan, sequence diagram, spec]
@@ -36,9 +36,9 @@ Output path: Projects/[Name]/work/YYYY-MM-DD-[plan-name].md
 ```
 
 If the goal is unclear or requirements are missing, route to Research first.
-If the plan scope exceeds the declared appetite, flag this explicitly before proceeding — do not silently produce an oversized plan.
+If the plan scope exceeds the declared appetite, flag this explicitly before proceeding: do not silently produce an oversized plan.
 
-## Step 2 — Research (if needed)
+## Step 2: Research (if needed)
 
 Planning often requires understanding before designing. If ANY of these are true, run research first:
 - The domain is unfamiliar (unfamiliar API, new framework, unknown constraints)
@@ -52,7 +52,7 @@ Delegate per the research process:
 
 If research is not needed (requirements are clear, domain is familiar), skip to Step 3.
 
-## Step 3 — Design
+## Step 3: Design
 
 Delegate to the **implementation-plan** agent.
 
@@ -64,7 +64,7 @@ Include in the prompt:
 
 For architecture-level planning, also consider delegating to **llm-architect** (for LLM system design) or **data-engineer** (for data pipeline architecture) in parallel with implementation-plan.
 
-## Step 4 — Review (MANDATORY)
+## Step 4: Review (MANDATORY)
 
 **You MUST dispatch architect-reviewer.** Skipping review is a process violation caught by the Stop hook.
 
@@ -79,13 +79,13 @@ If the plan involves LLM prompts or agent design, also delegate to **prompt-engi
 
 For high-stakes plans (multi-phase, cross-system, or irreversible decisions), **you MUST also dispatch adversarial-reviewer** to challenge assumptions before committing.
 
-## Step 5 — Revise (if needed)
+## Step 5: Revise (if needed)
 
 If review identified issues, send the plan + review feedback back to **implementation-plan** for revision.
 
-Repeat Steps 4–5 until the review passes or the user decides to proceed.
+Repeat Steps 4-5 until the review passes or the user decides to proceed.
 
-## Step 6 — Quality Check
+## Step 6: Quality Check
 
 Before marking planning complete:
 
@@ -100,8 +100,8 @@ If any check fails: identify the gap, revise (Step 5), and re-check.
 
 ## Notes
 
-- Planning is designing, not building. If you find yourself writing implementation code, stop — that's a Build task.
+- Planning is designing, not building. If you find yourself writing implementation code, stop: that's a Build task.
 - A plan without acceptance criteria is not a plan. Every step must have a way to verify it's done.
 - Prefer smaller increments over monolithic plans. If the plan has more than 7 steps, consider breaking it into phases.
-- The plan is a living document — it will be revised as implementation reveals new information. Don't over-specify.
+- The plan is a living document: it will be revised as implementation reveals new information. Don't over-specify.
 - **STATE.md is owned by pm-orchestrator.** Do not write to STATE.md from this skill. Save output to `work/` only. The `/pm` checkpoint (which fires for 2+ compound tasks) handles STATE.md updates.

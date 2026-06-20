@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Structural enforcement gates — Phase D dim4 (C1 / C2 / C3).
+"""Structural enforcement gates: Phase D dim4 (C1 / C2 / C3).
 
 Three checks that formalize latent CMDB wiring, run at registry-generation time
 (the moment framework state changes). Theme B of
 Projects/Agent-Governance-Research/work/2026-05-31-phase-d-growth-candidates.md.
 
-  C1 — KNOWN_DISPATCH_NAMES drift across the 4 copies      → HARD (exit nonzero)
-  C3 — every settings*.json hook registration points to a
+  C1: KNOWN_DISPATCH_NAMES drift across the 4 copies      → HARD (exit nonzero)
+  C3: every settings*.json hook registration points to a
        .py that exists on disk                             → HARD (exit nonzero)
-  C2 — hook -> `_helper` import-coupling map; unguarded
+  C2: hook -> `_helper` import-coupling map; unguarded
        (module-level) imports are BLOCK-class, guarded
        (try/except) imports are WARN-class                 → INFORMATIONAL
 
@@ -54,13 +54,13 @@ REGISTRY = VAULT / ".claude" / "registry.json"
 DISPATCH_LOGIC = HOOKS_DIR / "_dispatch_compliance_logic.py"
 
 # C5 (2026-06-02): dispatch names that intentionally do NOT resolve to a live
-# registry agent/skill. These are the FP-guards for the resolution gate — without
+# registry agent/skill. These are the FP-guards for the resolution gate: without
 # them C5 would false-positive on deliberate entries (the over-application trap the
 # boundary-test harness exists to prevent). Each needs a documented reason.
-#   workflow-orchestrator — deprecated alias kept as a safety net for skills still
+#   workflow-orchestrator: deprecated alias kept as a safety net for skills still
 #     referencing it (CLAUDE.md §"n8n Two-Phase Orchestration"); not a live agent.
-# (Alias-keys from SKILL_AGENT_ALIASES — e.g. "architect-review" -> architect-reviewer
-#  — are exempted separately/automatically, not listed here.)
+# (Alias-keys from SKILL_AGENT_ALIASES: e.g. "architect-review" -> architect-reviewer
+# : are exempted separately/automatically, not listed here.)
 _DEPRECATED_DISPATCH_ALIASES = {"workflow-orchestrator"}
 
 
@@ -214,16 +214,16 @@ def _load_dispatch_logic():
 
 
 def check_c5_dispatch_name_resolution() -> dict:
-    """C5: every KNOWN_DISPATCH_NAMES entry must resolve to a live target —
+    """C5: every KNOWN_DISPATCH_NAMES entry must resolve to a live target 
     a registered agent, a registered skill, a SKILL_AGENT_ALIASES key, or a
     documented deprecation alias. Anything else is a TRUE phantom: a dispatch
     name pointing at nothing (the finding_n8n_agents_missing_from_known_dispatch_names
-    regression class — a renamed/removed agent left in the list).
+    regression class: a renamed/removed agent left in the list).
 
     C1 only proves the 4 copies match EACH OTHER; they can be identically wrong.
     C5 is the orthogonal check against live registry reality.
 
-    WARN-class: resolution is deterministic, but keep it advisory until proven —
+    WARN-class: resolution is deterministic, but keep it advisory until proven 
     mirrors C4's WARN->HARD rollout. The exemptions (alias keys + deprecations) are
     the FP-guards.
     """

@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 Create today's daily note.
 
-1. Check `Daily Notes/` — if today's note already exists, open it and report that
+1. Check `Daily Notes/`: if today's note already exists, open it and report that
 2. Read `task_plan.md` and pull all incomplete "In Progress" tasks
 3. Create `Daily Notes/YYYY-MM-DD.md` using today's date with this structure:
 

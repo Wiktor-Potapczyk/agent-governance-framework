@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""inbox-auto-ingest.py — PostToolUse Write|Edit hook (M1 auto-trigger).
+"""inbox-auto-ingest.py: PostToolUse Write|Edit hook (M1 auto-trigger).
 
 Karpathy LLM-Wiki adoption auto-trigger. When a file is written or edited in
 Inbox/, emit additionalContext signaling that process-ingest should run on the

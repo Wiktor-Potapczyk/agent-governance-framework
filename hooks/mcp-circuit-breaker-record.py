@@ -1,10 +1,10 @@
 """
-mcp-circuit-breaker-record.py — PostToolUse half of the MCP circuit breaker.
+mcp-circuit-breaker-record.py: PostToolUse half of the MCP circuit breaker.
 
 Records per-server failures and successes into the breaker state file so the
 PreToolUse half (`mcp-circuit-breaker.py`) can decide when to block.
 
-What counts as a "failure" — heuristic:
+What counts as a "failure": heuristic:
     - tool_response.is_error is True
     - tool_response.error / tool_response.error_message is non-empty
     - tool_response contains the string "MCP error" / "error" near the start
@@ -15,7 +15,7 @@ What counts as a "success":
 
 Successes RESET the failure list (the breaker is rate-of-failure based;
 one good response means the server is alive). Successes do NOT clear a
-tripped_at — that requires either MCP_BREAKER_RESET or cooldown expiry.
+tripped_at: that requires either MCP_BREAKER_RESET or cooldown expiry.
 
 Exit codes: 0 always. Hook never crashes the parent session.
 """
@@ -134,7 +134,7 @@ def main() -> int:
             failures = failures[-50:]
         server_state["failures"] = failures
     elif verdict == "success":
-        # Success resets the failure window — the server is responsive
+        # Success resets the failure window: the server is responsive
         server_state["failures"] = []
         server_state["last_success_at"] = _now_iso()
     # 'unknown' → don't change state

@@ -1,4 +1,4 @@
-"""Smoke tests for skill-routing-check.py — PreToolUse Skill hook.
+"""Smoke tests for skill-routing-check.py: PreToolUse Skill hook.
 
 Validates the last TASK TYPE from the transcript matches the routing table
 for process-* skills. Allows non-process skills unconditionally. Denies misroutes.
@@ -83,7 +83,7 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(out, "")
 
     def test_non_process_skill_allowed(self):
-        # task-classifier, save, ensemble — not in PROCESS_SKILLS — unconditional pass
+        # task-classifier, save, ensemble: not in PROCESS_SKILLS: unconditional pass
         out = _run({"tool_name": "Skill", "tool_input": {"skill": "task-classifier"}})
         self.assertEqual(out, "")
 
@@ -181,7 +181,7 @@ class RoutingValidationTests(unittest.TestCase):
             self.assertEqual(out, "")  # Content → process-build is correct routing
 
     def test_last_classification_wins(self):
-        # Two classifications in the same transcript — the later one binds
+        # Two classifications in the same transcript: the later one binds
         with tempfile.TemporaryDirectory() as td:
             tp = _write_transcript(Path(td), [
                 _assistant_text("TASK TYPE: Research"),
@@ -244,7 +244,7 @@ class WorkflowBoundaryResetTests(unittest.TestCase):
         }
 
     def _tool_result_wrapper(self) -> dict:
-        """user entry that is a tool_result wrapper — entry 2 of the three-entry shape.
+        """user entry that is a tool_result wrapper: entry 2 of the three-entry shape.
         Must NOT be treated as a real user turn by the routing check."""
         return {
             "type": "user",
@@ -261,7 +261,7 @@ class WorkflowBoundaryResetTests(unittest.TestCase):
         }
 
     def _relay_text(self, text: str) -> dict:
-        """assistant relay entry — entry 3 of the three-entry shape."""
+        """assistant relay entry: entry 3 of the three-entry shape."""
         return _assistant_text(text)
 
     def test_workflow_process_planning_resets_routing_allows_research(self):
@@ -273,7 +273,7 @@ class WorkflowBoundaryResetTests(unittest.TestCase):
                 _assistant_text("TASK TYPE: Planning\n\nInvoking process-planning..."),
                 # Three-entry Workflow shape (entry 1: tool_use)
                 self._workflow_tool_use("process-planning"),
-                # Entry 2: tool_result wrapper — must NOT reset routing or clear state
+                # Entry 2: tool_result wrapper: must NOT reset routing or clear state
                 self._tool_result_wrapper(),
                 # Entry 3: relay text from the workflow
                 self._relay_text("PLANNING SCOPE\nGoal: migrate skills\n\nPLANNING COMPLETE"),
@@ -285,7 +285,7 @@ class WorkflowBoundaryResetTests(unittest.TestCase):
             })
             self.assertEqual(out, "", (
                 "process-research must be ALLOWED after a Workflow process-planning run "
-                "consumed the TASK TYPE: planning classification — B-0 routing reset"
+                "consumed the TASK TYPE: planning classification: B-0 routing reset"
             ))
 
     def test_workflow_via_scriptpath_resets_routing(self):
@@ -307,11 +307,11 @@ class WorkflowBoundaryResetTests(unittest.TestCase):
 
     def test_genuine_misroute_no_workflow_still_denied(self):
         """Negative fixture: TASK TYPE: planning + no Workflow between classification and Skill
-        invocation. A genuine misroute must still be DENIED — B-0 reset is not a blanket pass."""
+        invocation. A genuine misroute must still be DENIED: B-0 reset is not a blanket pass."""
         with tempfile.TemporaryDirectory() as td:
             tp = _write_transcript(Path(td), [
                 _assistant_text("TASK TYPE: Planning\n\nApproach: ..."),
-                # No Workflow tool_use — direct mis-invocation of process-research
+                # No Workflow tool_use: direct mis-invocation of process-research
             ])
             out = _run({
                 "tool_name": "Skill",
@@ -331,7 +331,7 @@ class WorkflowBoundaryResetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             tp = _write_transcript(Path(td), [
                 _assistant_text("TASK TYPE: Planning"),
-                # Workflow with a non-process name — should NOT reset
+                # Workflow with a non-process name: should NOT reset
                 {
                     "type": "assistant",
                     "message": {
@@ -353,7 +353,7 @@ class WorkflowBoundaryResetTests(unittest.TestCase):
                 "tool_input": {"skill": "process-research"},
                 "transcript_path": tp,
             })
-            # planning still active — research is mis-routed → deny
+            # planning still active: research is mis-routed → deny
             result = json.loads(out)
             self.assertEqual(
                 result["hookSpecificOutput"]["permissionDecision"],
@@ -378,12 +378,12 @@ class WorkflowBoundaryResetTests(unittest.TestCase):
                 "tool_input": {"skill": "process-research"},
                 "transcript_path": tp,
             })
-            # Build is now active — research is still mis-routed
+            # Build is now active: research is still mis-routed
             result = json.loads(out)
             self.assertEqual(
                 result["hookSpecificOutput"]["permissionDecision"],
                 "deny",
-                "TASK TYPE assertion after a Workflow re-establishes routing — still denies wrong skill",
+                "TASK TYPE assertion after a Workflow re-establishes routing: still denies wrong skill",
             )
 
 

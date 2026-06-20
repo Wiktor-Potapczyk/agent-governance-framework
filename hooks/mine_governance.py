@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Governance-log failure miner — v1-minimal (REV-1..REV-6).
+"""Governance-log failure miner: v1-minimal (REV-1..REV-6).
 
 Pure-stdlib helper. Scans governance-log.jsonl for recurring failure patterns
 keyed by (event_label, agent_type, hook, normalized_reason).
@@ -16,7 +16,7 @@ import sys
 from datetime import date, timedelta
 
 # ---------------------------------------------------------------------------
-# CONFIG CONSTANTS  (tunable — change here, nowhere else)
+# CONFIG CONSTANTS  (tunable: change here, nowhere else)
 # ---------------------------------------------------------------------------
 
 # Recurrence gate defaults
@@ -26,7 +26,7 @@ HIGH_SEV_C = 3       # min occurrence count for high-severity sigs
 WINDOW_DAYS = 30     # rolling window in calendar days
 
 # Events that are unconditionally high-severity regardless of per-record severity field.
-# fabrication_detected has no per-record severity field — always high.
+# fabrication_detected has no per-record severity field: always high.
 ALWAYS_HIGH_SEVERITY_EVENTS = {"fabrication_detected"}
 
 # dark-zone records carry their own `severity` field ("low"/"medium"/"high").
@@ -65,7 +65,7 @@ FAILURE_OUTCOME = "no_classification"
 FAILURE_REASON = "empty_must_dispatch_on_non_quick"
 
 # ---------------------------------------------------------------------------
-# NORMALIZATION  (light v1 — applied to reason text for sig_key)
+# NORMALIZATION  (light v1: applied to reason text for sig_key)
 # ---------------------------------------------------------------------------
 
 _RE_DIGITS = re.compile(r"\d+")
@@ -74,9 +74,9 @@ _RE_DIGITS = re.compile(r"\d+")
 # like "50/100" or "3/10".
 #
 # Three accepted forms:
-#   [A-Za-z]:[/\\]   — Windows drive letter (C:\, D:/)
-#   (?:\.\.?|~)[/\\] — explicit relative (./), parent-relative (../), or home-dir (~/)
-#   (?<!\d)/[^\s'"]{3,} — POSIX absolute path (/home/foo) — bare leading /
+#   [A-Za-z]:[/\\]  : Windows drive letter (C:\, D:/)
+#   (?:\.\.?|~)[/\\]: explicit relative (./), parent-relative (../), or home-dir (~/)
+#   (?<!\d)/[^\s'"]{3,}: POSIX absolute path (/home/foo): bare leading /
 #                         but NOT preceded by a digit (excludes "50/100", "3/10")
 #
 # The negative lookbehind (?<!\d) is the key guard: a fraction like "50/100" has
@@ -149,7 +149,7 @@ def _admitted(record: dict) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# FAILURE LABEL  — most-specific label for the sig_key
+# FAILURE LABEL : most-specific label for the sig_key
 # ---------------------------------------------------------------------------
 
 def _failure_label(record: dict) -> str:
@@ -157,10 +157,10 @@ def _failure_label(record: dict) -> str:
 
     The label reflects WHY the record was admitted, not just which event fired:
     - If the event is itself a named failure event (in FAILURE_EVENTS_EXACT or
-      endswith "_blocked"), the event name IS the failure class — use it.
+      endswith "_blocked"), the event name IS the failure class: use it.
     - If the record was admitted via outcome=="no_classification" (i.e. the event
       is a noise event like "agent_dispatched"), the failure class is the outcome
-      value — use "no_classification" so the sig reads correctly.
+      value: use "no_classification" so the sig reads correctly.
     - Fall through to reason, then "block_reason" marker, then "unknown".
 
     This ensures that noise-event records (agent_dispatched + outcome=no_classification)
@@ -174,7 +174,7 @@ def _failure_label(record: dict) -> str:
     # Use event only when it is itself a named failure event
     if event and (event in FAILURE_EVENTS_EXACT or event.endswith("_blocked")):
         return event
-    # Record admitted via outcome path — label is the outcome value
+    # Record admitted via outcome path: label is the outcome value
     if outcome:
         return outcome
     if reason:
@@ -185,7 +185,7 @@ def _failure_label(record: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# REASON TEXT  — best reason text for normalization
+# REASON TEXT : best reason text for normalization
 # ---------------------------------------------------------------------------
 
 def _reason_text(record: dict) -> str:
@@ -239,16 +239,16 @@ def _bucket(
     hook_total_counts: dict,
 ) -> str:
     """
-    (b) over-firing — if this sig's hook accounts for >50% of all admitted lines in window.
-    (a) doctrine-gap — classifier/compliance outcome with no dominating hook.
-    (c) genuine — default.
+    (b) over-firing: if this sig's hook accounts for >50% of all admitted lines in window.
+    (a) doctrine-gap: classifier/compliance outcome with no dominating hook.
+    (c) genuine: default.
     """
     if hook and hook_total_counts.get(hook, 0) > 0.5 * total_admitted_in_window:
         return "b over-firing"
     if event_label in ("no_classification", "empty_must_dispatch_on_non_quick") and not hook:
         return "a doctrine-gap"
     if event_label in ("no_classification", "empty_must_dispatch_on_non_quick"):
-        # Has a hook but is compliance-class — check if no single hook dominates
+        # Has a hook but is compliance-class: check if no single hook dominates
         if not hook or hook_total_counts.get(hook, 0) <= 0.5 * total_admitted_in_window:
             return "a doctrine-gap"
     return "c genuine"
@@ -271,7 +271,7 @@ def mine(
     log_path : str
         Path to governance-log.jsonl.
     now_date : datetime.date or "YYYY-MM-DD" str
-        Reference date for the rolling window. MUST be passed in — mine()
+        Reference date for the rolling window. MUST be passed in: mine()
         never reads the clock internally (determinism for tests).
     window_days : int
         Rolling window width in calendar days (default WINDOW_DAYS=30).
@@ -280,7 +280,7 @@ def mine(
 
     Returns
     -------
-    list of dict  — flagged (or regression-surfaced) sig records,
+    list of dict : flagged (or regression-surfaced) sig records,
                     sorted severity-high-first then count-desc.
     """
     if isinstance(now_date, str):
@@ -312,7 +312,7 @@ def mine(
             except Exception:
                 continue  # silently skip unparseable lines
             if not isinstance(record, dict):
-                continue  # valid JSON but not an object (bare list/string/number) — skip
+                continue  # valid JSON but not an object (bare list/string/number): skip
             # Harden against malformed records: coerce non-string string-ish fields
             # (a log line could carry agent_type:int, hook:{nested}, reason:list, etc.).
             # Leave None as None so the "non-empty block_reason" admission check is unaffected.
@@ -321,7 +321,7 @@ def mine(
                 if _v is not None and not isinstance(_v, str):
                     record[_f] = str(_v)
 
-            # Window filter — parse date from first 10 chars of ts.
+            # Window filter: parse date from first 10 chars of ts.
             # Coerce to str: ts may be a non-string (int/null) in a malformed line.
             ts = record.get("ts", "") or ""
             if not isinstance(ts, str):
@@ -390,7 +390,7 @@ def mine(
 
             # D1: dark-zone severity is record-derived.
             # Upgrade the sig to high if this dark-zone record has severity=="high".
-            # Take the maximum across all records — one high record makes the sig high.
+            # Take the maximum across all records: one high record makes the sig high.
             if label == DARK_ZONE_EVENT and m["severity"] != "high":
                 rec_sev = (record.get("severity", "") or "").lower()
                 if rec_sev == "high":
@@ -437,7 +437,7 @@ def mine(
                 suppressed = True
 
         if suppressed and not regression:
-            continue  # suppressed — don't include
+            continue  # suppressed: don't include
 
         # Top tool_name
         top_tool = ""
@@ -494,7 +494,7 @@ if __name__ == "__main__":
     )
 
     _today = _date.today()
-    print(f"mine_governance.py — running against real log, window={WINDOW_DAYS}d, now={_today}")
+    print(f"mine_governance.py: running against real log, window={WINDOW_DAYS}d, now={_today}")
     print(f"  log:    {_LOG}")
     print(f"  ledger: {_LEDGER} (present={os.path.isfile(_LEDGER)})")
     print()

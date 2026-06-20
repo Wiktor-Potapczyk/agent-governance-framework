@@ -1,5 +1,5 @@
 """
-mcp-circuit-breaker.py — PreToolUse guard for MCP tool calls (ECC-LEARN-E1).
+mcp-circuit-breaker.py: PreToolUse guard for MCP tool calls (ECC-LEARN-E1).
 
 Closes the silent-dead-MCP-server failure mode: a server that has crashed or hung
 returns errors on every subsequent call, the main session keeps trying, turns get
@@ -33,10 +33,10 @@ Defaults (overridable via env vars):
     COOLDOWN  = 1800 seconds (30 minutes after trip, then breaker auto-resets)
 
 Override:
-    MCP_HEALTH_FAIL_OPEN=1  — bypass the breaker for the next call
-    MCP_BREAKER_RESET=<server> — clear the breaker for a specific server
+    MCP_HEALTH_FAIL_OPEN=1 : bypass the breaker for the next call
+    MCP_BREAKER_RESET=<server>: clear the breaker for a specific server
 
-Exit codes: 0 always. Hook never crashes the parent session — fail-open.
+Exit codes: 0 always. Hook never crashes the parent session: fail-open.
 """
 
 from __future__ import annotations
@@ -137,7 +137,7 @@ def is_tripped(server_state: dict, now: datetime) -> bool:
     if tripped_at is not None:
         if now.timestamp() - tripped_at.timestamp() < COOLDOWN_SECONDS:
             return True
-        # Cooldown expired — auto-reset
+        # Cooldown expired: auto-reset
         server_state["tripped_at"] = None
     return len(server_state.get("failures") or []) >= THRESHOLD
 
@@ -221,7 +221,7 @@ def main() -> int:
     tool_name = payload.get("tool_name", "")
     server = _extract_server(tool_name)
     if server is None:
-        return 0  # not an MCP tool — pass
+        return 0  # not an MCP tool: pass
 
     state = load_state()
     server_state = state.get(server) or {}
@@ -261,7 +261,7 @@ def main() -> int:
         })
         return 0
 
-    # Breaker not tripped — save pruned state and allow
+    # Breaker not tripped: save pruned state and allow
     state[server] = server_state
     save_state(state)
     return 0

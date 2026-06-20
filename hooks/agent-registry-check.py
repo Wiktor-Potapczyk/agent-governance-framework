@@ -5,7 +5,7 @@ When a general-purpose or untyped agent is dispatched, checks the prompt
 against the agent registry keywords. If a specialist agent matches well,
 injects a suggestion into additionalContext.
 
-Does NOT block dispatches — advisory only.
+Does NOT block dispatches: advisory only.
 
 Workspace detection: walks up from this file's location to find CLAUDE.md,
 then resolves registry.json relative to that root.
@@ -148,7 +148,7 @@ def main():
         }
         print(json.dumps(response))
     else:
-        # No suggestions — log silently
+        # No suggestions: log silently
         try:
             with open(LOG_PATH, "a", encoding="utf-8") as f:
                 f.write(f"{timestamp} | type={agent_type} | id={agent_id} | no_match\n")

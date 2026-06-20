@@ -5,12 +5,12 @@ Reads a doc-coupling manifest (JSON) and flags EXACT cross-referenced-value
 contradictions between documentation files and their authoritative sources.
 
 This is the cheap, deterministic Phase-3 gate of the `doc-consistency` skill.
-It catches the failure class that bit us — a count/version/path asserted one
-way in doc A and another way in doc B (or in the live system) — WITHOUT any
+It catches the failure class that bit us: a count/version/path asserted one
+way in doc A and another way in doc B (or in the live system): WITHOUT any
 LLM call. Semantic / prose drift is out of scope here (that is the skill's
 LLM reconciliation phase); this script only compares exact values.
 
-Pure Python 3 stdlib (no pip, no yaml — manifest is JSON so we stay stdlib).
+Pure Python 3 stdlib (no pip, no yaml: manifest is JSON so we stay stdlib).
 All file reads use encoding='utf-8' (Windows open() otherwise defaults to a
 locale codec such as cp1252).
 

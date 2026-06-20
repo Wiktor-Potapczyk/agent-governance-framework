@@ -1,5 +1,5 @@
 """
-Tests for user-prompt-submit.py — depth-signal detection (S1/M1 fix 2026-04-13).
+Tests for user-prompt-submit.py: depth-signal detection (S1/M1 fix 2026-04-13).
 """
 
 import re
@@ -61,7 +61,7 @@ class TestDepthSignalDetection(unittest.TestCase):
 
     def test_skip_list_suppresses(self):
         """Skip-list items should not trigger depth signals (tested via flow,
-        not detection — skip_list sets classifier_reminder='' before depth check)."""
+        not detection: skip_list sets classifier_reminder='' before depth check)."""
         # "yes" is in skip_list. Even if it matched a pattern, the
         # classifier_reminder guard (and classifier_reminder) prevents injection.
         matched, _ = detect_depth_signal("yes")
