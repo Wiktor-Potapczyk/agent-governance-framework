@@ -680,10 +680,24 @@ class Check4FileExistenceTests(unittest.TestCase):
         """Edge case: claim references an EXISTING file with no Write trace.
         Per Q9 mechanism: if path exists on disk, it's not a fabrication
         (it might have been created in a prior turn). Silent.
-        Note: this test uses a path that must exist in the adopter's installation.
-        Substitute a real path from your project if this test fails on a fresh clone."""
-        # Use a known-existing file relative to the vault root (hooks/ dir is 2 levels down)
+
+        The hook resolves relative paths against VAULT_ROOT, which it computes
+        as three dirname levels above the hook script itself (i.e. the vault
+        root in a full installation, or the parent of the repo root in a
+        standalone clone).  The test path must exist at that computed root;
+        skip cleanly when it does not so a fresh clone stays green.
+        """
+        import os as _os
+        hook_script = str(Path(__file__).parent / "work-verification-check.py")
+        vault_root = _os.path.dirname(
+            _os.path.dirname(_os.path.dirname(_os.path.abspath(hook_script)))
+        )
         existing = "hooks/work-verification-check.py"
+        if not _os.path.exists(_os.path.join(vault_root, existing)):
+            self.skipTest(
+                f"requires vault installation: '{existing}' not found under "
+                f"computed VAULT_ROOT ({vault_root}); absent in standalone repo"
+            )
         with tempfile.TemporaryDirectory() as td:
             tp = _write_transcript(Path(td), [
                 _user(),

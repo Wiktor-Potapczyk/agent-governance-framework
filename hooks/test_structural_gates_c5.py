@@ -32,7 +32,18 @@ class C5LiveTests(unittest.TestCase):
         self.assertEqual(r["severity"], "WARN")
 
     def test_run_gates_exit_unaffected_by_warn(self):
-        """C5 is WARN-class: even a finding must not flip the HARD exit code."""
+        """C5 is WARN-class: even a finding must not flip the HARD exit code.
+
+        Requires the vault drift-test file to be present so C1 does not
+        produce a HARD finding that would legitimately flip the exit code
+        for unrelated reasons.  Skip in a standalone clone where that file
+        is absent.
+        """
+        if not sg.DRIFT_TEST.exists():
+            self.skipTest(
+                "requires vault drift-test file (.claude/hooks/"
+                "test_known_dispatch_names_drift.py), absent in standalone repo"
+            )
         import io
         from contextlib import redirect_stdout
         with redirect_stdout(io.StringIO()):
@@ -46,9 +57,17 @@ class C5BoundaryTests(unittest.TestCase):
     def test_fp_alias_key_not_phantom(self):
         """FP-C5-01 boundary_axis: 'SKILL_AGENT_ALIASES key vs unresolved name'.
         architect-review is an alias key (-> architect-reviewer); it must NOT be
-        flagged even though it is not a registered agent name."""
+        flagged even though it is not a registered agent name.
+
+        Requires the vault dispatch-logic module to be present.  Skip in a
+        standalone clone where that file is absent.
+        """
         dcl = sg._load_dispatch_logic()
-        self.assertIsNotNone(dcl)
+        if dcl is None:
+            self.skipTest(
+                "requires vault dispatch-logic module (.claude/hooks/"
+                "_dispatch_compliance_logic.py), absent in standalone repo"
+            )
         self.assertIn("architect-review", dcl.SKILL_AGENT_ALIASES)
         r = sg.check_c5_dispatch_name_resolution()
         self.assertNotIn("architect-review", " ".join(r["findings"]))
@@ -64,9 +83,23 @@ class C5BoundaryTests(unittest.TestCase):
     def test_tp_unknown_name_would_be_phantom(self):
         """TP-C5-01: a name that is neither registered, alias, nor deprecation
         resolves to nothing. Verify the resolution set logic directly (the live
-        list has none, so synthesize the membership test)."""
-        dcl = sg._load_dispatch_logic()
+        list has none, so synthesize the membership test).
+
+        Requires vault registry.json and dispatch-logic module.  Skip in a
+        standalone clone where those files are absent.
+        """
         import json
+        dcl = sg._load_dispatch_logic()
+        if dcl is None:
+            self.skipTest(
+                "requires vault dispatch-logic module (.claude/hooks/"
+                "_dispatch_compliance_logic.py), absent in standalone repo"
+            )
+        if not sg.REGISTRY.exists():
+            self.skipTest(
+                "requires vault registry.json (.claude/registry.json), "
+                "absent in standalone repo"
+            )
         reg = json.loads(sg.REGISTRY.read_text(encoding="utf-8"))
         resolvable = (set(reg.get("agents", {}))
                       | set(reg.get("skills", {}))
