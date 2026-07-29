@@ -1,12 +1,109 @@
 """
 Bash Safety Guard - PreToolUse Hook (matcher: Bash)
 Blocks dangerous shell commands before execution.
-Denies: rm -rf, force-push, credential exposure, destructive git ops.
+Denies: rm -rf, force-push, credential exposure, destructive git ops, git-hook bypass
+(--no-verify / -n on commit-class subcommands, -c core.hooksPath= overrides).
+
+DRIFT NOTE (GAP-11, 2026-07-10): _IRREVERSIBLE_FALLBACK_SNAPSHOT below is a FROZEN
+copy of _irreversible_surface.py IRREVERSIBLE_BASH_PATTERNS, transcribed 2026-07-10.
+Update the snapshot whenever _irreversible_surface.py changes (risk R1; drift is a
+process-lint Pass K candidate check).
 """
 
 import sys
 import json
 import re
+import os
+
+_HOOK_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _HOOK_DIR)
+
+
+# ---------------------------------------------------------------------------
+# FROZEN FALLBACK SNAPSHOT (GAP-11, 2026-07-10) — a hardcoded copy of the core
+# P1/P2/P3/P5 tuples from _irreversible_surface.py IRREVERSIBLE_BASH_PATTERNS
+# (transcribed 2026-07-10; P4 external-curl-write is a predicate, not a tuple,
+# so its degraded form stays a no-op predicate but ALARMS, below). Used ONLY when
+# the canonical module fails to import, so Gate-1 never degrades to an empty
+# surface. FROZEN COPY — update when _irreversible_surface.py changes (risk R1;
+# candidate automated check: process-lint Pass K doctrine-drift).
+# ---------------------------------------------------------------------------
+_IRREVERSIBLE_FALLBACK_SNAPSHOT = [
+    # P1 — unflagged relative single-file rm
+    (r'\brm\s+(?!-)(?!/)(?!["\']?[A-Za-z]:[/\\])[^\s;|&><]+', "rm on unflagged relative file (irreversible delete)"),
+    # P2 — normal (non-force) git push, tolerating git global options before `push`
+    (r'\bgit\s+(?:(?:-C\s+\S+|-c\s+\S+|--[A-Za-z][\w-]*(?:=\S+)?|-[A-Za-z])\s+)*push\b',
+     "git push (publication is effectively irreversible)"),
+    # P3 — DB destructive DDL/DML
+    (r'\bDROP\s+(?:TABLE|DATABASE|SCHEMA)\b', "SQL DROP TABLE/DATABASE/SCHEMA (destructive DDL)"),
+    (r'\bTRUNCATE\s+(?:TABLE\s+)?\w', "SQL TRUNCATE (destructive DML)"),
+    (r'\bDELETE\s+FROM\s+\w+(?![^;]*\bWHERE\b)', "SQL unbounded DELETE (no WHERE clause)"),
+    # P5 — prod deploy (isolated -p example-build-oracle stage exempt)
+    (r'\bdocker[\s-]+compose(?=\s)(?![^|;&\n]*-p\s+example-build-oracle\b)[^|;&\n]*\bup\b',
+     "docker compose up (prod deploy; isolated -p example-build-oracle stage exempt)"),
+    (r'\bdocker\s+build\b[^|;&\n]*-t\s+\S*:latest\b', "docker build -t *:latest (prod image build)"),
+    (r'\bgit\s+archive\b.*\|\s*ssh\b', "git archive | ssh (VPS deploy pipe)"),
+]
+
+
+def _alarm_gate1_surface_degraded(detail):
+    """GAP-11 (2026-07-10): make Gate-1 surface degradation LOUD. Appends a
+    gate1_surface_degraded event to governance-log.jsonl (same JSONL shape as the
+    deny events below) and prints a stderr warning. The GATE1_ALARM_LOG_PATH env
+    override exists so unit tests can capture the alarm in a temp log instead of
+    polluting the live governance log. Alarm failure must never crash the hook."""
+    try:
+        from datetime import datetime
+        log_path = os.environ.get(
+            "GATE1_ALARM_LOG_PATH",
+            os.path.join(_HOOK_DIR, "governance-log.jsonl"),
+        )
+        entry = json.dumps({
+            "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "schema": 2,
+            "event": "gate1_surface_degraded",
+            "hook": "bash-safety-guard",
+            "session": "unknown",
+            "detail": str(detail)[:200],
+        })
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(entry + "\n")
+    except Exception:
+        pass
+    try:
+        sys.stderr.write(
+            "BASH-SAFETY-GUARD WARNING: _irreversible_surface unavailable "
+            "(%s); Gate-1 running on FROZEN fallback snapshot.\n" % str(detail)[:200]
+        )
+    except Exception:
+        pass
+
+
+# Two-Gate Gate-1 (2026-06-16): import the NEW canonical irreversible Bash surface
+# from the shared module. These are APPENDED to BLOCKED_PATTERNS below — the existing
+# force-push / rm-rf / hook-bypass block stays verbatim and ABOVE them in iteration
+# order so its description fidelity is preserved.
+# GAP-11 hardening (2026-07-10): the fallback is no longer fail-open-to-empty. On
+# import failure the hook alarms (governance-log + stderr) and enforces the FROZEN
+# snapshot above. Never [].
+try:
+    from _irreversible_surface import IRREVERSIBLE_BASH_PATTERNS
+except Exception as _exc:
+    _alarm_gate1_surface_degraded("IRREVERSIBLE_BASH_PATTERNS import failed: %r" % (_exc,))
+    IRREVERSIBLE_BASH_PATTERNS = list(_IRREVERSIBLE_FALLBACK_SNAPSHOT)
+
+# Two-Gate Gate-1 (2026-06-17): the external-curl-write deny is a PARSING predicate
+# (replaces the old whole-segment-loopback P4 regex — confirmed under-block, pentest
+# wf_aeee55d3-224 HIGH #B). It runs as a dedicated block in main() on the inert-stripped
+# command. GAP-11 (2026-07-10): the ImportError fallback stays a no-op predicate (a
+# frozen predicate copy is optional per spec) but the degradation now ALARMS loudly.
+try:
+    from _irreversible_surface import curl_external_write
+except Exception as _exc:
+    _alarm_gate1_surface_degraded("curl_external_write import failed: %r" % (_exc,))
+
+    def curl_external_write(_command):
+        return (False, None)
 
 
 # H2 fix (2026-04-18): pre-strip known-inert string contexts so blocked-pattern
@@ -23,28 +120,107 @@ _INERT_CONTEXT_PATTERNS = [
     # `bash -c "…"` / `sh -c "…"` / `cmd -c` etc
     (re.compile(r'\b(?:bash|sh|zsh|cmd)\s+-c\s+"(?:\\.|[^"\\])*"'), "sh -c (double)"),
     (re.compile(r"\b(?:bash|sh|zsh|cmd)\s+-c\s+'(?:\\.|[^'\\])*'"), "sh -c (single)"),
-    # `grep 'pattern'` / `grep -E "pattern"` etc: pattern is not a command
+    # `grep 'pattern'` / `grep -E "pattern"` etc — pattern is not a command
     (re.compile(r'\bgrep(?:\s+-[a-zA-Z]+)*\s+"(?:\\.|[^"\\])*"'), "grep (double)"),
     (re.compile(r"\bgrep(?:\s+-[a-zA-Z]+)*\s+'(?:\\.|[^'\\])*'"), "grep (single)"),
-    # `echo "…"` / `printf "…"`: output, not execution
+    # `echo "…"` / `printf "…"` — output, not execution
     (re.compile(r'\b(?:echo|printf)\s+"(?:\\.|[^"\\])*"'), "echo/printf (double)"),
     (re.compile(r"\b(?:echo|printf)\s+'(?:\\.|[^'\\])*'"), "echo/printf (single)"),
+    # `-m "…"` / `-m '…'` — commit/tag message bodies are text, not shell.
+    # Prevents false-positives like `git commit -m "added --no-verify support"`.
+    # Negative lookbehind (?<!\w) ensures `-m` is a flag, not part of a longer word.
+    (re.compile(r'(?<!\w)-m\s*"(?:\\.|[^"\\])*"'), "-m message (double-quoted, optional space)"),
+    (re.compile(r"(?<!\w)-m\s*'(?:\\.|[^'\\])*'"), "-m message (single-quoted, optional space)"),
     # Heredocs: <<EOF … EOF (common delimiters)
     (re.compile(r'<<[-~]?\s*(\w+)\b[\s\S]*?^\1\b', re.MULTILINE), "heredoc"),
     (re.compile(r"<<[-~]?\s*'(\w+)'[\s\S]*?^\1\b", re.MULTILINE), "heredoc (single-quoted delim)"),
 ]
 
 
+# Constructs whose exact boundaries this simple quote scanner does NOT model:
+# command substitution (backtick, $(...)) , process substitution (<(...), >(...)),
+# and ANSI-C / locale special quoting ($'...', $"..."). If any appear, we refuse to
+# strip comments at all — see _strip_trailing_comments.
+_COMMENT_UNSAFE_TOKENS = ("`", "$(", "$'", '$"', "<(", ">(")
+
+
+def _strip_trailing_comments(command):
+    """Replace unquoted bash `#` comments with a space so destructive keywords
+    inside a trailing comment (`ls # DROP TABLE x later`) don't trigger a false
+    deny (QA finding 2026-06-16).
+
+    SAFETY GUARD (review 2026-06-16): if the command contains command/process
+    substitution or special quoting (backtick, ``$(``, ``$'``, ``$"``, ``<(``,
+    ``>(``), this scanner CANNOT reliably tell where those constructs end, so it
+    returns the command UNCHANGED and strips nothing. Empirically, a `#` that this
+    scanner would treat as a comment can sit inside such a construct while bash
+    executes a `; cmd` tail right after the construct closes (confirmed for backtick
+    substitution and ``$'...'`` ANSI-C quoting) — stripping to end-of-line would then
+    hide that live command (a critical under-block hole). Bailing reverts to the
+    pre-change behavior (whole command scanned) for these rare cases — at worst an
+    over-block, never an under-block.
+
+    For the remaining (common) case with no such construct, this is quote-aware: a
+    `#` inside single/double quotes is literal and left intact; a `#` only opens a
+    comment when unquoted, unescaped, and at line-start or preceded by whitespace,
+    running to end-of-line. Within that restricted grammar, bash never executes text
+    after the comment marker, so stripping the span is safe."""
+    if any(tok in command for tok in _COMMENT_UNSAFE_TOKENS):
+        return command
+    out = []
+    in_single = False
+    in_double = False
+    escaped = False
+    i = 0
+    n = len(command)
+    while i < n:
+        ch = command[i]
+        if escaped:
+            out.append(ch)
+            escaped = False
+            i += 1
+            continue
+        if ch == "\\" and not in_single:
+            out.append(ch)
+            escaped = True
+            i += 1
+            continue
+        if ch == "'" and not in_double:
+            in_single = not in_single
+            out.append(ch)
+            i += 1
+            continue
+        if ch == '"' and not in_single:
+            in_double = not in_double
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "#" and not in_single and not in_double:
+            prev = command[i - 1] if i > 0 else None
+            if prev is None or prev.isspace():
+                # Comment runs to end of this line. Replace the span with a space,
+                # preserving the newline so multi-line commands keep their structure.
+                j = command.find("\n", i)
+                out.append(" ")
+                if j == -1:
+                    break
+                i = j
+                continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def strip_inert_contexts(command):
     """Remove substrings that are known to be string literals or pattern args,
     not executable shell. Returns a cleaned command safe to pattern-match."""
-    cleaned = command
+    cleaned = _strip_trailing_comments(command)
     for pattern, _label in _INERT_CONTEXT_PATTERNS:
         cleaned = pattern.sub(" ", cleaned)
     return cleaned
 
 
-# Windows reserved device names: creating these breaks OneDrive sync (Issue #16604)
+# Windows reserved device names — creating these breaks OneDrive sync (Issue #16604)
 WINDOWS_RESERVED_NAMES = {
     "nul", "con", "prn", "aux",
     "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
@@ -54,14 +230,28 @@ WINDOWS_RESERVED_NAMES = {
 # Patterns that should NEVER execute without explicit user approval
 BLOCKED_PATTERNS = [
     # Destructive file operations
-    (r'\brm\s+(-[rfRF]+\s+|--force\s+|--recursive\s+)*/(?!tmp)', "rm -rf on non-tmp directory"),
-    (r'\brm\s+(-[rfRF]+\s+)+\.', "rm -rf on current directory"),
+    (r'\brm\s+(-[rfRF]+\s+|--force\s+|--recursive\s+)*/(?!(?:[a-z]/)?tmp/)', "rm -rf on non-tmp directory"),
+    (r'\brm\s+(-[rfRF]+\s+)+\.(?![a-zA-Z])', "rm -rf on current directory"),
     # Destructive git operations
     (r'\bgit\s+push\s+.*--force', "git force-push"),
     (r'\bgit\s+push\s+-f\b', "git force-push (-f)"),
     (r'\bgit\s+reset\s+--hard', "git reset --hard"),
     (r'\bgit\s+clean\s+-[fdxFDX]', "git clean (destructive)"),
     (r'\bgit\s+checkout\s+--\s+\.', "git checkout -- . (discard all changes)"),
+    # Hook bypass — commits/pushes that skip pre-commit/pre-push/commit-msg/etc hooks
+    # ECC-LEARN-A2 (2026-05-07, architect-revised): block --no-verify and -n short-form
+    # scoped to hook-bearing subcommands (commit/push/merge/cherry-pick/rebase/am).
+    # Scoping prevents false positives on read-only ops like `git log -S '--no-verify'`
+    # (pickaxe diff search) and `git log -n 5` (count flag, also `-n` but on log not commit).
+    # Also blocks core.hooksPath= overrides on any git invocation.
+    # Known limitations (out of static-scan scope): git aliases that expand to --no-verify
+    # are invisible (alias name only); compound shell assignments where --no-verify is
+    # constructed before `git` is reached (e.g. `V=--no-verify; git commit $V`) evade
+    # the post-`git` lookahead; subprocess wrappers (npm run, make targets) hide internals.
+    (r'\bgit\s+(?:commit|push|merge|cherry-pick|rebase|am)\b.*--no-verify\b', "git --no-verify on hook-bearing subcommand (bypasses pre-commit/pre-push/commit-msg/pre-rebase hooks)"),
+    (r'\bgit\s+(?:commit|push|merge|cherry-pick|rebase|am)\b.*\s-n\b', "git -n on hook-bearing subcommand (short form of --no-verify)"),
+    (r'\bgit\s+.*-c\s+core\.hooksPath\s*=', "git -c core.hooksPath= override (disables hooks for this invocation)"),
+    (r'\bGIT_HOOKS_PATH\s*=', "GIT_HOOKS_PATH= env var override (defensive — not a standard git mechanism but listed in spec)"),
     # Credential/secret exposure
     (r'\bcat\b.*\.(env|pem|key|secret)', "reading credential file"),
     (r'\becho\b.*\b(password|secret|token|api.key)\b.*>', "writing credentials to file"),
@@ -72,6 +262,11 @@ BLOCKED_PATTERNS = [
     # n8n specific
     (r'n8n_delete_workflow', "deleting n8n workflow"),
 ]
+
+# Two-Gate Gate-1 (2026-06-16): append the NEW irreversible-surface patterns AFTER the
+# existing block. Order matters — force-push patterns stay above the generic git-push
+# pattern so `git push --force` reports the force-push description, not the normal one.
+BLOCKED_PATTERNS.extend(IRREVERSIBLE_BASH_PATTERNS)
 
 
 def main():
@@ -139,6 +334,51 @@ def main():
                 pass
             return
 
+    # External-curl-write predicate (Two-Gate Gate-1, 2026-06-17). Runs on the
+    # inert-stripped command, AFTER the regex loop and as its own block (mirrors the
+    # Windows-reserved-filename block below). Denies a curl that mutates REMOTE state
+    # (explicit -X POST/PUT/PATCH/DELETE OR implicit body-bearing POST) while allowing
+    # loopback-target writes — without the old under-block where a localhost token in a
+    # header/body/query/path/referer suppressed the deny on a genuine remote write.
+    # Fail-open: a predicate exception must never crash the hook.
+    try:
+        curl_deny, curl_reason = curl_external_write(scannable)
+    except Exception:
+        curl_deny, curl_reason = (False, None)
+    if curl_deny:
+        result = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": (
+                    f"BASH SAFETY: Blocked '{curl_reason}'. "
+                    f"Command: {command[:100]}... "
+                    f"If this is intentional, ask the user to confirm."
+                ),
+            }
+        }
+        print(json.dumps(result))
+        try:
+            import os
+            from datetime import datetime
+            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
+            transcript_path = payload.get("transcript_path", "")
+            session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+            entry = json.dumps({
+                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "schema": 2,
+                "event": "deny",
+                "hook": "bash-safety-guard",
+                "session": session_id,
+                "pattern": curl_reason,
+                "command_prefix": command[:50],
+            })
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(entry + "\n")
+        except Exception:
+            pass
+        return
+
     # Check for Windows reserved filenames in redirect targets and file creation
     # Matches: > nul, > ./nul, touch nul, cat > nul, echo > nul, etc.
     reserved_match = re.search(
@@ -181,7 +421,7 @@ def main():
                 pass
             return
 
-    # Command is safe: allow silently
+    # Command is safe — allow silently
     return
 
 

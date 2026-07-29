@@ -493,3 +493,18 @@
 | Inputs | Blueprint `.md` file path from n8n-workflow-architect; blueprint must have status `#pending-builder-dispatch` or `#approved` |
 | Output contract | BUILD PROGRESS milestone report (per-milestone validation status); VALIDATION RESULTS (per checkpoint); AUTONOMOUS LOOP status (iterations, green/cap/deadlock) when eligible; completion statement with workflow ID; NEVER activates workflow: surfaces Promotion Gate to user |
 | Known failure modes | Agent body documents explicit failure table: validate_node_minimal failure before add = do not add + stop; validate_workflow failure after add = autofix only if blueprint authorizes + stop if still fails; deadlock (same error twice on same node) = stop + report; cap hit (10 iterations) = stop + report last 3 diagnostics; never improvises past blueprint gaps: always stops and reports |
+
+### n8n-reviewer
+
+| Field | Value |
+|---|---|
+| Domain | Post-build review of n8n workflow logic: branching, error recovery, credential scoping, silent-failure patterns |
+| Tools | Read, Write, Edit, Glob, Grep, Bash |
+| Dispatched by | direct dispatch, or via the `n8n-reviewer` skill; runs after the builder completes a milestone |
+| Model | sonnet |
+| Inputs | Workflow JSON or a live workflow ID, plus the blueprint it was built from |
+| Output contract | Review findings grouped by severity, each naming the node and the specific guideline it violates |
+| Known failure modes | Reviews the disk artifact rather than live state when both exist; subagents in this framework lack MCP access, so live workflow context must be supplied in the dispatch prompt |
+
+---
+

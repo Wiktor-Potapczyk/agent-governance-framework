@@ -134,6 +134,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/mcp-irreversible-guard.py\""
+          },
+          {
+            "type": "command",
             "command": "python \"{{VAULT_ROOT}}/.claude/hooks/mcp-circuit-breaker.py\""
           }
         ]

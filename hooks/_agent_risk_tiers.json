@@ -1,0 +1,353 @@
+{
+  "_meta": {
+    "derived": "2026-07-13",
+    "rubric": "Projects/Agent-Governance-Research/work/2026-07-10-step11-competence-gate-spec.md #4",
+    "source_note": "Tool grants derived from agent .md frontmatter (authoritative); registry.json `tools` is [] for undeclared agents. HIGH requires Rubric 1 plus a Rubric 2/3 blast-radius qualifier.",
+    "ratification": "RATIFIED by Wiktor 2026-07-14 (decision walkthrough). The 6-agent high tier (blueprint-mode, data-engineer, git-flow-manager, n8n-workflow-builder, nosql-specialist, postgres-pro) is confirmed. Advisory mode runs on this list; enforce mode remains separately owner-gated per spec Step 1.",
+    "owner": "Wiktor"
+  },
+  "abstract_bilingual_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "adversarial-reviewer": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant, YAML-list frontmatter); reviewer independence doctrine forbids editing the artifact under review."
+  },
+  "agent-creator": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "agent-sdk-verifier-py": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "agent-sdk-verifier-ts": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "analyzer": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "api-designer": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); output surface is API specs/design docs, not enforcement-critical."
+  },
+  "api-security-audit": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); audit role, read-mostly by design."
+  },
+  "architect-reviewer": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); reviewer role, writes reports not enforcement-critical files."
+  },
+  "argument_builder_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "atomic-explorer": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "atomic-reviewer": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "bibliography_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "blueprint-mode": {
+    "tier": "high",
+    "reason": "Rubric 1 (Bash+Write+Edit grant) + Rubric 2 (primary build implementer; normal output surface includes enforcement-critical .claude/hooks/ and .claude/skills/ paths)."
+  },
+  "citation_compliance_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "code-architect": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "code-explorer": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "code-reviewer": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "code-simplifier": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); refactors project code, not enforcement-critical paths by design."
+  },
+  "collaboration_depth_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "comment-analyzer": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "comparator": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "competitive-analyst": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant (no Bash, no write-capable MCP declared); file-write only, reversible via git."
+  },
+  "compliance_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "content-marketer": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant (no Bash, no write-capable MCP declared); file-write only, reversible via git."
+  },
+  "conversation-analyzer": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "data-engineer": {
+    "tier": "high",
+    "reason": "Rubric 1 (Bash+Write grant) + Rubric 3 (DB-write pipeline work adjacent to the Gate-1 DROP/TRUNCATE/unbounded-DELETE surface when pointed at live databases)."
+  },
+  "debugger": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); fixes are scoped to the artifact under investigation, not enforcement-critical by design."
+  },
+  "devils_advocate_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "devils_advocate_reviewer_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "domain_reviewer_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "draft_writer_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "editor_in_chief_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "editorial_synthesizer_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "eic_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "ethics_review_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "field_analyst_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "formatter_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "git-flow-manager": {
+    "tier": "high",
+    "reason": "Rubric 1 (Bash+Write+Edit grant) + Rubric 3 (operates adjacent to the Gate-1 `git push` surface by design)."
+  },
+  "grader": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "implementation-plan": {
+    "tier": "medium",
+    "reason": "Terminal-capable tool list (execute/runInTerminal analog); output is planning documents. Known Write-fabrication risk (reference_subagent_write_tool_access)."
+  },
+  "intake_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "integrity_verification_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "literature_strategist_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "llm-architect": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); output is architecture docs/prompts."
+  },
+  "mcp-developer": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); builds MCP server code in project dirs, does not own .mcp.json by design."
+  },
+  "mcp-registry-navigator": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant (no Bash, no write-capable MCP declared); file-write only, reversible via git."
+  },
+  "mcp-server-architect": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); design role for MCP servers."
+  },
+  "meta_analysis_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "methodology_reviewer_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "monitoring_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "n8n-reviewer": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); post-build review role, no write-capable n8n MCP grants."
+  },
+  "n8n-workflow-architect": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant + read-only n8n MCP tools: get/list/validate/executions/health only); Phase-1 design role, cannot mutate workflows."
+  },
+  "n8n-workflow-builder": {
+    "tier": "high",
+    "reason": "Rubric 1 (Bash + write-capable n8n MCP grants: n8n_create_workflow, n8n_update_partial_workflow, n8n_update_full_workflow, n8n_autofix_workflow, n8n_test_workflow) + Rubric 3 (operates adjacent to the Gate-1 active:true flip by design)."
+  },
+  "nosql-specialist": {
+    "tier": "high",
+    "reason": "Rubric 1 (Bash+Write grant) + Rubric 3 (live datastore write operation adjacent to the Gate-1 DB surface; same class as postgres-pro/data-engineer)."
+  },
+  "peer_reviewer_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "perspective_reviewer_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "pipeline_orchestrator_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "plugin-validator": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash in declared registry tools); validation role."
+  },
+  "pm-orchestrator": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); output is checkpoint reports + STATE edits."
+  },
+  "postgres-pro": {
+    "tier": "high",
+    "reason": "Rubric 1 (Bash+Write grant) + Rubric 3 (live Postgres/Supabase write operation adjacent to the Gate-1 DB surface)."
+  },
+  "powershell-7-expert": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); general scripting incl. scheduled tasks, not on the enumerated Gate-1 surface."
+  },
+  "pr-test-analyzer": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "prompt-engineer": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); output is prompts/specs."
+  },
+  "query-clarifier": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant (no Bash, no write-capable MCP declared); file-write only, reversible via git."
+  },
+  "report-generator": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant (no Bash, no write-capable MCP declared); file-write only, reversible via git."
+  },
+  "report_compiler_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "research-analyst": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant (no Bash, no write-capable MCP declared); file-write only, reversible via git."
+  },
+  "research-coordinator": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant (no Bash, no write-capable MCP declared); file-write only, reversible via git."
+  },
+  "research-orchestrator": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant (no Bash, no write-capable MCP declared); file-write only, reversible via git."
+  },
+  "research-synthesizer": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant (no Bash, no write-capable MCP declared); file-write only, reversible via git."
+  },
+  "research_architect_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "research_question_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "revision_coach_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "risk_of_bias_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "silent-failure-hunter": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "skill-reviewer": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "socratic_mentor_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "source_verification_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "state_tracker_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "structure_architect_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "synthesis_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "technical-researcher": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); research role, writes reports."
+  },
+  "type-design-analyzer": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  },
+  "vault-keeper": {
+    "tier": "medium",
+    "reason": "Rubric 1 only (Bash grant); vault file stewardship, never-delete doctrine applies."
+  },
+  "visualization_agent": {
+    "tier": "low",
+    "reason": "No Rubric-1 grant declared in registry tools; document/review role by design (plugin agent)."
+  }
+}

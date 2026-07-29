@@ -12,18 +12,20 @@ The framework operationalizes three research-backed principles: classify before 
 
 - **Popperian QA** -- Quality assurance is framed as falsification, not confirmation. A PASS means "could not break it." Every QA artifact must declare what was *not* tested (Untested Surface). Three tiers: per-task verification, per-increment adversarial pentest, and human-triggered eval suites.
 
+- **Two-Gate Autonomy** -- Autonomy is licensed by two independent gates in series, and task size is not one of them. Gate 1 (reversibility) is a hard floor: every action on an enumerated irreversible surface is *denied*, not merely flagged, because under `bypassPermissions` an "ask" decision is a no-op and only a deny actually stops anything. Gate 2 (detectability) expands autonomy above that floor: if the agent can write a tool call right now that would fail were the action wrong, it proceeds alone; if correctness needs an independent detector that re-derives rather than re-reads, it pauses. The floor lives in the PreToolUse hook rather than the classifier, specifically so no fast path can route around it. See `docs/concepts/two-gate-autonomy.md` and ADR-0007.
+
 - **Workflow-enforced procedure layer** -- All six core process skills (`process-research`, `process-analysis`, `process-build`, `process-planning`, `process-qa`, `process-pentest`) ship as deterministic Claude Code Workflow scripts (`workflows/process-*.js`) that make their dispatch sequence happen by construction. Routing-as-code: the script encodes which agents run, in what order, with typed handoffs and HALT paths. Agents reason freely inside each step. The prose SKILL.md survives as spec-of-record and fallback. See `docs/reference/workflows.md` and ADR-0006.
 
 ## Architecture
 
-The framework operates across four layers, with 35 active enforcement hooks (distinct scripts registered in the settings template, plus four shared libraries):
+The framework operates across four layers, with 36 active enforcement hooks (distinct scripts registered in the settings template, plus nine shared libraries):
 
 | Layer | What it does | Hook events |
 |---|---|---|
 | **Classifier** | Forces task classification on every non-trivial prompt; enforces all required fields (IMPLIES, TASK TYPE, APPROACH, MISSED); enforces PM in MUST DISPATCH for every non-Quick task | `UserPromptSubmit`, `Stop` (classifier-field-check) |
 | **Process Skills** | Routes tasks to typed process flows (research, analysis, build, QA, planning); validates skill selection matches classifier output | `PreToolUse` (skill-routing-check), `PostToolUse` (skill-step-reminder) |
 | **Agent Delegation** | Enforces MUST DISPATCH items from the classifier; injects behavioral governance into every subagent at spawn; quality-checks subagent output on exit | `SubagentStart`, `SubagentStop`, `Stop` (dispatch-compliance-check) |
-| **Tool Safety & Quality Enforcement** | Blocks dangerous Bash commands (rm -rf, force-push, credential exposure); blocks QA/pentest reports filed with zero execution tools; blocks premature escalation with fewer than 3 tool uses; monitors unsupported citations and dark-zone reasoning failures | `PreToolUse` (bash-safety-guard), `Stop` (work-verification-check, dark-zone-check, process-step-check, governance-log) |
+| **Tool Safety & Quality Enforcement** | Gate-1 denies the irreversible surface across both shell and MCP (deletion, `DROP`/`TRUNCATE`, `git push`, external writes, prod deploys, outbound sends); blocks dangerous Bash commands (rm -rf, force-push, credential exposure); Gate-2 enforces the structural verifier contract on reversible work; blocks QA/pentest reports filed with zero execution tools; blocks premature escalation with fewer than 3 tool uses; monitors unsupported citations and dark-zone reasoning failures | `PreToolUse` (bash-safety-guard, mcp-irreversible-guard), `Stop` (verifier-gate-check, work-verification-check, dark-zone-check, process-step-check, governance-log) |
 
 All hooks are stateless Python scripts that read from stdin and write to stdout. They require no database, no server, and no persistent process.
 
@@ -35,11 +37,14 @@ For a detailed technical walkthrough of the architecture, see [docs/architecture
 framework-repo/
 ├── agents/
 │   ├── governance/          # 28 specialist agents (research team, architect, QA, planning, etc.)
-│   └── domain-examples/     # Placeholder for project-specific agent examples
+│   └── domain-examples/     # Project-specific agent examples (n8n architect, builder, reviewer)
 ├── hooks/
 │   ├── user-prompt-submit.py        # Context bar + classifier enforcement on every message
 │   ├── skill-routing-check.py       # PreToolUse: validates skill matches classifier TYPE
-│   ├── bash-safety-guard.py         # PreToolUse: blocks dangerous shell commands
+│   ├── bash-safety-guard.py         # PreToolUse: Gate-1 shell arm, denies the irreversible surface
+│   ├── mcp-irreversible-guard.py    # PreToolUse: Gate-1 MCP arm, enumerated destructive tools
+│   ├── _irreversible_surface.py     # (library) the single canonical irreversible surface
+│   ├── verifier-gate-check.py       # Stop: Gate-2 structural verifier contract
 │   ├── skill-step-reminder.py       # PostToolUse: injects step reminders after skill loads
 │   ├── subagent-governance.py       # SubagentStart: injects behavioral rules into subagents
 │   ├── subagent-quality-check.py    # SubagentStop: checks for empty, error, or wall-of-text output
@@ -57,8 +62,8 @@ framework-repo/
 │   └── disabled/                    # Optional/experimental hooks
 ├── skills/
 │   ├── core/                # 17 governance skills (task-classifier, process-*, db-migration-plan, process-postmortem, doc-consistency, verify, ensemble, pm, process-governance-mine, etc.)
-│   ├── vault/               # 7 knowledge-management skills (save, inbox, standup, process-ingest, process-lint, etc.)
-│   └── domain-examples/     # 19 domain skills across Apify and n8n
+│   ├── vault/               # 9 knowledge-management skills (save, inbox, standup, process-ingest, process-lint, etc.)
+│   └── domain-examples/     # 21 domain skills across Apify and n8n
 ├── workflows/               # 6 deterministic process-skill workflow scripts (the enforced procedure layer)
 ├── settings/
 │   ├── settings.json.example        # Global hook registration template

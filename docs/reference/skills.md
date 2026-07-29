@@ -55,6 +55,10 @@ A skill is a Markdown procedure loaded by Claude Code's skill loader (walks `ski
 | Steps | Read STATE.md → gather open questions → map source files → group into PROBLEM sections (3-6) → write loop prompt to `work/YYYY-MM-DD-[topic]-research-loop.md` → generate command with `--max-iterations` → present for review. Full procedure: [`skills/core/architect-loop/SKILL.md`](../../skills/core/architect-loop/SKILL.md) |
 | Outputs | Loop prompt `.md` file in `Projects/[Name]/work/`; ready-to-paste `/ralph-loop` command |
 | Enforced by | `dispatch-compliance-check.py` (lists `architect-loop` as a known dispatch target; verifies it was invoked when MUST DISPATCH names it) |
+| `process-query` | process | Answer a question from the wiki layer with citations |
+| `vault-maintain` | utility | Vault-wide maintenance: tags, MOCs, link integrity, summaries |
+| `n8n-review` | process | Quality-findings report on an n8n workflow |
+| `n8n-reviewer` | process | Review, rename, document, or security-audit an n8n workflow |
 
 ---
 
@@ -436,3 +440,64 @@ Domain examples ship as adapters that apply core framework process to a specific
 | `n8n-node-configuration` | n8n | Operation-aware node configuration guidance and property-dependency resolution |
 | `n8n-validation-expert` | n8n | Interpret validation errors and guide fixes including false-positive handling |
 | `n8n-workflow-patterns` | n8n | Proven architectural patterns for n8n workflow design |
+
+### process-query
+
+| Field | Value |
+|---|---|
+| Type | process |
+| Frontmatter | `name: process-query`; trigger: a question answerable from the wiki layer |
+| Use-when | Answering a question from the LLM-Wiki rather than from the model's own recall; the read half of the Karpathy wiki triad alongside `process-ingest` (write) and `process-lint` (verify) |
+| Do-NOT-use-when | The answer needs new source material that is not yet in the wiki. Ingest first, then query |
+| Dispatches | None |
+| Steps | Read the wiki layer, synthesise an answer with citations back to the pages used, optionally file the answer back as a new wiki page. Full procedure: [`skills/vault/process-query/SKILL.md`](../../skills/vault/process-query/SKILL.md) |
+| Outputs | An answer carrying citations; optionally a new wiki page |
+| Enforced by | process discipline (no dedicated hook) |
+
+---
+
+### vault-maintain
+
+| Field | Value |
+|---|---|
+| Type | utility |
+| Frontmatter | `name: vault-maintain`; trigger: "vault maintenance", `/vault-maintain`, `/vault-maintain phase:N` |
+| Use-when | Vault-wide maintenance across four phases: tag hygiene, MOC freshness, cross-project link integrity, summary auto-fill |
+| Do-NOT-use-when | Cleaning up a single project's work files. That is `maintain`, which is scoped to one project directory |
+| Dispatches | None |
+| Steps | Run all four phases in sequence, or a single phase via `phase:N`. Full procedure: [`skills/vault/vault-maintain/SKILL.md`](../../skills/vault/vault-maintain/SKILL.md) |
+| Outputs | Corrected tags, refreshed MOC member lists, repaired cross-project links |
+| Enforced by | process discipline (no dedicated hook) |
+
+---
+
+### n8n-review
+
+| Field | Value |
+|---|---|
+| Type | process |
+| Frontmatter | `name: n8n-review`; trigger: audit or quality-check an n8n workflow |
+| Use-when | Producing a quality-findings report on an n8n workflow against team guidelines: naming, visual chain, sticky notes, execution data, error handling, security, credentials |
+| Do-NOT-use-when | Building or modifying a workflow (that is the architect and builder pair), or when the goal is broader than a findings report |
+| Dispatches | None |
+| Steps | Walk the workflow against each guideline category and emit findings. Full procedure: [`skills/domain-examples/n8n/n8n-review/SKILL.md`](../../skills/domain-examples/n8n/n8n-review/SKILL.md) |
+| Outputs | A findings report with per-category verdicts |
+| Enforced by | process discipline (no dedicated hook) |
+
+---
+
+### n8n-reviewer
+
+| Field | Value |
+|---|---|
+| Type | process |
+| Frontmatter | `name: n8n-reviewer`; trigger: n8n workflow JSON pasted, or a request to review, rename, document, or security-audit an automation |
+| Use-when | Broader n8n work than a findings report: renaming, documentation, security audit, best-practice application |
+| Do-NOT-use-when | The goal is only a quality-findings report (use `n8n-review`), or the task is building a workflow (use the architect) |
+| Dispatches | May dispatch the `n8n-reviewer` agent |
+| Steps | Route by intent, then apply the relevant guideline set. Full procedure: [`skills/domain-examples/n8n/n8n-reviewer/SKILL.md`](../../skills/domain-examples/n8n/n8n-reviewer/SKILL.md) |
+| Outputs | Reviewed or documented workflow artifacts |
+| Enforced by | process discipline (no dedicated hook) |
+
+---
+

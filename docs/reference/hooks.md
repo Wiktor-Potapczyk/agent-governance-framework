@@ -47,6 +47,10 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | `task-plan-auto-sync.py` | Stop | Mark task_plan.md item done on QA PASS | Yes: `settings.json.template` |
 | `pre-compact.py` | PreCompact | Write recovery snapshot before context compaction | Yes: `settings.json.template` |
 | `prose-slop-check.py` | PostToolUse (Write) | Warn on LLM-register slop words in wiki/work prose | No: dormant, not registered |
+| `mcp-irreversible-guard.py` | PreToolUse (`mcp__.*`) | Gate-1 deny on enumerated destructive MCP tools | Yes: `settings.json.template` |
+| `transition-gate-check.py` | PreToolUse (Write/Edit) | Gate phase transitions on recorded evidence | No: opt-in |
+| `git-credential-scope-check.py` | SessionStart | Warn when git credential scope is broader than the repo needs | No: opt-in |
+| `hook-write-regression-gate.py` | PostToolUse (Write/Edit) | Block hook edits that regress the test suite | No: opt-in |
 
 ---
 
@@ -131,6 +135,22 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Logical paths** | Skip if subagent invocation. Skip if effort.level == "low". Skip if prompt is trivial (heuristic). Throttle check: <30min since last fire AND STATE.md mtime unchanged AND same project → skip. Else: read STATE.md → extract status + last_action → read task_plan top 5 open items → emit orientation. Any read failure → emit empty (fail-open). |
 | **Failure mode** | Fail-open: all file-read failures caught; throttle state write uses atomic temp-rename pattern to avoid corruption. |
 | **Rationale** | Reduces the need for the model to proactively re-read STATE.md each turn while avoiding per-prompt noise via throttling. |
+
+---
+
+### `git-credential-scope-check.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | SessionStart |
+| **Matcher** | `startup`, `resume` |
+| **Registered in** | not registered by default (opt-in) |
+| **Action** | Warns when the configured git credential scope is broader than the current repository requires. |
+| **Inputs** | git configuration for the active repository. |
+| **Outputs / Side-effects** | stdout: `additionalContext` warning; never blocks. |
+| **Logical paths** | Read the credential helper configuration and remote. Compare configured scope against what the repo needs. Broader than necessary, warn once per session. Otherwise silent. |
+| **Failure mode** | Fail-open, advisory only. |
+| **Rationale** | Credential scope is invisible until it leaks. Surfacing it at session start costs nothing and catches over-broad configuration before a push. |
 
 ---
 
@@ -248,6 +268,38 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 
 ---
 
+### `mcp-irreversible-guard.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PreToolUse |
+| **Matcher** | `mcp__.*` |
+| **Registered in** | `settings/settings.json.template` |
+| **Action** | Denies MCP tool calls that fall on the canonical irreversible surface. The MCP arm of Gate 1; `bash-safety-guard.py` is the shell arm. |
+| **Inputs** | stdin JSON payload: `tool_name` and `tool_input`. |
+| **Outputs / Side-effects** | stdout: `{"permissionDecision": "deny", ...}` on match; nothing on allow. |
+| **Logical paths** | Import the canonical surface from `_irreversible_surface.py`. Match `tool_name` against the **enumerated** destructive-tool list, never a blanket `mcp__.*` deny, which would block every MCP read and train the operator to bypass reflexively. On match, deny and emit the reason so the agent can surface a decision brief. No match, allow. Import failure or parse error, allow. |
+| **Failure mode** | Fail-open: any exception exits 0 without blocking. |
+| **Rationale** | Under universal `bypassPermissions` an `ask` decision is a no-op, so `deny` is the only decision that actually stops an irreversible MCP call. See ADR-0007 and `docs/concepts/two-gate-autonomy.md`. |
+
+---
+
+### `transition-gate-check.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PreToolUse |
+| **Matcher** | `Write|Edit|MultiEdit` |
+| **Registered in** | not registered by default (opt-in) |
+| **Action** | Gates a declared phase transition on recorded evidence rather than assertion. |
+| **Inputs** | stdin JSON payload: `tool_input.file_path` and content; project state files. |
+| **Outputs / Side-effects** | stdout: warning or block payload when a transition is claimed without supporting evidence. |
+| **Logical paths** | Detect a phase-transition edit to a state file. Look for the evidence the transition requires. Evidence present, allow. Absent, surface the gap. |
+| **Failure mode** | Fail-open. |
+| **Rationale** | Phase transitions are the point where unverified optimism enters project state and persists. |
+
+---
+
 ## PostToolUse hooks
 
 ### `skill-step-reminder.py`
@@ -359,6 +411,22 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Logical paths** | Read last-checkpoint timestamp. Missing file → treat as epoch 0. Now - last < 60s → emit nothing (silent). 60s ≤ now - last < 300s → inject KNOWLEDGE_REMINDER. now - last ≥ 300s → inject [CHECKPOINT] save notice + KNOWLEDGE_REMINDER. Update last-checkpoint to now. |
 | **Failure mode** | Fail-open: timestamp parse error or write error → continue without blocking. |
 | **Rationale** | Provides a low-noise periodic reminder to save state during long sessions, reducing the risk of losing context or work across compaction. |
+
+---
+
+### `hook-write-regression-gate.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PostToolUse |
+| **Matcher** | `Write|Edit` |
+| **Registered in** | not registered by default (opt-in) |
+| **Action** | Blocks an edit to a hook when that edit regresses the hook test suite. |
+| **Inputs** | stdin JSON payload: the edited hook path. |
+| **Outputs / Side-effects** | stdout: block payload naming the failing tests. |
+| **Logical paths** | Detect that the written path is a hook. Run the matching test module. Tests pass, allow. Tests fail, block and name them. |
+| **Failure mode** | Fail-open if the suite cannot be run at all. |
+| **Rationale** | Hooks are the enforcement layer. A silently broken hook removes a guarantee without removing the belief that the guarantee holds. |
 
 ---
 

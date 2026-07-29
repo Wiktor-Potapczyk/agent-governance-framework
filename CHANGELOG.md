@@ -1,5 +1,46 @@
 # Changelog
 
+## 2026-07-29: Two-Gate Autonomy completed, shared-library expansion, reference coverage
+
+### Added
+
+- **`hooks/_irreversible_surface.py`**: the single canonical irreversible surface (deletion, `DROP`/`TRUNCATE`/unbounded `DELETE`, `git push`, external write verbs, prod deploys, outbound sends). Both Gate-1 arms import it, so the deny-list exists once rather than in two drifting copies. **This file was previously referenced by `hooks/bash-safety-guard.py` but absent from the repository**, leaving a public artifact documenting a dependency it did not contain.
+- **`hooks/mcp-irreversible-guard.py`**: the MCP arm of Gate 1, registered under `PreToolUse` matcher `mcp__.*` in the settings template. Denies enumerated destructive MCP tools rather than applying a blanket deny, which would block every MCP read and train reflexive bypassing. Completes Two-Gate Autonomy, which previously shipped only its shell arm and its Gate-2 verifier.
+- **`docs/adr/0007-two-gate-autonomy.md`**: MADR ADR recording the model, the rejection of size-gating, and why `deny` rather than `ask` is the only decision that functions under `bypassPermissions`.
+- **`docs/concepts/two-gate-autonomy.md`**: fourth concept page, alongside enforcement-layers, falsification-qa and task-classification. Covers both gate tests, the re-derivation versus re-reading distinction, worked examples, and the known fallback-snapshot drift hazard.
+- **Enforcement hooks**: `transition-gate-check.py`, `hook-write-regression-gate.py`, `git-credential-scope-check.py`. All shipped opt-in, all documented in `docs/reference/hooks.md`.
+- **`hooks/_agent_risk_tiers.json`**: the per-agent risk-tier data `test_agent_risk_tiers.py` depends on, previously absent.
+- **Shared libraries** (4 → 9): `_irreversible_surface.py`, `_dispatch_compliance_logic.py`, `_competence_signal.py`, `_daily_aggregate.py`, `_event_emit.py`, `_haiku_summarize.py`.
+- **Tests** for the new hooks, plus `test_bash_safety_guard.py`, `test_verifier_gate_check.py`, `test_dark_zone_check.py` and `test_agent_risk_tiers.py`, which cover hooks the repo previously shipped untested.
+- **`skills/vault/`** (7 → 9): `process-query` completes the Karpathy wiki triad (ingest writes, query reads, lint verifies); `vault-maintain` adds vault-wide maintenance.
+- **`skills/domain-examples/n8n/`** (7 → 9): `n8n-review`, `n8n-reviewer`.
+- **`agents/domain-examples/n8n/n8n-reviewer.md`**: the `domain-examples` agent directory was a placeholder and now carries the reviewer alongside the architect and builder.
+- **`hooks/disabled/`**: `em-dash-guard.py`, `prose-codes-check.py` and their test, shipped as opt-in worked examples of deterministic subjective-style enforcement at the Stop hook.
+
+### Changed
+
+- **`hooks/bash-safety-guard.py`** updated from the 189-line version to the current 429-line implementation. The shipped version predated Two-Gate Autonomy entirely: it had no `_IRREVERSIBLE_FALLBACK_SNAPSHOT` and no GAP-11 drift note, so ADR-0007 and the concept page would have described code the repository did not contain. Its test suite goes from 20 failing to 49 passing.
+- **`hooks/verifier-gate-check.py`** updated from 146 to 212 lines (Gate-2 structural contract), 18 tests passing.
+- **`settings/settings.json.template`**: registers `mcp-irreversible-guard.py` ahead of the circuit breaker on the `mcp__.*` matcher, so the Gate-1 deny evaluates before availability logic. Active enforcement hooks 35 → 36.
+- **`README.md`**: Two-Gate Autonomy added to Core Innovations; the Tool Safety layer row now names both Gate-1 arms and the Gate-2 verifier; repository-structure block corrected (the `agents/domain-examples/` comment still described an empty placeholder).
+- **`.doc-consistency.json`**: literal pins updated, `active-enforcement-hooks` 35 → 36 and `shared-hook-libraries` 4 → 9.
+- **Count assertions** reconciled across `docs/architecture.md`, `INSTALL.md`, `README.md` and `hooks/README.md`: vault skills 7 → 9, n8n skills 7 → 9, domain skills total 19 → 21.
+- **`docs/reference/{hooks,skills,agents}.md`**: entries added for every artifact above, following the per-artifact attributes-table schema in the Documentation Standard.
+
+### Not shipped, and why
+
+- `routing-table-validation.py` resolves dispatch tokens against `registry.json`, which this repo does not ship, so it cannot function here. A copy already exists under `hooks/disabled/` from an earlier publication; no duplicate was added.
+- `test_dispatch_compliance_check.py` was withheld: this repo's `dispatch-compliance-check.py` is a larger, separately-adapted lineage than the source version, and overwriting it to satisfy a test would regress deliberate publication-time adaptation.
+
+### Known pre-existing condition
+
+- `hooks/disabled/test_routing_table_validation.py` has 7 failing tests against `hooks/disabled/routing-table-validation.py`. Both predate this change and neither was modified here. Flagged rather than fixed. The rest of the suite is 522 passing, 12 skipped.
+
+### Not published (flagged, not silently dropped)
+
+- `proactivity-check.py`, `vault-structure-check.py` and `sdlc-evidence-verifier.py` were blocked by the pre-push content gate: the first two carry employer-identifying tokens, the third hardcodes a private deployment hostname that is structural to how it works. Publishing either requires a scrub pass, which is an authoring decision rather than a reconciliation one.
+- `repo-sync`, `impeccable` and `jira-ticket` skills are held for an owner decision: the first embeds a literal private token list, the second has unverified third-party licensing, the third binds to private issue-tracker conventions.
+
 ## 2026-06-11: Full procedure-layer migration: workflows/, ADR-0006, reference pages
 
 ### Added

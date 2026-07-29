@@ -1,6 +1,6 @@
 # Hook Registry
 
-This framework uses 35 active enforcement hooks across 8 event types, plus four shared libraries (`sidecar_loader.py`, `_governance_logger.py`, `_wiki_citation_logic.py`, `_subagent_quality_logic.py`). Two further hooks ship **opt-in**: present but not registered in the default config: `prose-slop-check.py` and `registry-staleness-check.py` (listed at the foot of the table). The deferred stub `context-fill-log.py` has been moved to `_archived/hooks/` (it was never registered and its module docstring says "DO NOT REGISTER"). Five additional hook scripts (4 Python + 1 PowerShell) live in `hooks/disabled/`: some disabled after an instructive failure, some shipping opt-in/unregistered (e.g. `routing-table-validation.py`): see `disabled/README.md` for each.
+This framework uses 36 active enforcement hooks across 8 event types, plus four shared libraries (`sidecar_loader.py`, `_governance_logger.py`, `_wiki_citation_logic.py`, `_subagent_quality_logic.py`). Two further hooks ship **opt-in**: present but not registered in the default config: `prose-slop-check.py` and `registry-staleness-check.py` (listed at the foot of the table). The deferred stub `context-fill-log.py` has been moved to `_archived/hooks/` (it was never registered and its module docstring says "DO NOT REGISTER"). Five additional hook scripts (4 Python + 1 PowerShell) live in `hooks/disabled/`: some disabled after an instructive failure, some shipping opt-in/unregistered (e.g. `routing-table-validation.py`): see `disabled/README.md` for each.
 
 ## Active Hooks
 

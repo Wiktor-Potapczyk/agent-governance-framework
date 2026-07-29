@@ -168,11 +168,11 @@ The repository includes domain-specific agents and skills as worked examples. Th
 
 **Domain-example agents:** `agents/domain-examples/` is currently a placeholder for project-specific agent examples; reference implementations may be added in future releases. The domain-flavored agents that ship today live in `agents/governance/` and can be used directly: `content-marketer.md`, `competitive-analyst.md`, `vault-keeper.md`.
 
-**Domain-example skills** (19 total in `skills/domain-examples/`):
+**Domain-example skills** (21 total in `skills/domain-examples/`):
 - Apify: 12 skills covering scraping, lead generation, market research, and more
-- n8n: 7 skills covering workflow patterns, node configuration, and code generation
+- n8n: 9 skills covering workflow patterns, node configuration, and code generation
 
-**Vault management skills** (7 total in `skills/vault/`):
+**Vault management skills** (9 total in `skills/vault/`):
 - `save`, `inbox`, `standup`, `daily`, `maintain` -- for knowledge-base management workflows
 - `process-ingest`, `process-lint` -- for the LLM-Wiki ingest and consistency-lint operations
 
