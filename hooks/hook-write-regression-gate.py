@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""hook-write-regression-gate.py — PostToolUse Write|Edit regression gate for harness hook edits.
+"""hook-write-regression-gate.py: PostToolUse Write|Edit regression gate for harness hook edits.
 
 GAP-3a (TA-3 Phase 2, spec Step 9 of 2026-07-09-harness-revision-spec): an edit to
-any `.claude/hooks/*.py` file lands silently today — nothing forces the held-out
+any `.claude/hooks/*.py` file lands silently today: nothing forces the held-out
 oracle suite to run before the session reports success. This gate closes that:
 on every Write/Edit to a hook `.py` file it runs the full pytest suite and, if
 red, emits a LOUD PostToolUse warning into context. It never blocks and never
-auto-reverts — the evaluator stays outside the loop (WARN/advisory-first,
+auto-reverts: the evaluator stays outside the loop (WARN/advisory-first,
 Phase-2 invariant 1).
 
 Scope decisions (explicit, per plan Step 2):
@@ -23,8 +23,8 @@ Latency budget (spec R3 / acceptance criterion): full-suite wall clock <= 60s;
 registered timeout must be >= measured latency + margin.
 
 Test isolation (like the GATE1_ALARM_LOG_PATH precedent): unit tests override
-  HOOK_REGRESSION_GATE_TARGET_DIR — the directory pytest runs against
-  HOOK_REGRESSION_GATE_LOG_PATH   — where the suite output lands
+  HOOK_REGRESSION_GATE_TARGET_DIR: the directory pytest runs against
+  HOOK_REGRESSION_GATE_LOG_PATH: where the suite output lands
 so they exercise a temp mini-suite, never the live one.
 
 Exit codes: 0 always (clean, warn, or internal error). This hook never blocks.
@@ -108,7 +108,7 @@ def run_suite(target_dir: str, log_path: str) -> tuple[int, str]:
         code = proc.returncode
     except subprocess.TimeoutExpired:
         return -1, f"pytest timed out after {SUITE_TIMEOUT_SECONDS}s"
-    except Exception as exc:  # noqa: BLE001 — gate must never crash the turn
+    except Exception as exc:  # noqa: BLE001: gate must never crash the turn
         return -1, f"gate could not run pytest: {exc}"
     try:
         with open(log_path, encoding="utf-8", errors="replace") as fh:
@@ -137,6 +137,32 @@ def _log_fire(decision: str, detail: str) -> None:
         pass
 
 
+def _matrix_findings_text() -> str:
+    """Contract C5, per-edit placement. Returns the rendered findings, or ""
+    when the matrix is clean or the check itself could not run.
+
+    Fail-open by construction: a broken checker must never turn into a warning
+    about the edit, which would be a false accusation against the author.
+    """
+    try:
+        scripts_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"
+        )
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_har_for_gate", os.path.join(scripts_dir, "hook_activity_report.py")
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        if not mod.matrix_findings():
+            return ""
+        return mod.findings_text()
+    except Exception:
+        return ""
+
+
 def main() -> int:
     try:
         payload = json.loads(sys.stdin.read() or "{}")
@@ -148,17 +174,26 @@ def main() -> int:
         return 0
     file_path = (payload.get("tool_input") or {}).get("file_path", "")
     if not is_gated_hook_write(file_path):
-        return 0  # fast path — no pytest run
+        return 0  # fast path: no pytest run
 
     code, tail = run_suite(_target_dir(), _log_path())
 
+    matrix = _matrix_findings_text()
+
     if code == 0:
+        if matrix:
+            _emit(
+                "[MATRIX GATE] The regression suite is green, but the generated "
+                f"asset matrix reports findings after the edit to {file_path}:\n{matrix}"
+            )
+            _log_fire("warn", f"matrix findings after edit of {os.path.basename(file_path)}")
+            return 0
         _log_fire("quiet", f"suite green after edit of {os.path.basename(file_path)}")
         return 0
 
     if code == -1:
         _emit(
-            "[HOOK-WRITE REGRESSION GATE — GATE ERROR] Edit to "
+            "[HOOK-WRITE REGRESSION GATE: GATE ERROR] Edit to "
             f"{file_path} could not be regression-checked ({tail}). "
             "Run the suite manually before reporting success: "
             "python -m pytest .claude/hooks/ -q"
@@ -167,7 +202,7 @@ def main() -> int:
         return 0
 
     _emit(
-        "[HOOK-WRITE REGRESSION GATE — SUITE RED] The edit to "
+        "[HOOK-WRITE REGRESSION GATE: SUITE RED] The edit to "
         f"{file_path} landed with a FAILING regression suite (pytest exit {code}). "
         "DO NOT report success. Root-cause and fix before proceeding. Suite tail:\n"
         f"{tail}"

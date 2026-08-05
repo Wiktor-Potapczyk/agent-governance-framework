@@ -42,17 +42,55 @@ def main():
 
         source = payload.get("source", "unknown")  # startup, resume, clear, compact
 
-        entry = {
-            "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "schema": 2,
-            "event": "session_start",
-            "hook": "session-start-log",
-            "session": session_id,
-            "source": source,
-        }
+        # Observability v2: add environment field (detect test via env var)
+        env = os.environ.get("OBSERVABILITY_ENV", "").strip().lower()
+        environment = "test" if env == "test" else "prod"
 
-        with open(LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry) + "\n")
+        from _event_emit import emit_event
+        emit_event(
+            event="session_start",
+            hook="session-start-log",
+            session=session_id,
+            environment=environment,
+            extra={"source": source},
+        )
+
+        # Observability v2: dashboard summary: refresh yesterday's aggregate
+        # (today's hasn't accumulated yet) and emit dashboard_alert event if any
+        # threshold tripped. Never blocks session start.
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from _daily_aggregate import write_aggregate  # type: ignore
+            from datetime import timedelta
+            # Test override: DASHBOARD_TARGET_DATE env var (YYYY-MM-DD) forces
+            # aggregation for a specific historical date. Default: yesterday.
+            yday = os.environ.get("DASHBOARD_TARGET_DATE") or (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            agg = write_aggregate(yday)
+            if agg and agg.get("alerts"):
+                emit_event(
+                    event="dashboard_alert",
+                    hook="session-start-log",
+                    session=session_id,
+                    environment=environment,
+                    extra={
+                        "aggregate_date": yday,
+                        "alerts": agg.get("alerts", []),
+                        "sessions": agg.get("sessions", 0),
+                        "qa_fails": agg.get("qa_fails", 0),
+                        "classifier_blocks": agg.get("classifier_blocks", 0),
+                        "agent_warns": agg.get("agent_warn_downgrades", 0),
+                    },
+                )
+                # Also emit a one-liner to stderr so it surfaces in hook log
+                # viewers without polluting stdout (PENTEST-FIX-1, 2026-05-06):
+                # CC hook contract requires stdout to contain ONLY the JSON
+                # hookSpecificOutput block: any trailing stdout content
+                # breaks strict JSON parsers with "Extra data" error. The
+                # dashboard_alert event above is the canonical record;
+                # stderr is for human-visible surfacing only.
+                print(f"DASHBOARD ({yday}): {' | '.join(agg['alerts'])}", file=sys.stderr)
+        except Exception:
+            pass  # dashboard is best-effort
     except Exception:
         pass  # Never break session start
 

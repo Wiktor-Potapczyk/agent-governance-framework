@@ -18,10 +18,9 @@ import re
 from datetime import datetime
 
 
-LOG_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "governance-log.jsonl"
-)
+# LOG_PATH removed 2026-08-01: the only reader was the direct open() this hook
+# no longer performs. The destination now lives in _event_emit, which resolves
+# GOVERNANCE_LOG_PATH at call time.
 
 # 200KB window: covers even 10+ agent outputs per turn
 READ_BYTES = 204800
@@ -42,11 +41,12 @@ KNOWN_DISPATCH_NAMES = {
     "adversarial-reviewer", "api-designer", "api-security-audit", "architect-review", "architect-reviewer",
     "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
     "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
-    "mcp-developer", "mcp-registry-navigator", "mcp-server-architect", "n8n-reviewer",
+    "mcp-developer", "mcp-registry-navigator", "mcp-server-architect",
+    "n8n-reviewer", "n8n-workflow-architect", "n8n-workflow-builder",
     "nosql-specialist", "pm-orchestrator", "postgres-pro", "powershell-7-expert",
     "prompt-engineer", "query-clarifier", "report-generator", "research-analyst",
     "research-coordinator", "research-orchestrator", "research-synthesizer",
-    "technical-researcher", "vault-keeper", "workflow-orchestrator",
+    "technical-researcher", "vault-keeper",
     # Skills (from .claude/skills/): only process/governance skills likely in MUST DISPATCH
     "process-qa", "process-analysis", "process-build", "process-planning",
     "process-research", "process-pentest", "pm", "task-classifier", "verify",
@@ -135,6 +135,7 @@ def main():
     agents_dispatched = []
     skills_invoked = []
     wiki_queried = False  # W-V1 Phase 1 (2026-05-26): mcp__qmd__query tool_use detection
+    memory_searched_raw = False  # 2026-06-01: raw Grep of a qmd-indexed corpus (memory/ or Resources/KB)
 
     for line in lines:
         line = line.strip()
@@ -210,20 +211,27 @@ def main():
                     # inp["collection"] but we count both as "consulted retrieval";
                     # downstream analysis can disaggregate.
                     wiki_queried = True
+                elif name == "Grep":
+                    # 2026-06-01: detect a raw Grep of a qmd-indexed corpus (the
+                    # memory folder or Resources/KB). Paired with wiki_queried below
+                    # this is the "forgot qmd" baseline signal: searched the corpus
+                    # by hand without consulting qmd. Grep only (search intent);
+                    # single-file Read is a legitimate fetch, not a forget.
+                    gp = (inp.get("path") or "").replace("\\", "/").lower()
+                    if ("/memory" in gp and "/projects/" in gp) or "resources/kb" in gp:
+                        memory_searched_raw = True
 
     # Only log if we found a classification this turn
     if not last_type:
         return
 
-    # Extract session ID from transcript filename
-    session_id = os.path.splitext(os.path.basename(transcript_path))[0]
+    # session_id first, then the transcript stem (P1-D fix 2026-04-09 kept the
+    # stem; session_from restores session_id as the primary source). This hook
+    # returns early without a transcript, so the two agree in practice here.
+    from _governance_logger import session_from
+    session_id = session_from(payload)
 
-    log_entry = {
-        "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "schema": 2,  # P1-E: schema version field (2026-04-09)
-        "event": "turn_summary",  # 2026-05-08: schema consistency fix; was bare row producing dashboard `legacy_classification` fallback
-        "hook": "governance-log",
-        "session": session_id,  # Full UUID (P1-D fix 2026-04-09)
+    extra = {
         "type": last_type,
         "effort_level": effort_level,  # Week-19 effort.level telemetry (P1-E+, 2026-05-22)
         "implies": last_implies,
@@ -234,13 +242,27 @@ def main():
         "agent_count": len(agents_dispatched),
         "skill_count": len(skills_invoked),
         "wiki_queried": wiki_queried,  # W-V1 Phase 1 (2026-05-26): qmd MCP consultation this turn
+        "memory_searched_raw": memory_searched_raw,  # 2026-06-01: raw Grep of memory/KB corpus this turn
+        "memory_forgot_qmd": memory_searched_raw and not wiki_queried,  # 2026-06-01: forget signal: searched corpus by hand, never consulted qmd
     }
 
-    try:
-        with open(LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(json.dumps(log_entry) + "\n")
-    except OSError:
-        pass  # Don't crash on write failure
+    # C7 convergence (2026-08-01). This was the last direct writer with its own
+    # open(). emit_event supplies ts/schema/event/hook/session/environment and
+    # merges the rest, so the record gains `environment` and loses nothing.
+    #
+    # The catch widens from `except OSError` to emit_event's bare Exception, and
+    # that is a fix rather than a cost: json.dumps used to sit inside this try,
+    # so a serialization failure escaped the narrow clause and crashed the Stop
+    # hook, which crashes the turn. The comment here already said "Don't crash on
+    # write failure"; the narrow clause did not implement it. A lost log line is
+    # recoverable and C5's DARK_HOOK check surfaces a hook that stops appearing.
+    from _event_emit import emit_event
+    emit_event(
+        event="turn_summary",  # 2026-05-08: schema consistency fix; was a bare row producing the dashboard `legacy_classification` fallback
+        hook="governance-log",
+        session=session_id,
+        extra=extra,
+    )
 
 
 if __name__ == "__main__":

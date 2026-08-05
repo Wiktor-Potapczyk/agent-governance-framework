@@ -189,12 +189,109 @@ class GetVerdictTests(unittest.TestCase):
         self.assertEqual(result["n"], 0)
 
     def test_injected_exception_returns_safe_object_never_raises(self):
-        with mock.patch.object(cs, "parse_events", side_effect=RuntimeError("boom")):
-            result = cs.get_verdict("/any/path.jsonl", "a")
-        self.assertEqual(result["verdict"], "NO_SIGNAL")
-        self.assertEqual(result["n"], 0)
-        self.assertIsNone(result["score"])
-        self.assertTrue(result.get("error"))
+        # The injection point moved when get_verdict stopped calling parse_events
+        # (2026-08-01: the byte tail was replaced by a backwards completion read).
+        # Both internals are exercised rather than just the one, so the fail-open
+        # contract is now pinned more tightly than it was before the change.
+        for target in ("iter_completions_backwards", "score_agent"):
+            with self.subTest(internal=target):
+                with mock.patch.object(cs, target, side_effect=RuntimeError("boom")):
+                    result = cs.get_verdict("/any/path.jsonl", "a")
+                self.assertEqual(result["verdict"], "NO_SIGNAL")
+                self.assertEqual(result["n"], 0)
+                self.assertIsNone(result["score"])
+                self.assertTrue(result.get("error"))
+
+
+class WindowIsMeasuredInCompletionsNotBytesTests(unittest.TestCase):
+    """The backwards-counter defect, reproduced.
+
+    WINDOW_PER_AGENT is defined in completion EVENTS, but the read that feeds it
+    was bounded in BYTES. Completions for one agent are sparse in a stream that
+    every hook writes to, so the two disagree the moment traffic grows: the same
+    agent's warm-up count was observed going 5, then 3, then 0 with no code
+    change. A low n then means "did not see", not "has not warmed up", and the
+    counter runs backwards as unrelated records accumulate.
+
+    The gate is ADVISORY (it prints and lets the dispatch proceed), so this is a
+    wrong number rather than a wrong block. It is still wrong, and it silently
+    erases warm-up history an agent already earned.
+    """
+
+    def _log_with_filler(self, path, agent, completions, filler_bytes):
+        """Write `completions` for `agent`, then bury them under unrelated traffic."""
+        with open(path, "w", encoding="utf-8") as fh:
+            for line in completions:
+                fh.write(line + "\n")
+            written = 0
+            i = 0
+            while written < filler_bytes:
+                line = json.dumps({
+                    "ts": "2026-07-13 12:00:00", "schema": 2, "event": "hook_fire",
+                    "hook": "prose-slop-check", "session": "real-session-2",
+                    "detail": "x" * 200, "seq": i,
+                }) + "\n"
+                fh.write(line)
+                written += len(line)
+                i += 1
+
+    def test_completions_are_found_even_when_buried_past_the_byte_window(self):
+        tmp = tempfile.mkdtemp()
+        p = os.path.join(tmp, "step11.jsonl")
+        # 10 clean passes, then 2MB of unrelated traffic on top of them.
+        self._log_with_filler(p, "a", [_pass("a")] * 10, 2 * 1024 * 1024)
+        result = cs.get_verdict(p, "a")
+        self.assertEqual(result["n"], 10,
+                         "completions older than the byte window must still count")
+        self.assertEqual(result["verdict"], "OK")
+
+    def test_the_count_does_not_regress_as_unrelated_records_accumulate(self):
+        # The regression itself: same completions, more noise, same n.
+        tmp = tempfile.mkdtemp()
+        counts = []
+        for filler in (0, 1024 * 1024, 3 * 1024 * 1024):
+            p = os.path.join(tmp, "step11-%d.jsonl" % filler)
+            self._log_with_filler(p, "a", [_pass("a")] * 8, filler)
+            counts.append(cs.get_verdict(p, "a")["n"])
+        self.assertEqual(counts, [8, 8, 8],
+                         "n fell as unrelated traffic grew: %r" % (counts,))
+
+    def test_the_window_still_caps_at_the_most_recent_events(self):
+        # Correctness in the other direction: reading further back must not
+        # widen the scoring window beyond WINDOW_PER_AGENT.
+        tmp = tempfile.mkdtemp()
+        p = os.path.join(tmp, "step11.jsonl")
+        # 10 old blocks then 50 recent passes: the blocks fall outside the window.
+        self._log_with_filler(p, "a", [_block("a")] * 10 + [_pass("a")] * 50, 0)
+        result = cs.get_verdict(p, "a")
+        self.assertEqual(result["n"], cs.WINDOW_PER_AGENT)
+        self.assertEqual(result["score"], 1.0)
+
+    def test_synthetic_session_prefilter_still_applies_to_the_new_reader(self):
+        tmp = tempfile.mkdtemp()
+        p = os.path.join(tmp, "step11.jsonl")
+        self._log_with_filler(
+            p, "a", [_pass("a", session="session")] * 20 + [_pass("a")] * 6, 0)
+        result = cs.get_verdict(p, "a")
+        self.assertEqual(result["n"], 6, "synthetic-session entries must stay dropped")
+
+    def test_a_line_split_across_the_chunk_boundary_is_not_corrupted(self):
+        # Reading backwards in chunks: the first fragment of each chunk is a
+        # partial line and must be carried, not parsed. A silent JSONDecodeError
+        # here would just drop completions and look like a low count.
+        tmp = tempfile.mkdtemp()
+        p = os.path.join(tmp, "step11.jsonl")
+        self._log_with_filler(p, "a", [_pass("a")] * 40, 300 * 1024)
+        result = cs.get_verdict(p, "a")
+        self.assertEqual(result["n"], 40)
+
+    def test_missing_and_empty_files_still_fail_open(self):
+        self.assertEqual(cs.get_verdict("/nonexistent/x.jsonl", "a")["verdict"],
+                         "NO_SIGNAL")
+        tmp = tempfile.mkdtemp()
+        p = os.path.join(tmp, "empty.jsonl")
+        open(p, "w").close()
+        self.assertEqual(cs.get_verdict(p, "a")["verdict"], "NO_SIGNAL")
 
 
 class NoDenyCapabilityTests(unittest.TestCase):

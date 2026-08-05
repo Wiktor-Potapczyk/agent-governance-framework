@@ -1,15 +1,11 @@
 """
-routing-table-validation.py: PreToolUse Edit|Write|MultiEdit hook (opt-in)
+routing-table-validation.py: PreToolUse Edit|Write|MultiEdit hook (Delta-5 Tier A)
 
 Denies edits to CLAUDE.md or any .claude/skills/*/SKILL.md that would introduce
 a broken dispatch-name reference: an agent name in a clear dispatch position that
 does not resolve to any entry in registry.json.
 
-This hook ships UNREGISTERED (disabled by default). To arm it, copy it to your
-active hooks directory and add it to your settings.json/settings.local.json under
-the PreToolUse event with matchers for Edit, Write, and MultiEdit.
-
-DESIGN CONTRACT:
+DESIGN CONTRACT (from hook spec):
   - Fail-open on ANY ambiguity: parse errors, unreadable registry, unclear position.
   - Low false-positive: only DENY when ALL four gates (a/b/c/d) pass.
   - Deny protocol: emit the hookSpecificOutput/permissionDecision:deny JSON form.
@@ -22,7 +18,7 @@ Gate summary (ALL must hold to deny):
   (a) Target file is CLAUDE.md or .claude/skills/*/SKILL.md (case-insensitive).
   (b) Unresolved token is in a clear DISPATCH POSITION in a NEW/CHANGED line.
   (c) Token has agent-name SHAPE: ^[a-z][a-z0-9]+(?:[-_][a-z0-9]+)+$
-  (d) Token resolves to nothing in registry.json agents union DEPRECATED_ALLOWLIST.
+  (d) Token resolves to nothing in registry.json agents ∪ DEPRECATED_ALLOWLIST.
 
 Dispatch positions recognised (case-insensitive):
   - "MUST DISPATCH: ...": comma-separated names after the colon
@@ -50,10 +46,10 @@ from pathlib import PurePosixPath, Path
 # ---------------------------------------------------------------------------
 
 # Agents that are legitimately referenced in dispatch positions even though
-# they may be deprecated or renamed in this project.
-# Add retired agent names here to prevent false-positive blocks after a rename.
-# Example: frozenset({"old-agent-name", "another-retired-name"})
-DEPRECATED_ALLOWLIST: frozenset[str] = frozenset()
+# they may be deprecated or renamed. Extend as needed.
+DEPRECATED_ALLOWLIST: frozenset[str] = frozenset({
+    "workflow-orchestrator",  # CLAUDE.md discusses it as a deprecated alias
+})
 
 # Non-agent identifiers that are agent-shaped but are NOT agent names.
 # Prevents false positives on structural terms that happen to look like agents.
@@ -97,46 +93,21 @@ _FENCE_RE = re.compile(r'^\s*```')
 # Path resolution helpers
 # ---------------------------------------------------------------------------
 
-def _repo_root() -> str:
-    """Walk up from __file__ to find the repo/project root (contains CLAUDE.md).
-
-    Layout assumption: this hook lives at <root>/.claude/hooks/ or <root>/hooks/.
-    Both are tried; falls back to three levels up if neither contains CLAUDE.md.
-    """
+def _vault_root() -> str:
+    """Walk up from __file__ to find the vault root (contains CLAUDE.md)."""
     here = Path(os.path.abspath(__file__))
-    # Try two-levels-up (<root>/.claude/hooks/file -> <root>)
-    candidate_2up = here.parent.parent.parent
-    if (candidate_2up / "CLAUDE.md").exists():
-        return str(candidate_2up)
-    # Try one-level-up (<root>/hooks/file -> <root>)
-    candidate_1up = here.parent.parent
-    if (candidate_1up / "CLAUDE.md").exists():
-        return str(candidate_1up)
-    return str(candidate_2up)
+    # hooks are at <vault>/.claude/hooks/routing-table-validation.py
+    # so vault = here.parent.parent.parent
+    candidate = here.parent.parent.parent
+    if (candidate / "CLAUDE.md").exists():
+        return str(candidate)
+    # Fallback: two levels up from __file__
+    return str(here.parent.parent.parent)
 
 
 def _registry_path() -> str:
     here = Path(os.path.abspath(__file__))
-    # Search for registry.json walking up from __file__.
-    #
-    # Supported layouts (where <root> is the project/repo root):
-    #   Deployed:  <root>/.claude/hooks/routing-table-validation.py
-    #   Disabled:  <root>/.claude/hooks/disabled/routing-table-validation.py
-    #
-    # Registry may sit at:
-    #   <root>/.claude/registry.json  : standard (generate_registry.py output)
-    #   <root>/registry.json          : non-standard flat layout
-    #
-    # Walk up at most 4 levels; try both locations at each level.
-    probe = here.parent
-    for _ in range(4):
-        for rel in (".claude/registry.json", "registry.json"):
-            candidate = probe / rel
-            if candidate.exists():
-                return str(candidate)
-        probe = probe.parent
-    # Fallback: same dir as this file's parent (will fail-open if absent)
-    return str(here.parent.parent / ".claude" / "registry.json")
+    return str(here.parent.parent / "registry.json")
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +144,7 @@ def _load_registry_agents() -> set[str] | None:
 
         return valid if valid else None
     except Exception:
-        return None  # fail-open: cannot parse -> cannot validate -> allow
+        return None  # fail-open: cannot parse → cannot validate → allow
 
 
 # ---------------------------------------------------------------------------
@@ -368,6 +339,20 @@ def _emit_deny(broken_tokens: list[str], file_path: str) -> None:
 # Main
 # ---------------------------------------------------------------------------
 
+_SESSION: str | None = None  # set from the payload in main(); None when absent
+
+
+def _log_fire(decision: str, detail: str | None = None) -> None:
+    """Record this firing to hook-activity.jsonl. Never raises (contract C1)."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from _governance_logger import log_fire
+        log_fire("routing-table-validation", decision=decision, detail=detail,
+                 session=_SESSION)
+    except Exception:
+        pass
+
+
 def main() -> int:
     try:
         raw = sys.stdin.read()
@@ -375,7 +360,15 @@ def main() -> int:
             return 0
         payload = json.loads(raw)
     except Exception:
-        return 0  # fail-open: parse error -> allow
+        return 0  # fail-open: parse error → allow
+
+    global _SESSION
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from _governance_logger import session_from
+        _SESSION = session_from(payload)
+    except Exception:
+        _SESSION = None
 
     try:
         tool_name = payload.get("tool_name", "")
@@ -404,14 +397,23 @@ def main() -> int:
         # Load registry: fail-open on failure
         registry_agents = _load_registry_agents()
         if registry_agents is None:
-            return 0  # cannot validate -> allow
+            # Contract C1. Logged only past gate (a): this hook fires on every
+            # Write/Edit, and only doctrine-file edits are in its scope.
+            _log_fire("skip", "registry-unavailable")
+            return 0  # cannot validate → allow
 
         broken = _validate_text(text_to_validate, registry_agents)
         if broken:
+            # Deny first, log second. Argument building for the log call happens
+            # outside the helper's try, and this is a Tier-A gate: nothing between
+            # the verdict and the deny may be able to swallow it.
             _emit_deny(broken, file_path)
+            _log_fire("deny", "%s %s" % (os.path.basename(file_path or ""), ",".join(sorted(set(broken))[:5])))
+        else:
+            _log_fire("allow", os.path.basename(file_path or ""))
 
     except Exception:
-        pass  # fail-open: any unexpected error -> allow
+        pass  # fail-open: any unexpected error → allow
 
     return 0
 

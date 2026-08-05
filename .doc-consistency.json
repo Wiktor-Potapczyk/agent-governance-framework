@@ -158,7 +158,10 @@
     {
       "id": "active-enforcement-hooks",
       "expect": {
-        "literal": "36"
+        "count_matches": {
+          "file": "settings/settings.json.template",
+          "pattern": "[a-z0-9_-]+\\.py"
+        }
       },
       "asserted_in": [
         {
@@ -167,14 +170,44 @@
         },
         {
           "file": "hooks/README.md",
-          "pattern": "uses (\\d+) active enforcement hooks"
+          "pattern": "(?:uses|holds) (\\d+) active enforcement hooks"
+        }
+      ]
+    },
+    {
+      "id": "hooks-on-disk",
+      "expect": {
+        "count_files": {
+          "dir": "hooks",
+          "glob": "*.py",
+          "exclude_globs": [
+            "_*.py",
+            "test_*.py",
+            "conftest.py",
+            "mine_governance.py",
+            "sidecar_loader.py",
+            "weekly-usage.py"
+          ]
+        }
+      },
+      "asserted_in": [
+        {
+          "file": "hooks/README.md",
+          "pattern": "holds (\\d+) hook scripts"
+        },
+        {
+          "file": "README.md",
+          "pattern": "ships \\*\\*(\\d+) hooks\\*\\*"
         }
       ]
     },
     {
       "id": "shared-hook-libraries",
       "expect": {
-        "literal": "9"
+        "count_files": {
+          "dir": "hooks",
+          "glob": "_*.py"
+        }
       },
       "asserted_in": [
         {

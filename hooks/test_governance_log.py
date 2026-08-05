@@ -85,7 +85,7 @@ class TestExtractDispatchNames(unittest.TestCase):
     def test_trailing_reasoning_long(self):
         raw = (
             "process-build, process-qa This is too many files to edit inline "
-            ",  it would destroy context. Let me use parallel agents."
+            ": it would destroy context. Let me use parallel agents."
         )
         self.assertEqual(extract_dispatch_names(raw), "process-build, process-qa")
 
@@ -180,36 +180,6 @@ class TestKnownNamesCompleteness(unittest.TestCase):
         ]
         for name in common:
             self.assertIn(name, KNOWN_DISPATCH_NAMES, f"{name} missing")
-
-
-class TestBlockedTurnLogging(unittest.TestCase):
-    """M6 fix (2026-04-13): blocked turns should be logged with blocked_turn=true."""
-
-    def test_blocked_turn_flag_set(self):
-        """When stop_hook_active is true, log entry should include blocked_turn=True."""
-        # The flag is derived from payload.get("stop_hook_active")
-        # Test the logic inline since the hook main() needs stdin/transcript
-        self.assertTrue(bool(True))  # is_blocked_turn = bool(payload.get("stop_hook_active"))
-        # Real test: the log_entry dict includes "blocked_turn" field
-        log_entry = {
-            "ts": "2026-04-13 00:00:00",
-            "schema": 2,
-            "session": "test",
-            "type": "Build",
-            "blocked_turn": True,
-        }
-        self.assertTrue(log_entry["blocked_turn"])
-
-    def test_normal_turn_blocked_false(self):
-        """Normal turn should have blocked_turn=False."""
-        log_entry = {
-            "ts": "2026-04-13 00:00:00",
-            "schema": 2,
-            "session": "test",
-            "type": "Build",
-            "blocked_turn": False,
-        }
-        self.assertFalse(log_entry["blocked_turn"])
 
 
 if __name__ == "__main__":

@@ -258,6 +258,133 @@ def check_pm_after_increment(lines):
     return False, f"Increment complete ({task_creates} tasks + pentest) but /pm checkpoint not invoked"
 
 
+# Anchored + single-line (pentest HIGH 2026-08-01): unanchored matching parsed
+# "RECHECK:" and mid-sentence "double CHECK:" as declared clauses, and the DOTALL
+# tail captured the NEXT line whenever the clause itself was empty.
+_CHECK_CLAUSE_RE = re.compile(r"(?:^|[.;)])[ \t]*CHECK:[ \t]*([^\n]*)", re.MULTILINE)
+# Most specific first: re-derivation and tool-call are tested before the generic
+# test bucket so a clause naming both lands in the more informative category.
+_CHECK_TYPE_KEYWORDS = [
+    ("none-exists", ("none-exists",)),
+    ("re-derivation", ("re-deriv", "rederiv", "separate agent", "independent", "verifier", "recount", "recompute")),
+    ("tool-call", ("validate", "n8n_", "webfetch", "curl", "http", "mcp", "bash", "node --check", "grep")),
+    ("test", ("pytest", "test", "assert", "exit 0", "exit code", "suite")),
+]
+
+
+# The gate's 200KB window is 0.05% of a long transcript (measured 2026-08-01: a
+# 394MB session held 308 TaskCreate blocks, ZERO of them inside the window), so
+# observation reads its own larger bounded window and STAMPS whether it was
+# truncated. Consumers must treat a truncated observation as a lower bound.
+# NOTE: the same blindness affects check_pm_after_increment's HARD gate. That is
+# an enforcement-semantics change and is surfaced to the owner, not fixed here.
+OBSERVE_READ_BYTES = 4 * 1024 * 1024
+
+
+def _read_observation_window(path):
+    """Return (lines, truncated) for the observation pass. Never raises."""
+    size = os.path.getsize(path)
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        fh.seek(max(0, size - OBSERVE_READ_BYTES))
+        return fh.read().split("\n"), size > OBSERVE_READ_BYTES
+
+
+def _tok_hit(low, tok):
+    """Word-boundary match for word-only tokens, substring for symbol-bearing ones.
+    Plain substring matching let 'latest' and 'attests' claim the 'test' bucket,
+    corrupting the emitted histogram (pentest HIGH 2026-08-01)."""
+    probe = tok.strip()
+    if probe.replace(" ", "").isalnum():
+        return re.search(r"\b" + re.escape(probe) + r"\b", low) is not None
+    return probe in low
+
+# A clause is STRONG when it names something executable: a runner, a tool, an
+# artifact path, an observable comparison, or an independent re-derivation.
+# Absence of every one of these is the WEAK_CHECK signal (see observe_step_checks).
+_STRONG_CHECK_TOKENS = (
+    "pytest", "unittest", "npm ", "node ", "python ", "bash ", "exit 0", "exit code",
+    "test_", "assert", " green", "suite", "returns", "return code", "run ", "rerun",
+    "n8n_", "mcp__", "curl", "http", "webfetch", "grep", "glob", "validate", "git ",
+    "equals", "matches", "zero errors", "no errors", "count", "diff", "output",
+    "re-deriv", "rederiv", "separate agent", "independent", "verifier", "recompute", "recount",
+    ".py", ".js", ".md", ".json", ".jsonl", ".mjs", ".sh",
+)
+
+
+def observe_step_checks(lines):
+    """Stage 1 instrumentation (ratified 2026-08-01 proposal): count CHECK: clauses
+    on TaskCreate descriptions in the transcript tail. ADVISORY ONLY: never blocks.
+    Returns None when no TaskCreate is present (nothing to observe).
+    Consumers compute the attach-rate over real-UUID sessions only (REV-7 semantics)."""
+    task_creates = 0
+    with_check = 0
+    weak_check = 0
+    types = {}
+    seen_clauses = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if entry.get("type") != "assistant":
+            continue
+        for block in (entry.get("message", {}) or {}).get("content", []):
+            if block.get("type") != "tool_use" or block.get("name") != "TaskCreate":
+                continue
+            inp = block.get("input", {})
+            if isinstance(inp, str):
+                try:
+                    inp = json.loads(inp)
+                except (json.JSONDecodeError, TypeError):
+                    inp = {}
+            task_creates += 1
+            desc = str(inp.get("description") or "")
+            seen_clauses.append(desc)  # key on FULL step text: clause-only keys collide
+            # Read EVERY clause in the step, not just the first: a weak leading
+            # clause used to hide a real one behind it (pentest HIGH). An empty
+            # clause is no clause at all.
+            clauses = [c.strip() for c in _CHECK_CLAUSE_RE.findall(desc)]
+            clauses = [c for c in clauses if c]
+            if not clauses:
+                continue
+            with_check += 1
+            resolved = None
+            for clause in clauses:
+                low = clause.lower()
+                ctype = "other"
+                for label, keywords in _CHECK_TYPE_KEYWORDS:
+                    if any(_tok_hit(low, k) for k in keywords):
+                        ctype = label
+                        break
+                # WEAK_CHECK (pentest HIGH fix 2026-08-01): the doctrine's canonical
+                # theater is a SHORT clause restating the goal ("verify the change
+                # works"), which a length-only rule scores 0. A clause is weak when
+                # it names no executable action, or blows the length cap.
+                # `none-exists` is an honest declaration and is never weak.
+                weak = ctype != "none-exists" and (
+                    len(clause) > 120 or not any(_tok_hit(low, t) for t in _STRONG_CHECK_TOKENS))
+                if not weak:
+                    resolved = ctype
+                    break
+            if resolved is None:
+                weak_check += 1
+                resolved = "weak"
+            types[resolved] = types.get(resolved, 0) + 1
+    if task_creates == 0:
+        return None
+    # obs_key (pentest MED fix): every Stop event re-reads the same transcript tail,
+    # so repeated Stops re-emit identical observations. Consumers dedupe on
+    # (session, obs_key) instead of summing raw records, which would make the
+    # attach-rate Stop-count-weighted.
+    import hashlib
+    obs_key = hashlib.sha256(" ".join(seen_clauses).encode("utf-8")).hexdigest()[:12]
+    return {"task_creates": task_creates, "with_check": with_check,
+            "weak_check": weak_check, "types": types, "obs_key": obs_key}
+
+
 def main():
     payload_text = sys.stdin.read()
     if not payload_text:
@@ -284,6 +411,24 @@ def main():
 
     lines = tail.split("\n")
 
+    # Stage 1 step-check observation (ratified 2026-08-01): advisory emit, fail-open.
+    try:
+        from _event_emit import emit_event
+        obs_lines, obs_truncated = _read_observation_window(transcript_path)
+        obs = observe_step_checks(obs_lines)
+        if obs is not None:
+            obs["window_truncated"] = obs_truncated
+            from _governance_logger import session_from
+            session_id = session_from(payload)
+            emit_event(
+                event="step_check_observation",
+                hook="process-step-check",
+                session=session_id,
+                extra=obs,
+            )
+    except Exception:
+        pass  # instrumentation must never break the gate
+
     # Find the last process skill invocation and collect everything after it
     last_process_skill = None
     text_after_skill = []
@@ -302,9 +447,9 @@ def main():
         # B-1b fix (2026-06-11): Turn-boundary reset must fire only on REAL user
         # messages, not on tool_result wrapper entries. A Workflow invocation lands
         # as three transcript entries:
-        #   1. assistant : Workflow tool_use
-        #   2. user      : tool_result wrapper  ← NOT a real user turn
-        #   3. assistant : relay text (contains SCOPE/QA REPORT)
+        #   1. assistant: Workflow tool_use
+        #   2. user: tool_result wrapper  ← NOT a real user turn
+        #   3. assistant: relay text (contains SCOPE/QA REPORT)
         # If we reset on entry 2, found_skill is False before the relay text (entry 3)
         # arrives, and the SCOPE/QA-REPORT check silently skips: B-1a without B-1b
         # has zero enforcement effect.
@@ -401,21 +546,19 @@ def main():
     if not pm_passed:
         # Log and block
         try:
-            from datetime import datetime
-            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0]  # Full UUID (P1-D fix 2026-04-09)
-            log_entry = json.dumps({
-                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "event": "block",
-                "hook": "process-step-check",
-                "session": session_id,
-                "process": "pm-enforcement",
-                "hard_failures": [pm_msg],
-                "soft_warnings": [],
-                "schema": 2,
-            })
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(log_entry + "\n")
+            from _event_emit import emit_event
+            from _governance_logger import session_from
+            session_id = session_from(payload)
+            emit_event(
+                event="block",
+                hook="process-step-check",
+                session=session_id,
+                extra={
+                    "process": "pm-enforcement",
+                    "hard_failures": [pm_msg],
+                    "soft_warnings": [],
+                },
+            )
         except Exception:
             pass
         reason = f"PM ENFORCEMENT: {pm_msg}. Invoke /pm before reporting back."
@@ -427,21 +570,19 @@ def main():
     if not pm_report_passed:
         hard_failures_pm = [pm_report_msg]
         try:
-            from datetime import datetime
-            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0]  # Full UUID (P1-D fix 2026-04-09)
-            log_entry = json.dumps({
-                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "event": "block",
-                "hook": "process-step-check",
-                "session": session_id,
-                "process": "pm-report-enforcement",
-                "hard_failures": hard_failures_pm,
-                "soft_warnings": [],
-                "schema": 2,
-            })
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(log_entry + "\n")
+            from _event_emit import emit_event
+            from _governance_logger import session_from
+            session_id = session_from(payload)
+            emit_event(
+                event="block",
+                hook="process-step-check",
+                session=session_id,
+                extra={
+                    "process": "pm-report-enforcement",
+                    "hard_failures": hard_failures_pm,
+                    "soft_warnings": [],
+                },
+            )
         except Exception:
             pass
         reason = f"PM REPORT: {pm_report_msg}. Add PM CHECKPOINT REPORT block after /pm output."
@@ -483,23 +624,21 @@ def main():
 
     # Always log when a process skill was detected (pass or fail)
     try:
-        from datetime import datetime
-        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-        session_id = os.path.splitext(os.path.basename(transcript_path))[0]  # Full UUID (P1-D fix 2026-04-09)
-        log_entry = json.dumps({
-            "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "event": "block" if hard_failures else ("warn" if soft_warnings else "pass"),
-            "hook": "process-step-check",
-            "session": session_id,
-            "process": last_process_skill,
-            "hard_failures": hard_failures,
-            "soft_warnings": soft_warnings,
-            "agent_count": len(agents_after_skill),
-            "agents": agents_after_skill,
-            "schema": 2,
-        })
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(log_entry + "\n")
+        from _event_emit import emit_event
+        from _governance_logger import session_from
+        session_id = session_from(payload)
+        emit_event(
+            event="block" if hard_failures else ("warn" if soft_warnings else "pass"),
+            hook="process-step-check",
+            session=session_id,
+            extra={
+                "process": last_process_skill,
+                "hard_failures": hard_failures,
+                "soft_warnings": soft_warnings,
+                "agent_count": len(agents_after_skill),
+                "agents": agents_after_skill,
+            },
+        )
     except Exception:
         pass
 

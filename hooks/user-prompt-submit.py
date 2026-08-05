@@ -40,7 +40,9 @@ def main():
                         model_id = model_matches[-1].group(1)
                         model_label = re.sub(r'^claude-', '', model_id)
                         model_label = re.sub(r'-\d{8}$', '', model_label)
-                        if 'opus' in model_id:
+                        # 1M-context family: opus 5.x, fable/mythos (Claude 5 tier),
+                        # sonnet-5 (1M since v2.1.197). Everything else stays 200K.
+                        if any(t in model_id for t in ('opus', 'fable', 'mythos', 'sonnet-5')):
                             limit_k = 1000
                         else:
                             limit_k = 200
@@ -115,31 +117,6 @@ def main():
             ]
             if p_lower in skip_list:
                 classifier_reminder = ""
-        # S1/M1 fix (2026-04-13): Depth-signal detection.
-        # If user message contains depth signals, inject stronger warning.
-        # Placed AFTER skip_list (trivial prompts suppress depth check).
-        DEPTH_SIGNALS = [
-            (r'\bare you sure\b', "follow-up directive -- inherits or escalates, NEVER Quick"),
-            (r'\bthink deeper\b', "explicit request for deeper reasoning -- NEVER Quick"),
-            (r'\bwhy did\b', "causal investigation -- requires tracing causes, not lookup"),
-            (r'\bthought experiment\b', "architectural reasoning -- NEVER Quick"),
-            (r'\bi\'ve noticed\b', "pattern observation -- invites investigation"),
-            (r'\banalyze this\b', "explicit analysis request -- NEVER Quick"),
-            (r'\bthink about this\b', "explicit reasoning request -- NEVER Quick"),
-            (r'\bbefore deciding\b', "deliberation request -- NEVER Quick"),
-            (r'\bwas it always\b', "timeline investigation -- requires evidence"),
-        ]
-        if prompt_text and not is_subagent and classifier_reminder:
-            for pattern, reason in DEPTH_SIGNALS:
-                if re.search(pattern, prompt_text.lower()):
-                    classifier_reminder = (
-                        f"DEPTH SIGNAL DETECTED: This prompt matches a depth pattern "
-                        f"({reason}). Quick is NOT available for this message. "
-                        f"You MUST classify as Research, Analysis, or the appropriate "
-                        f"non-Quick type. | {classifier_reminder}"
-                    )
-                    break
-
     except Exception:
         pass
 
@@ -162,6 +139,21 @@ def main():
         }
     }
     print(json.dumps(msg))
+
+    # Contract C1. One record per user prompt, which is also the only per-turn
+    # series of measured context occupancy the vault keeps.
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from _governance_logger import log_fire, session_from
+        log_fire(
+            "user-prompt-submit",
+            session=session_from(raw),
+            decision=("inject" if combined else "silent"),
+            # The bar glyphs in ctx_line are display-only; the log keeps the number.
+            detail="pct=%d%s" % (pct, "" if ctx_line else " ctx=unavailable"),
+        )
+    except Exception:
+        pass
 
 if __name__ == "__main__":
     main()

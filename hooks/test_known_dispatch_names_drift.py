@@ -25,8 +25,7 @@ import unittest
 
 
 HOOKS_DIR = os.path.dirname(os.path.abspath(__file__))
-# Add scripts/ to path so we can import the shared canonical set.
-# hooks/ and scripts/ are siblings at the repo root, so one level up suffices.
+# Add scripts/ to path so we can import the shared canonical set
 SCRIPTS_DIR = os.path.join(HOOKS_DIR, "..", "scripts")
 sys.path.insert(0, os.path.normpath(SCRIPTS_DIR))
 

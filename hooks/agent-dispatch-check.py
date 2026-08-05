@@ -20,6 +20,34 @@ import re
 # 200KB window: matches other hardened hooks (agent-dispatch bump 2026-04-09)
 READ_BYTES = 204800
 
+# Observability v2: shared event-emit helper (silent on import failure)
+try:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from _event_emit import emit_event  # type: ignore
+except Exception:  # pragma: no cover
+    emit_event = None  # type: ignore
+
+
+def _emit_dispatch(session_id, agent_type, must_dispatch, exempted, warn, outcome):
+    """Fire event 5 agent_dispatched. Silent on any error."""
+    if emit_event is None:
+        return
+    try:
+        emit_event(
+            event="agent_dispatched",
+            hook="agent-dispatch-check",
+            session=session_id,
+            extra={
+                "agent_type": agent_type,
+                "skill_context": must_dispatch or [],
+                "exempted_via_registry": bool(exempted),
+                "warn_downgrade": bool(warn),
+                "outcome": outcome,  # one of: allow, always_allowed, allow_exemption, warn, warn_research_direct, no_classification
+            },
+        )
+    except Exception:
+        pass
+
 # Agent types that are always allowed (infrastructure, not specialist routing)
 ALWAYS_ALLOWED = {"general-purpose", "explore", "plan", "bash"}
 
@@ -32,11 +60,96 @@ PROCESS_ROUTING_SKILLS = {
     "process-planning", "process-qa", "process-pentest",
 }
 
+# Family-B (2026-07-15): downstream research-pipeline agents that MUST be
+# entered via process-research, never dispatched directly (CLAUDE.md line ~267:
+# "Research (enter via process-research, never dispatch downstream directly)").
+# Direct dispatch WITHOUT process-research in MUST DISPATCH -> advisory WARN
+# (non-blocking, additive; escalation-to-block is a future measurement-gated step).
+GUARDED_RESEARCH_AGENTS = {
+    "research-orchestrator", "research-analyst", "technical-researcher",
+    "research-synthesizer", "report-generator", "research-coordinator",
+    "query-clarifier",
+}
+
 # Registry path: loaded lazily to list all valid agents (local + plugin)
 REGISTRY_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "registry.json"
 )
+
+# Step-11 competence gate paths (2026-07-13): module constants so tests can
+# repoint them at fixtures (same pattern as REGISTRY_PATH).
+GATE_SIDECAR_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "_agent_risk_tiers.json"
+)
+GATE_LOG_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl"
+)
+
+
+def _competence_gate(session_id, agent_type):
+    """ADVISORY-ONLY Step-11 competence gate (spec 2026-07-10, DQ-1..DQ-5).
+
+    Computes the per-agent STRUCTURAL RELIABILITY signal (not semantic
+    competence) for high-tier agents only, emits one competence_gate_decision
+    trace event, and on a BELOW verdict prints a stderr warning. Structurally
+    incapable of denying: no stdout write, no decision object, no effect on
+    the caller's control flow. Entirely fail-open: any exception is a
+    silent allow (Gate-1 remains the only fail-closed layer).
+    """
+    try:
+        with open(GATE_SIDECAR_PATH, "r", encoding="utf-8") as f:
+            tiers = json.load(f)
+        tier_entry = tiers.get(agent_type)
+        if not isinstance(tier_entry, dict) or tier_entry.get("tier") != "high":
+            return  # non-high tier: no gate work at all (no event, no log read)
+
+        import _competence_signal  # lazy: only high-tier dispatches pay for it
+
+        result = _competence_signal.get_verdict(GATE_LOG_PATH, agent_type)
+        verdict = result.get("verdict", "NO_SIGNAL")
+        score = result.get("score")
+        n = result.get("n", 0)
+
+        action_taken = "none"
+        if verdict == "BELOW":
+            action_taken = "warn"
+            print(
+                f"COMPETENCE GATE (advisory): structural reliability signal "
+                f"for '{agent_type}' is BELOW threshold: score={score:.2f} "
+                f"over n={n} scored completions (threshold "
+                f"{_competence_signal.ADVISORY_THRESHOLD}). Advisory only - "
+                f"dispatch proceeds.",
+                file=sys.stderr,
+            )
+
+        # Decision trace event: deliberately NOT routed through _event_emit
+        # (contract C7). GATE_LOG_PATH is also the path this gate READS its own
+        # history from, and the tests repoint that constant to isolate a run.
+        # Emitting through the shared helper would resolve a different path and
+        # break read-your-writes for the gate and its tests alike.
+        try:
+            from datetime import datetime
+            entry = json.dumps({
+                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "schema": 2,
+                "event": "competence_gate_decision",
+                "hook": "agent-dispatch-check",
+                "session": session_id,
+                "agent_type": agent_type,
+                "risk_tier": "high",
+                "score": score,
+                "n": n,
+                "verdict": verdict,
+                "mode": "advisory",
+                "action_taken": action_taken,
+            })
+            with open(GATE_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(entry + "\n")
+        except Exception:
+            pass
+    except Exception:
+        pass
 
 
 def load_registry_agents():
@@ -70,29 +183,18 @@ SKILL_AGENT_ALIASES = {
     # Skills that dispatch agents with different names
     "pm": {"pm-orchestrator"},
     "architect-review": {"architect-reviewer"},
-    # Process skills dispatch their specialists (S3 fix 2026-04-13)
-    "process-research": {
-        "research-orchestrator", "technical-researcher", "research-analyst",
-        "research-synthesizer", "report-generator",
-    },
-    "process-analysis": {
-        "architect-reviewer", "adversarial-reviewer",
-        "prompt-engineer", "debugger", "api-designer",
-        "data-engineer", "workflow-orchestrator", "api-security-audit",
-        "research-synthesizer", "report-generator",
-    },
-    "process-planning": {
-        "implementation-plan", "adversarial-reviewer", "architect-reviewer",
-        "technical-researcher", "research-analyst", "api-designer",
-        "llm-architect", "data-engineer", "prompt-engineer",
-    },
-    "process-build": {
-        "blueprint-mode", "architect-reviewer", "implementation-plan",
-        "prompt-engineer", "debugger",
-    },
+    # Process skills dispatch their primary agents
+    "process-planning": {"implementation-plan", "adversarial-reviewer"},
+    "process-build": {"blueprint-mode", "architect-reviewer", "implementation-plan"},
+    "process-research": {"research-orchestrator", "technical-researcher", "research-analyst"},
+    "process-analysis": {"architect-reviewer", "adversarial-reviewer"},
+    # PRE-I2-A (2026-04-12): 3 additional aliases from plan v2 audit
     "process-qa": {"debugger"},  # dispatched conditionally on QA failure
-    "process-pentest": {"debugger"},  # pentest dispatches debugger on findings
+    "process-pentest": {"debugger"},  # pentest dispatches debugger on findings, not architect-reviewer (skill says "execute yourself")
     "architect-loop": {"architect-reviewer", "adversarial-reviewer"},  # Ralph Loop dispatches reviewers
+    # NOTE: process-research does NOT alias research-synthesizer/report-generator :
+    # those are dispatched by research-orchestrator internally, not by the main session.
+    # Direct dispatch of downstream agents without process-research is a process violation.
 }
 
 # Known agent/skill names: same set as governance-log.py and dispatch-compliance-check.py
@@ -103,11 +205,12 @@ KNOWN_DISPATCH_NAMES = {
     "adversarial-reviewer", "api-designer", "api-security-audit", "architect-review", "architect-reviewer",
     "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
     "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
-    "mcp-developer", "mcp-registry-navigator", "mcp-server-architect", "n8n-reviewer",
+    "mcp-developer", "mcp-registry-navigator", "mcp-server-architect",
+    "n8n-reviewer", "n8n-workflow-architect", "n8n-workflow-builder",
     "nosql-specialist", "pm-orchestrator", "postgres-pro", "powershell-7-expert",
     "prompt-engineer", "query-clarifier", "report-generator", "research-analyst",
     "research-coordinator", "research-orchestrator", "research-synthesizer",
-    "technical-researcher", "vault-keeper", "workflow-orchestrator",
+    "technical-researcher", "vault-keeper",
     # Skills
     "process-qa", "process-analysis", "process-build", "process-planning",
     "process-research", "process-pentest", "pm", "task-classifier", "verify",
@@ -156,16 +259,29 @@ def main():
             tool_input = {}
 
     agent_type = (tool_input.get("subagent_type") or "").lower()
+    transcript_path = payload.get("transcript_path")
+    from _governance_logger import session_from
+    session_id = session_from(payload)
+
     if not agent_type:
+        _emit_dispatch(session_id, "", [], False, False, "no_type")
         return  # No type specified = general-purpose, allow
 
     # Always allow infrastructure agents
     if agent_type in ALWAYS_ALLOWED:
+        _emit_dispatch(session_id, agent_type, [], False, False, "always_allowed")
         return
 
+    # Step-11 competence gate (2026-07-13, wired this line): advisory-only
+    # structural reliability signal for high-tier named agents. Generic types
+    # have already returned above, so the gate sees only named specialist
+    # dispatches. Never denies, never returns early, never writes stdout :
+    # see _competence_gate docstring.
+    _competence_gate(session_id, agent_type)
+
     # Read transcript for last MUST DISPATCH
-    transcript_path = payload.get("transcript_path")
     if not transcript_path or not os.path.exists(transcript_path):
+        _emit_dispatch(session_id, agent_type, [], False, False, "no_transcript")
         return  # Can't verify, allow
 
     file_size = os.path.getsize(transcript_path)
@@ -210,7 +326,35 @@ def main():
 
     # If no MUST DISPATCH or it's empty/none, allow any agent
     if not must_dispatch:
+        _emit_dispatch(session_id, agent_type, [], False, False, "no_classification")
         return
+
+    # Family-B warn (2026-07-15, additive/non-blocking): a guarded downstream
+    # research-pipeline agent dispatched DIRECTLY without process-research in the
+    # MUST DISPATCH routing context is a process violation (CLAUDE.md line ~267).
+    # Warn only: dispatch proceeds; escalation-to-block is a future measurement-
+    # gated step. Distinct outcome label keeps this window separable from the
+    # pre-existing off-contract 'warn'. Fail-open: never stdout/exit/deny.
+    if agent_type in GUARDED_RESEARCH_AGENTS and "process-research" not in must_dispatch:
+        print(
+            f"RESEARCH DISPATCH (advisory): '{agent_type}' is a downstream "
+            f"research-pipeline agent dispatched directly without 'process-research' "
+            f"in MUST DISPATCH {must_dispatch}. Doctrine: enter research via "
+            f"process-research, never dispatch downstream directly. Logged for review.",
+            file=sys.stderr,
+        )
+        try:
+            emit_event(
+                event="warn_research_direct",
+                hook="agent-dispatch-check",
+                session=session_id,
+                extra={"agent_type": agent_type, "must_dispatch": must_dispatch},
+            )
+        except Exception:
+            pass
+        _emit_dispatch(session_id, agent_type, must_dispatch, False, True, "warn_research_direct")
+        # NO return: fall through to the existing allow/deny/exemption logic so
+        # the dispatch still proceeds exactly as before. Additive signal only.
 
     # Expand must_dispatch with skill→agent aliases (bug fix 2026-04-10).
     # If user declared [pm, architect-review], the allowed set should also
@@ -230,22 +374,15 @@ def main():
         registry_agents = load_registry_agents() if has_process_skill else set()
         if has_process_skill and agent_type in registry_agents:
             try:
-                from datetime import datetime
-                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
-                entry = json.dumps({
-                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "event": "allow_process_skill_exemption",
-                    "hook": "agent-dispatch-check",
-                    "session": session_id,
-                    "agent_type": agent_type,
-                    "must_dispatch": must_dispatch,
-                    "schema": 2,
-                })
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(entry + "\n")
+                emit_event(
+                    event="allow_process_skill_exemption",
+                    hook="agent-dispatch-check",
+                    session=session_id,
+                    extra={"agent_type": agent_type, "must_dispatch": must_dispatch},
+                )
             except Exception:
                 pass
+            _emit_dispatch(session_id, agent_type, must_dispatch, True, False, "allow_exemption")
             return  # Allowed via process-skill routing exemption
 
         # A: warn-downgrade: not blocked, but logged and surfaced to stderr.
@@ -259,25 +396,19 @@ def main():
         print(reason, file=sys.stderr)
         # Log warn event (schema: event=warn, not deny)
         try:
-            from datetime import datetime
-            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
-            entry = json.dumps({
-                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "event": "warn",
-                "hook": "agent-dispatch-check",
-                "session": session_id,
-                "agent_type": agent_type,
-                "must_dispatch": must_dispatch,
-                "schema": 2,
-            })
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(entry + "\n")
+            emit_event(
+                event="warn",
+                hook="agent-dispatch-check",
+                session=session_id,
+                extra={"agent_type": agent_type, "must_dispatch": must_dispatch},
+            )
         except Exception:
             pass
+        _emit_dispatch(session_id, agent_type, must_dispatch, False, True, "warn")
         return  # No deny: advisory only
 
     # Agent is in the list: allow
+    _emit_dispatch(session_id, agent_type, must_dispatch, False, False, "allow")
     return
 
 

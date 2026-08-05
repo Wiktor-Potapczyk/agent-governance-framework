@@ -17,11 +17,11 @@ import tempfile
 HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "em-dash-guard.py")
 
 # Literal glyphs (consistent with the hook's detection list).
-EM = "—"        # U+2014 em dash
-EN = "–"        # U+2013 en dash
-HBAR = "―"      # U+2015 horizontal bar
-MINUS = "−"     # U+2212 minus sign
-FIGURE = "‒"    # U+2012 figure dash
+EM = ":"        # U+2014 em dash
+EN = ":"        # U+2013 en dash
+HBAR = ":"      # U+2015 horizontal bar
+MINUS = ":"     # U+2212 minus sign
+FIGURE = ":"    # U+2012 figure dash
 
 
 def run(assistant_text=None, stop_hook_active=False, transcript_exists=True,
@@ -76,9 +76,9 @@ case("dash only in the second text block", True, content_blocks=[
 case("clean prose, hyphens only", False,
      assistant_text="day-to-day self-hosted well-known. No fancy dashes here.")
 case("em dash only inside fenced code", False,
-     assistant_text="Here is code:\n```\nx = 1  # note — a dash\n```\nDone.")
+     assistant_text="Here is code:\n```\nx = 1  # note: a dash\n```\nDone.")
 case("em dash only inside inline code", False,
-     assistant_text="The char `—` is U+2014. I describe it without typing it.")
+     assistant_text="The char `:` is U+2014. I describe it without typing it.")
 case("the literal word em-dash with hyphen", False,
      assistant_text="I will not use the em-dash or en-dash in prose.")
 case("em dash inside a real markdown table row", False,

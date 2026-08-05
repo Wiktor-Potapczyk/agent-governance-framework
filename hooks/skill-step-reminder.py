@@ -33,7 +33,7 @@ PROCESS_REMINDERS = {
         "Step 1: Write BUILD SCOPE block. "
         "Step 2: Delegate to implementation-plan. "
         "Step 3: Delegate to blueprint-mode (or domain specialist). "
-        "Step 4: MUST dispatch architect-review. Skipping review is a process violation. "
+        "Step 4: MUST dispatch architect-reviewer. Skipping review is a process violation. "
         "Step 5: Quality check (live verification for n8n). "
         "Do NOT skip the review step."
     ),
@@ -42,7 +42,7 @@ PROCESS_REMINDERS = {
         "Step 1: Write PLANNING SCOPE block. "
         "Step 2: Research if unknowns exist. "
         "Step 3: Delegate to implementation-plan. "
-        "Step 4: MUST dispatch architect-review. Skipping review is a process violation. "
+        "Step 4: MUST dispatch architect-reviewer. Skipping review is a process violation. "
         "Step 5: Revise based on review. "
         "For high-stakes plans: MUST also dispatch adversarial-reviewer."
     ),
@@ -55,6 +55,18 @@ PROCESS_REMINDERS = {
         "Step 5: Escalate failures: do NOT fix them, report them."
     ),
 }
+
+
+def _log_fire(decision, detail=None, payload=None):
+    """Record this firing to hook-activity.jsonl. Never raises (contract C1)."""
+    try:
+        import os
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from _governance_logger import log_fire, session_from
+        log_fire("skill-step-reminder", decision=decision, detail=detail,
+                 session=session_from(payload))
+    except Exception:
+        pass
 
 
 def main():
@@ -81,6 +93,10 @@ def main():
     reminder = PROCESS_REMINDERS.get(skill_name)
     if not reminder:
         return
+
+    # Contract C1. Logged only past the process-skill filter above: this hook fires
+    # on every Skill call, and only the matched ones carry signal.
+    _log_fire("remind", skill_name, payload)
 
     result = {
         "hookSpecificOutput": {

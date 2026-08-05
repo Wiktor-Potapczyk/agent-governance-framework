@@ -20,25 +20,25 @@ sys.path.insert(0, _HOOK_DIR)
 
 
 # ---------------------------------------------------------------------------
-# FROZEN FALLBACK SNAPSHOT (GAP-11, 2026-07-10) — a hardcoded copy of the core
+# FROZEN FALLBACK SNAPSHOT (GAP-11, 2026-07-10): a hardcoded copy of the core
 # P1/P2/P3/P5 tuples from _irreversible_surface.py IRREVERSIBLE_BASH_PATTERNS
 # (transcribed 2026-07-10; P4 external-curl-write is a predicate, not a tuple,
 # so its degraded form stays a no-op predicate but ALARMS, below). Used ONLY when
 # the canonical module fails to import, so Gate-1 never degrades to an empty
-# surface. FROZEN COPY — update when _irreversible_surface.py changes (risk R1;
+# surface. FROZEN COPY: update when _irreversible_surface.py changes (risk R1;
 # candidate automated check: process-lint Pass K doctrine-drift).
 # ---------------------------------------------------------------------------
 _IRREVERSIBLE_FALLBACK_SNAPSHOT = [
-    # P1 — unflagged relative single-file rm
+    # P1: unflagged relative single-file rm
     (r'\brm\s+(?!-)(?!/)(?!["\']?[A-Za-z]:[/\\])[^\s;|&><]+', "rm on unflagged relative file (irreversible delete)"),
-    # P2 — normal (non-force) git push, tolerating git global options before `push`
+    # P2: normal (non-force) git push, tolerating git global options before `push`
     (r'\bgit\s+(?:(?:-C\s+\S+|-c\s+\S+|--[A-Za-z][\w-]*(?:=\S+)?|-[A-Za-z])\s+)*push\b',
      "git push (publication is effectively irreversible)"),
-    # P3 — DB destructive DDL/DML
+    # P3: DB destructive DDL/DML
     (r'\bDROP\s+(?:TABLE|DATABASE|SCHEMA)\b', "SQL DROP TABLE/DATABASE/SCHEMA (destructive DDL)"),
     (r'\bTRUNCATE\s+(?:TABLE\s+)?\w', "SQL TRUNCATE (destructive DML)"),
     (r'\bDELETE\s+FROM\s+\w+(?![^;]*\bWHERE\b)', "SQL unbounded DELETE (no WHERE clause)"),
-    # P5 — prod deploy (isolated -p example-build-oracle stage exempt)
+    # P5: prod deploy (isolated -p example-build-oracle stage exempt)
     (r'\bdocker[\s-]+compose(?=\s)(?![^|;&\n]*-p\s+example-build-oracle\b)[^|;&\n]*\bup\b',
      "docker compose up (prod deploy; isolated -p example-build-oracle stage exempt)"),
     (r'\bdocker\s+build\b[^|;&\n]*-t\s+\S*:latest\b', "docker build -t *:latest (prod image build)"),
@@ -80,7 +80,7 @@ def _alarm_gate1_surface_degraded(detail):
 
 
 # Two-Gate Gate-1 (2026-06-16): import the NEW canonical irreversible Bash surface
-# from the shared module. These are APPENDED to BLOCKED_PATTERNS below — the existing
+# from the shared module. These are APPENDED to BLOCKED_PATTERNS below: the existing
 # force-push / rm-rf / hook-bypass block stays verbatim and ABOVE them in iteration
 # order so its description fidelity is preserved.
 # GAP-11 hardening (2026-07-10): the fallback is no longer fail-open-to-empty. On
@@ -93,7 +93,7 @@ except Exception as _exc:
     IRREVERSIBLE_BASH_PATTERNS = list(_IRREVERSIBLE_FALLBACK_SNAPSHOT)
 
 # Two-Gate Gate-1 (2026-06-17): the external-curl-write deny is a PARSING predicate
-# (replaces the old whole-segment-loopback P4 regex — confirmed under-block, pentest
+# (replaces the old whole-segment-loopback P4 regex: confirmed under-block, pentest
 # wf_aeee55d3-224 HIGH #B). It runs as a dedicated block in main() on the inert-stripped
 # command. GAP-11 (2026-07-10): the ImportError fallback stays a no-op predicate (a
 # frozen predicate copy is optional per spec) but the degradation now ALARMS loudly.
@@ -120,13 +120,13 @@ _INERT_CONTEXT_PATTERNS = [
     # `bash -c "…"` / `sh -c "…"` / `cmd -c` etc
     (re.compile(r'\b(?:bash|sh|zsh|cmd)\s+-c\s+"(?:\\.|[^"\\])*"'), "sh -c (double)"),
     (re.compile(r"\b(?:bash|sh|zsh|cmd)\s+-c\s+'(?:\\.|[^'\\])*'"), "sh -c (single)"),
-    # `grep 'pattern'` / `grep -E "pattern"` etc — pattern is not a command
+    # `grep 'pattern'` / `grep -E "pattern"` etc: pattern is not a command
     (re.compile(r'\bgrep(?:\s+-[a-zA-Z]+)*\s+"(?:\\.|[^"\\])*"'), "grep (double)"),
     (re.compile(r"\bgrep(?:\s+-[a-zA-Z]+)*\s+'(?:\\.|[^'\\])*'"), "grep (single)"),
-    # `echo "…"` / `printf "…"` — output, not execution
+    # `echo "…"` / `printf "…"`: output, not execution
     (re.compile(r'\b(?:echo|printf)\s+"(?:\\.|[^"\\])*"'), "echo/printf (double)"),
     (re.compile(r"\b(?:echo|printf)\s+'(?:\\.|[^'\\])*'"), "echo/printf (single)"),
-    # `-m "…"` / `-m '…'` — commit/tag message bodies are text, not shell.
+    # `-m "…"` / `-m '…'`: commit/tag message bodies are text, not shell.
     # Prevents false-positives like `git commit -m "added --no-verify support"`.
     # Negative lookbehind (?<!\w) ensures `-m` is a flag, not part of a longer word.
     (re.compile(r'(?<!\w)-m\s*"(?:\\.|[^"\\])*"'), "-m message (double-quoted, optional space)"),
@@ -140,7 +140,7 @@ _INERT_CONTEXT_PATTERNS = [
 # Constructs whose exact boundaries this simple quote scanner does NOT model:
 # command substitution (backtick, $(...)) , process substitution (<(...), >(...)),
 # and ANSI-C / locale special quoting ($'...', $"..."). If any appear, we refuse to
-# strip comments at all — see _strip_trailing_comments.
+# strip comments at all: see _strip_trailing_comments.
 _COMMENT_UNSAFE_TOKENS = ("`", "$(", "$'", '$"', "<(", ">(")
 
 
@@ -155,9 +155,9 @@ def _strip_trailing_comments(command):
     returns the command UNCHANGED and strips nothing. Empirically, a `#` that this
     scanner would treat as a comment can sit inside such a construct while bash
     executes a `; cmd` tail right after the construct closes (confirmed for backtick
-    substitution and ``$'...'`` ANSI-C quoting) — stripping to end-of-line would then
+    substitution and ``$'...'`` ANSI-C quoting): stripping to end-of-line would then
     hide that live command (a critical under-block hole). Bailing reverts to the
-    pre-change behavior (whole command scanned) for these rare cases — at worst an
+    pre-change behavior (whole command scanned) for these rare cases: at worst an
     over-block, never an under-block.
 
     For the remaining (common) case with no such construct, this is quote-aware: a
@@ -220,7 +220,7 @@ def strip_inert_contexts(command):
     return cleaned
 
 
-# Windows reserved device names — creating these breaks OneDrive sync (Issue #16604)
+# Windows reserved device names: creating these breaks OneDrive sync (Issue #16604)
 WINDOWS_RESERVED_NAMES = {
     "nul", "con", "prn", "aux",
     "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
@@ -238,7 +238,7 @@ BLOCKED_PATTERNS = [
     (r'\bgit\s+reset\s+--hard', "git reset --hard"),
     (r'\bgit\s+clean\s+-[fdxFDX]', "git clean (destructive)"),
     (r'\bgit\s+checkout\s+--\s+\.', "git checkout -- . (discard all changes)"),
-    # Hook bypass — commits/pushes that skip pre-commit/pre-push/commit-msg/etc hooks
+    # Hook bypass: commits/pushes that skip pre-commit/pre-push/commit-msg/etc hooks
     # ECC-LEARN-A2 (2026-05-07, architect-revised): block --no-verify and -n short-form
     # scoped to hook-bearing subcommands (commit/push/merge/cherry-pick/rebase/am).
     # Scoping prevents false positives on read-only ops like `git log -S '--no-verify'`
@@ -251,7 +251,7 @@ BLOCKED_PATTERNS = [
     (r'\bgit\s+(?:commit|push|merge|cherry-pick|rebase|am)\b.*--no-verify\b', "git --no-verify on hook-bearing subcommand (bypasses pre-commit/pre-push/commit-msg/pre-rebase hooks)"),
     (r'\bgit\s+(?:commit|push|merge|cherry-pick|rebase|am)\b.*\s-n\b', "git -n on hook-bearing subcommand (short form of --no-verify)"),
     (r'\bgit\s+.*-c\s+core\.hooksPath\s*=', "git -c core.hooksPath= override (disables hooks for this invocation)"),
-    (r'\bGIT_HOOKS_PATH\s*=', "GIT_HOOKS_PATH= env var override (defensive — not a standard git mechanism but listed in spec)"),
+    (r'\bGIT_HOOKS_PATH\s*=', "GIT_HOOKS_PATH= env var override (defensive: not a standard git mechanism but listed in spec)"),
     # Credential/secret exposure
     (r'\bcat\b.*\.(env|pem|key|secret)', "reading credential file"),
     (r'\becho\b.*\b(password|secret|token|api.key)\b.*>', "writing credentials to file"),
@@ -264,9 +264,72 @@ BLOCKED_PATTERNS = [
 ]
 
 # Two-Gate Gate-1 (2026-06-16): append the NEW irreversible-surface patterns AFTER the
-# existing block. Order matters — force-push patterns stay above the generic git-push
+# existing block. Order matters: force-push patterns stay above the generic git-push
 # pattern so `git push --force` reports the force-push description, not the normal one.
 BLOCKED_PATTERNS.extend(IRREVERSIBLE_BASH_PATTERNS)
+
+# ---------------------------------------------------------------------------
+# WIKTOR RULING 2026-08-05: normal `git push` WARNS, it does not block.
+#
+# The Gate-1 design routed a normal push to a hard deny, on the theory that the
+# human gate is the owner re-running it himself via the `!`-prefix bypass. In
+# practice the command he pastes is the command the agent just composed and
+# handed him verbatim, so the ritual moved no decision to a human: it only cost
+# a round trip. His words: "What is the fucking purpose of me copying and
+# pasting the exact command you have recommended to me? ... Of course the hook
+# should remind you that your action might be destructive and you should think
+# twice but not block you entirely."
+#
+# So the normal-push pattern is LIFTED OUT of BLOCKED_PATTERNS into
+# WARN_PATTERNS, which permits the call and returns a caution the agent reads
+# before the push runs. Everything else on the irreversible surface is
+# untouched, and specifically STILL DENIED:
+#   - force-push (--force / -f), which rewrites published history and is the
+#     genuinely unrecoverable one, unlike a normal push which is additive and
+#     revertable with `git revert`
+#   - --no-verify and friends (hook bypass on commit/push/merge/rebase)
+#   - unflagged relative rm, SQL DROP/TRUNCATE/unbounded DELETE, prod deploy,
+#     external writes
+# (Measured 2026-08-05 while verifying this change: a FLAGGED absolute-path
+# delete such as `rm -rf /tmp/x` passes silently and always did. That is the
+# Family-C calibration, not a hole this edit opened, but it is worth knowing
+# the rm floor is narrower than the module docstring's "Denies: rm -rf" reads.)
+# The push is still LOGGED to governance-log.jsonl, as a `warn` event rather
+# than a `deny`, so the audit trail keeps every publication.
+# ---------------------------------------------------------------------------
+_NORMAL_PUSH_DESC = "git push (publication is effectively irreversible)"
+WARN_PATTERNS = [(p, d) for (p, d) in BLOCKED_PATTERNS if d == _NORMAL_PUSH_DESC]
+BLOCKED_PATTERNS = [(p, d) for (p, d) in BLOCKED_PATTERNS if d != _NORMAL_PUSH_DESC]
+
+
+def _warn_and_allow(command, description, payload):
+    """Permit the call, but hand back a caution the agent sees first."""
+    result = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow",
+            "permissionDecisionReason": (
+                f"BASH SAFETY (warning, not a block): '{description}'. "
+                f"Command: {command[:100]}. "
+                "Publishing is visible to everyone with access to the remote and "
+                "cannot be un-seen; a wrong commit is corrected with `git revert`, "
+                "not by deleting history. Check the branch and the remote are the "
+                "ones you mean, then proceed."
+            ),
+        }
+    }
+    print(json.dumps(result))
+    try:
+        from _event_emit import emit_event
+        from _governance_logger import session_from
+        emit_event(
+            event="warn",
+            hook="bash-safety-guard",
+            session=session_from(payload),
+            extra={"pattern": description, "command_prefix": command[:50]},
+        )
+    except Exception:
+        pass
 
 
 def main():
@@ -314,31 +377,36 @@ def main():
             # P1-D + P1-E fix (2026-04-09): added session + schema fields for analytics joins
             try:
                 import os
-                from datetime import datetime
-                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-                # Extract session from transcript_path if available
-                transcript_path = payload.get("transcript_path", "")
-                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
-                entry = json.dumps({
-                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "schema": 2,
-                    "event": "deny",
-                    "hook": "bash-safety-guard",
-                    "session": session_id,
-                    "pattern": description,
-                    "command_prefix": command[:50],
-                })
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(entry + "\n")
+                from _event_emit import emit_event
+                from _governance_logger import session_from
+                # session_id first, then the transcript stem. Deriving from the
+                # transcript alone silently discarded a valid session_id and filed
+                # the record as "unknown", which is_test_session reads as synthetic:
+                # the hook was labelling its own real denies as test traffic.
+                session_id = session_from(payload)
+                emit_event(
+                    event="deny",
+                    hook="bash-safety-guard",
+                    session=session_id,
+                    extra={"pattern": description, "command_prefix": command[:50]},
+                )
             except Exception:
                 pass
+            return
+
+    # Warn-only surface (owner ruling 2026-08-05): runs AFTER the deny loop, so a
+    # force-push -- which is still in BLOCKED_PATTERNS -- denies on the pass above and
+    # never reaches here. Only a normal, additive push lands in this block.
+    for pattern, description in WARN_PATTERNS:
+        if re.search(pattern, scannable, re.IGNORECASE):
+            _warn_and_allow(command, description, payload)
             return
 
     # External-curl-write predicate (Two-Gate Gate-1, 2026-06-17). Runs on the
     # inert-stripped command, AFTER the regex loop and as its own block (mirrors the
     # Windows-reserved-filename block below). Denies a curl that mutates REMOTE state
     # (explicit -X POST/PUT/PATCH/DELETE OR implicit body-bearing POST) while allowing
-    # loopback-target writes — without the old under-block where a localhost token in a
+    # loopback-target writes: without the old under-block where a localhost token in a
     # header/body/query/path/referer suppressed the deny on a genuine remote write.
     # Fail-open: a predicate exception must never crash the hook.
     try:
@@ -360,21 +428,15 @@ def main():
         print(json.dumps(result))
         try:
             import os
-            from datetime import datetime
-            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            transcript_path = payload.get("transcript_path", "")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
-            entry = json.dumps({
-                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "schema": 2,
-                "event": "deny",
-                "hook": "bash-safety-guard",
-                "session": session_id,
-                "pattern": curl_reason,
-                "command_prefix": command[:50],
-            })
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(entry + "\n")
+            from _event_emit import emit_event
+            from _governance_logger import session_from
+            session_id = session_from(payload)
+            emit_event(
+                event="deny",
+                hook="bash-safety-guard",
+                session=session_id,
+                extra={"pattern": curl_reason, "command_prefix": command[:50]},
+            )
         except Exception:
             pass
         return
@@ -402,26 +464,23 @@ def main():
             print(json.dumps(result))
             try:
                 import os
-                from datetime import datetime
-                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-                transcript_path = payload.get("transcript_path", "")
-                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
-                entry = json.dumps({
-                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "schema": 2,
-                    "event": "deny",
-                    "hook": "bash-safety-guard",
-                    "session": session_id,
-                    "pattern": f"windows-reserved-filename:{target_name}",
-                    "command_prefix": command[:50],
-                })
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(entry + "\n")
+                from _event_emit import emit_event
+                from _governance_logger import session_from
+                session_id = session_from(payload)
+                emit_event(
+                    event="deny",
+                    hook="bash-safety-guard",
+                    session=session_id,
+                    extra={
+                        "pattern": f"windows-reserved-filename:{target_name}",
+                        "command_prefix": command[:50],
+                    },
+                )
             except Exception:
                 pass
             return
 
-    # Command is safe — allow silently
+    # Command is safe: allow silently
     return
 
 

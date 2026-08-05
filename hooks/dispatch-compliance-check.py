@@ -1,27 +1,63 @@
 """
 Dispatch Compliance Check - Stop Hook
 Verifies that skills/agents declared in MUST DISPATCH were actually invoked.
-Reads transcript tail, finds last MUST DISPATCH field, checks Skill and Agent
-tool_use blocks for matching dispatches. Blocks if any declared item is missing.
+Reads transcript tail, finds last MUST DISPATCH field, checks Skill, Agent, and
+Workflow tool_use blocks for matching dispatches. Blocks if any declared item is missing.
 
 Regex hardening (2026-03-22):
 - 200KB window (up from 80KB) to capture large agent outputs
 - Fence stripping: ignores content inside ``` blocks (prevents false matches on docs/examples)
 - Case-insensitive field detection
 - Multiline MUST DISPATCH: captures across line breaks until next field label
+
+Refactored 2026-05-14 (CC-AUTOMATION-LEARN Step 1): pure logic now lives in
+`_dispatch_compliance_logic.py`. This file is the thin I/O wrapper: transcript
+file reads, sidecar fallback orchestration, governance-log writing, stdout
+block emission. KNOWN_DISPATCH_NAMES / SKILL_AGENT_ALIASES / extract_dispatch_names /
+strip_fences are re-exported at module level for any importers.
 """
 
 import sys
 import json
 import os
 import re
+import uuid
 
-# H11 integration (2026-04-19): sidecar_loader import with graceful fallback.
-# Used when transcript classification block is missing/truncated (post-compaction
-# blind spot). Hook dir injected into sys.path so `sidecar_loader` resolves.
+# Make sibling logic module importable BEFORE the sidecar import below,
+# since both live in the same directory.
 _HOOK_DIR = os.path.dirname(os.path.abspath(__file__))
 if _HOOK_DIR not in sys.path:
     sys.path.insert(0, _HOOK_DIR)
+
+# Backward-compatibility shim (LOW-2, 2026-05-21).
+# Before the 2026-05-14 Step 1 extraction these names were DEFINED in this file.
+# They now live in `_dispatch_compliance_logic.py`. This block re-exports them
+# at module level as defensive future-proofing: a consumer that loads this hook
+# via importlib / sys.path manipulation (the filename is hyphenated, so a plain
+# `import` statement cannot reach it) still sees the same symbols it would have
+# before the extraction. No such consumer exists in the repo today: both
+# `governance-log.py` and `agent-dispatch-check.py` keep their own independent
+# copies of KNOWN_DISPATCH_NAMES: so the shim is precautionary, not
+# load-bearing. New code should import from `_dispatch_compliance_logic` directly.
+from _dispatch_compliance_logic import (  # noqa: E402
+    FIELD_LABELS,
+    KNOWN_DISPATCH_NAMES,
+    SKILL_AGENT_ALIASES,
+    compute_matched_alias_aware,
+    compute_missing,
+    extract_dispatch_names,
+    find_must_dispatch_raw,
+    find_task_type,
+    format_empty_dispatch_reason,
+    format_missing_reason,
+    is_trackable_process_skill,
+    scan_assistant_text_block,
+    strip_fences,
+)
+
+# H11 integration (2026-04-19): sidecar_loader import with graceful fallback.
+# Used when transcript classification block is missing/truncated (post-compaction
+# blind spot).
 try:
     from sidecar_loader import mandatory_agent_names
     _SIDECAR_AVAILABLE = True
@@ -31,85 +67,30 @@ except ImportError:
 # 200KB window: covers even 10+ agent outputs per turn
 READ_BYTES = 204800
 
-# Field labels used as delimiters for multiline capture
-FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
-
-# Known agent/skill names: same set as governance-log.py (P0 fix 2026-04-09)
-# Used to filter must_dispatch raw text to valid names only, discarding
-# trailing reasoning text that would otherwise cause false-positive blocks.
-KNOWN_DISPATCH_NAMES = {
-    # Agents
-    "adversarial-reviewer", "api-designer", "api-security-audit", "architect-review", "architect-reviewer",
-    "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
-    "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
-    "mcp-developer", "mcp-registry-navigator", "mcp-server-architect", "n8n-reviewer",
-    "nosql-specialist", "pm-orchestrator", "postgres-pro", "powershell-7-expert",
-    "prompt-engineer", "query-clarifier", "report-generator", "research-analyst",
-    "research-coordinator", "research-orchestrator", "research-synthesizer",
-    "technical-researcher", "vault-keeper", "workflow-orchestrator",
-    # Skills
-    "process-qa", "process-analysis", "process-build", "process-planning",
-    "process-research", "process-pentest", "pm", "task-classifier", "verify",
-    "ensemble", "architect-loop", "save", "maintain", "index",
-}
-
-# Skill/short-name → agent-name aliases (2026-04-12, coherence fix)
-# Must match agent-dispatch-check.py SKILL_AGENT_ALIASES exactly.
-# When a declared item in MUST DISPATCH is a skill name but the actual dispatch
-# uses the agent's runtime name (e.g., "architect-review" declared but
-# "architect-reviewer" dispatched), alias resolution prevents false blocks.
-SKILL_AGENT_ALIASES = {
-    "pm": {"pm-orchestrator"},
-    "architect-review": {"architect-reviewer"},
-    "process-research": {
-        "research-orchestrator", "technical-researcher", "research-analyst",
-        "research-synthesizer", "report-generator",
-    },
-    "process-analysis": {
-        "architect-reviewer", "adversarial-reviewer",
-        "prompt-engineer", "debugger", "api-designer",
-        "data-engineer", "workflow-orchestrator", "api-security-audit",
-        "research-synthesizer", "report-generator",
-    },
-    "process-planning": {
-        "implementation-plan", "adversarial-reviewer", "architect-reviewer",
-        "technical-researcher", "research-analyst", "api-designer",
-        "llm-architect", "data-engineer", "prompt-engineer",
-    },
-    "process-build": {
-        "blueprint-mode", "architect-reviewer", "implementation-plan",
-        "prompt-engineer", "debugger",
-    },
-    "process-qa": {"debugger"},
-    "process-pentest": {"debugger"},
-    "architect-loop": {"architect-reviewer", "adversarial-reviewer"},
-}
+# GAP-4 dual-emit (2026-07-10): date the dual-emit migration landed. The legacy
+# int `schema` field may retire after consumers move to `schema_version`.
+LEGACY_SCHEMA_RETIREMENT_DATE = "2026-07-10"
 
 
-def extract_dispatch_names(raw_text):
-    """Extract only known agent/skill names from MUST DISPATCH raw text.
-    Filters trailing reasoning text (P0 fix 2026-04-09)."""
-    if not raw_text:
-        return []
-    raw_lower = raw_text.lower().strip()
-    if raw_lower.startswith("none") or raw_lower.startswith("n/a"):
-        return []
+def stamp_and_append(entry, log_path, correlation_id):
+    """GAP-4 dual-emit (2026-07-10): stamp the new schema fields onto a
+    governance-log entry dict and append it as one JSONL line.
 
-    found = []
-    for segment in raw_text.split(","):
-        segment = segment.strip()
-        words = segment.split()
-        for i in range(min(3, len(words)), 0, -1):
-            candidate = " ".join(words[:i]).strip().lower().rstrip(".,;:")
-            if candidate in KNOWN_DISPATCH_NAMES:
-                found.append(candidate)
-                break
-    return found
+    Dual-emit contract: the legacy `schema: 2` int field each emit site already
+    sets stays UNTOUCHED: old and new fields coexist; nothing is renamed or
+    removed. New fields:
+      - schema_version: "2" (string form of the current schema)
+      - correlation_id: uuid4 string generated ONCE per hook invocation and
+        shared by every entry that run emits, so a dispatch-chain correlates
+      - retirement_date: the dual-emit migration date (see constant above)
 
-
-def strip_fences(text):
-    """Remove markdown fenced code blocks to prevent false matches on examples/docs."""
-    return re.sub(r'```[\s\S]*?```', '', text)
+    Raises on I/O failure: every call site wraps in its existing try/except
+    (the hook must never crash on a logging failure)."""
+    entry["schema_version"] = "2"
+    entry["correlation_id"] = correlation_id
+    entry["retirement_date"] = LEGACY_SCHEMA_RETIREMENT_DATE
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
 
 
 def main():
@@ -124,6 +105,10 @@ def main():
 
     if payload.get("stop_hook_active"):
         return
+
+    # GAP-4 (2026-07-10): ONE correlation id per hook invocation, shared by every
+    # governance-log entry this run emits (see stamp_and_append).
+    correlation_id = str(uuid.uuid4())
 
     try:
         import os as _gho, sys as _ghs
@@ -147,17 +132,15 @@ def main():
 
     lines = tail.split("\n")
 
-    must_dispatch = []
-    dispatched = set()
-    found_contract = False
-    task_type_str = ""  # Fix 3 (2026-04-14): captured per classification block
-
-    # H11 integration (2026-04-19): unconditional tracking for post-compaction
-    # sidecar fallback. `all_dispatched` mirrors `dispatched` but is populated
-    # regardless of `found_contract`. `recent_process_skill` is the last-seen
-    # process-* / task-classifier Skill invocation: used to identify the active
-    # skill when no classification block survives in the window.
-    all_dispatched = set()
+    # Scan state: must_dispatch / dispatched / found_contract / task_type
+    # plus H11 trackers (all_dispatched, recent_process_skill).
+    state = {
+        "must_dispatch": [],
+        "dispatched": set(),
+        "found_contract": False,
+        "task_type": "",
+    }
+    all_dispatched: set[str] = set()
     recent_process_skill = None
 
     for line in lines:
@@ -174,48 +157,10 @@ def main():
 
         message = entry.get("message", {})
         for block in message.get("content", []):
-            # Look for classification blocks containing MUST DISPATCH
             if block.get("type") == "text":
-                text = block.get("text", "")
-                # Bug fix (2026-04-10): strip_fences was removing the actual
-                # classification block when output inside markdown fences.
-                # Safe to skip: extract_dispatch_names (P0 fix) filters garbage,
-                # and the code resets on each new classification block.
-                clean = text
-                # Only process MUST DISPATCH inside a REAL classification block
-                valid_types = r'(?:Quick|Research|Analysis|Content|Build|Planning|Compound)'
-                tt_match = re.search(r'(?:TASK TYPE|CLASSIFICATION):\s*' + valid_types, clean, re.IGNORECASE)
-                if tt_match:
-                    # New classification resets everything
-                    must_dispatch = []
-                    dispatched = set()
-                    found_contract = False
-                    # Fix 3 (2026-04-14): capture the TASK TYPE token so the
-                    # general-purpose substitution warning can decide whether to fire.
-                    _tt_token = tt_match.group(0).split(":", 1)[-1].strip().lower()
-                    task_type_str = _tt_token
-                    # Multiline MUST DISPATCH: capture until next field label, fence, or end
-                    m = re.search(
-                        r'MUST DISPATCH:\s*(.*?)(?=\n\s*' + FIELD_LABELS + r'\s*:|\Z)',
-                        clean,
-                        re.DOTALL | re.IGNORECASE
-                    )
-                    if m:
-                        raw = m.group(1).strip()
-                        raw = raw.strip('`')
-                        # Collapse whitespace/newlines into single space
-                        raw = re.sub(r'\s+', ' ', raw)
-                        # P0 fix (2026-04-09): use extract_dispatch_names to filter
-                        # trailing reasoning text. Previously split on commas naively,
-                        # which included garbage tokens and caused false-positive blocks.
-                        must_dispatch = extract_dispatch_names(raw)
-                        found_contract = True
-                        dispatched = set()
+                # Pure logic decides whether this block changes state.
+                state = scan_assistant_text_block(block.get("text", ""), state)
 
-            # Track Skill and Agent dispatches. Two trackers:
-            # - `dispatched`: gated on `found_contract` (existing behavior for
-            #   enforcement against the current classification's MUST DISPATCH)
-            # - `all_dispatched`: unconditional: feeds H11 post-compaction fallback
             if block.get("type") == "tool_use":
                 name = block.get("name", "")
                 inp = block.get("input", {})
@@ -228,84 +173,77 @@ def main():
                 dispatched_name = None
                 if name == "Skill":
                     dispatched_name = (inp.get("skill") or "").lower()
-                    # H11: track most-recent NON-TERMINAL process-* skill invocation for fallback.
-                    # Exclude terminal skills (process-qa, process-pentest): they have empty
-                    # mandatory lists, so letting them overwrite recent_process_skill nullifies
-                    # enforcement for the earlier process-build/process-planning/etc.
-                    # (2026-04-19 architect-reviewer Q4 fix: close exploitable nullification gap.)
-                    if dispatched_name and (
-                        dispatched_name.startswith("process-")
-                        or dispatched_name == "task-classifier"
-                    ) and dispatched_name not in ("process-qa", "process-pentest"):
+                    if is_trackable_process_skill(dispatched_name):
                         recent_process_skill = dispatched_name
                 elif name == "Agent":
                     dispatched_name = (inp.get("subagent_type") or "").lower()
+                elif name == "Workflow":
+                    dispatched_name = (inp.get("name") or "").lower()
+                    if not dispatched_name:
+                        sp = inp.get("scriptPath") or ""
+                        base = os.path.basename(sp)
+                        dispatched_name = base[:-3].lower() if base.endswith(".js") else base.lower()
+                    # Deliberately do NOT set recent_process_skill here: a
+                    # workflow-converted skill performs its sidecar dispatches
+                    # INSIDE the workflow run (invisible to this transcript), so
+                    # arming the H11 sidecar fallback off a Workflow invocation
+                    # demands dispatches that can never appear here: false
+                    # positive hit live 2026-06-11 (process-planning acceptance
+                    # run). The workflow script itself IS the dispatch guarantee.
 
                 if dispatched_name:
                     all_dispatched.add(dispatched_name)
-                    if found_contract:
-                        dispatched.add(dispatched_name)
+                    if state["found_contract"]:
+                        state["dispatched"].add(dispatched_name)
 
-    # H11 fallback (2026-04-19): if no classification block found in the 200KB
-    # window but a process-* skill was invoked, load the machine-readable
-    # mandatory-dispatch contract from the skill's DISPATCHES.json sidecar.
-    # This closes the post-compaction enforcement blind spot surfaced by audit
-    # finding H11 (2026-04-18). Acts only when the existing transcript scan
-    # found nothing: normal contract-present flow is unchanged.
-    if not found_contract and recent_process_skill and _SIDECAR_AVAILABLE:
+    # H11 fallback (2026-04-19): if no classification block found but a
+    # process-* skill was invoked, load mandatory-dispatch contract from
+    # the skill's DISPATCHES.json sidecar.
+    if not state["found_contract"] and recent_process_skill and _SIDECAR_AVAILABLE:
         try:
             sidecar_mandatory = mandatory_agent_names(recent_process_skill)
         except Exception:
             sidecar_mandatory = []
         if sidecar_mandatory:
-            must_dispatch = sidecar_mandatory
-            dispatched = set(all_dispatched)
-            found_contract = True
-            task_type_str = "sidecar-fallback"  # non-"quick" so H3 guard passes through
-            # Log fallback activation (observability)
+            state["must_dispatch"] = sidecar_mandatory
+            state["dispatched"] = set(all_dispatched)
+            state["found_contract"] = True
+            state["task_type"] = "sidecar-fallback"
             try:
                 from datetime import datetime
-                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
-                entry = json.dumps({
+                log_path = os.path.join(_HOOK_DIR, "governance-log.jsonl")
+                from _governance_logger import session_from
+                session_id = session_from(payload)
+                stamp_and_append({
                     "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "event": "h11_sidecar_fallback_activated",
                     "hook": "dispatch-compliance",
                     "session": session_id,
                     "skill": recent_process_skill,
-                    "must_dispatch": must_dispatch,
+                    "must_dispatch": state["must_dispatch"],
                     "schema": 2,
-                })
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(entry + "\n")
+                }, log_path, correlation_id)
             except Exception:
                 pass
-        # If sidecar exists but has no mandatory dispatches (e.g. process-qa/pentest
-        #: terminal skills), fall through to the normal `if not found_contract` return.
-        # If sidecar is missing entirely, also fall through (no enforcement possible).
 
-    if not found_contract:
+    if not state["found_contract"]:
         return
 
+    must_dispatch = state["must_dispatch"]
+    dispatched = state["dispatched"]
+    task_type_str = state["task_type"]
+
     # H3 fix (2026-04-18): reject empty MUST DISPATCH on non-Quick tasks.
-    # The classifier spec states "none is ONLY valid for Quick tasks." Previously
-    # this hook accepted any empty must_dispatch silently: the composed B1+B2+B3
-    # bypass relied on this. Block non-Quick MUST DISPATCH: none at the contract
-    # level before any dispatch checks run.
-    # "task_type_str" is lowercase already (line 152); Quick literal is "quick".
     if not must_dispatch:
         if task_type_str and task_type_str != "quick":
-            reason = (
-                f"DISPATCH COMPLIANCE: MUST DISPATCH is empty ('none') but TASK TYPE "
-                f"is '{task_type_str}'. 'none' is ONLY valid for Quick tasks per the "
-                f"classifier spec. Re-classify or populate MUST DISPATCH."
-            )
+            reason = format_empty_dispatch_reason(task_type_str)
             print(json.dumps({"decision": "block", "reason": reason}))
             try:
                 from datetime import datetime
-                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
-                entry = json.dumps({
+                log_path = os.path.join(_HOOK_DIR, "governance-log.jsonl")
+                from _governance_logger import session_from
+                session_id = session_from(payload)
+                stamp_and_append({
                     "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "event": "block",
                     "hook": "dispatch-compliance",
@@ -313,47 +251,36 @@ def main():
                     "reason": "empty_must_dispatch_on_non_quick",
                     "task_type": task_type_str,
                     "schema": 2,
-                })
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(entry + "\n")
+                }, log_path, correlation_id)
             except Exception:
                 pass
             return
-        # Quick or unknown type with empty MUST DISPATCH: valid, no enforcement needed
+        # Quick or unknown type with empty MUST DISPATCH: valid
         return
 
-    # Alias-aware missing check (2026-04-12 coherence fix):
-    # A declared item is satisfied if either the item itself OR any of its
-    # aliases are in the dispatched set. E.g., "architect-review" declared,
-    # "architect-reviewer" dispatched → satisfied via alias.
-    missing = []
-    for item in must_dispatch:
-        aliases = SKILL_AGENT_ALIASES.get(item, set())
-        if item not in dispatched and not (aliases & dispatched):
-            missing.append(item)
+    missing = compute_missing(must_dispatch, dispatched, SKILL_AGENT_ALIASES)
 
     if missing:
-        reason = (
-            f"DISPATCH COMPLIANCE: MUST DISPATCH declared "
-            f"[{', '.join(must_dispatch)}] but missing: "
-            f"[{', '.join(missing)}]. Invoke them before completing."
-        )
+        reason = format_missing_reason(must_dispatch, missing)
         print(json.dumps({"decision": "block", "reason": reason}))
-        # Log block event
         try:
             from datetime import datetime
-            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"  # Full UUID (P1-D fix 2026-04-09)
-            entry = json.dumps({"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "block", "hook": "dispatch-compliance", "session": session_id, "declared": must_dispatch, "missing": missing, "schema": 2})
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(entry + "\n")
+            log_path = os.path.join(_HOOK_DIR, "governance-log.jsonl")
+            from _governance_logger import session_from
+            session_id = session_from(payload)
+            stamp_and_append({
+                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "event": "block",
+                "hook": "dispatch-compliance",
+                "session": session_id,
+                "declared": must_dispatch,
+                "missing": missing,
+                "schema": 2,
+            }, log_path, correlation_id)
         except Exception:
             pass
 
         # Fix 3 (2026-04-14): general-purpose substitution soft warning.
-        # Pure observability: does NOT change block/pass behavior, only writes
-        # an additional JSONL line so we can see how often the assistant
-        # substitutes general-purpose for a declared specialist.
         try:
             if (
                 "general-purpose" in dispatched
@@ -361,9 +288,10 @@ def main():
                 and task_type_str != "quick"
             ):
                 from datetime import datetime
-                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
-                warn_entry = json.dumps({
+                log_path = os.path.join(_HOOK_DIR, "governance-log.jsonl")
+                from _governance_logger import session_from
+                session_id = session_from(payload)
+                stamp_and_append({
                     "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "event": "warning",
                     "warning": "general-purpose substitution",
@@ -373,33 +301,18 @@ def main():
                     "declared": must_dispatch,
                     "missing": missing,
                     "schema": 2,
-                })
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(warn_entry + "\n")
+                }, log_path, correlation_id)
         except Exception:
             pass
     else:
         # P2-B (2026-04-09): Log pass event when all declared items are dispatched.
-        # Required for DAR computation without relying on absence-of-block heuristic.
-        # H1 fix (2026-04-18): alias-expand matched computation so declared items
-        # satisfied via SKILL_AGENT_ALIASES (e.g., architect-review → architect-reviewer)
-        # are correctly counted. Previously this used raw set intersection which
-        # recorded matched=[], matched_count=0 for every legitimate alias-satisfied
-        # Build/Planning pass: silently corrupting DAR analytics for the two
-        # highest-frequency task types.
         try:
             from datetime import datetime
-            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
-            matched_alias_aware = []
-            for item in must_dispatch:
-                if item in dispatched:
-                    matched_alias_aware.append(item)
-                else:
-                    aliases = SKILL_AGENT_ALIASES.get(item, set())
-                    if aliases & dispatched:
-                        matched_alias_aware.append(item)
-            entry = json.dumps({
+            log_path = os.path.join(_HOOK_DIR, "governance-log.jsonl")
+            from _governance_logger import session_from
+            session_id = session_from(payload)
+            matched_alias_aware = compute_matched_alias_aware(must_dispatch, dispatched, SKILL_AGENT_ALIASES)
+            stamp_and_append({
                 "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "event": "pass",
                 "hook": "dispatch-compliance",
@@ -409,9 +322,7 @@ def main():
                 "declared_count": len(must_dispatch),
                 "matched_count": len(matched_alias_aware),
                 "schema": 2,
-            })
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(entry + "\n")
+            }, log_path, correlation_id)
         except Exception:
             pass
 

@@ -36,7 +36,7 @@ def _run(file_path: str, content: str) -> str:
 
 
 WIKI = "Resources/KB/some-page.md"
-WORK = "Projects/Agent-Governance-Research/work/2026-06-02-note.md"
+WORK = "Projects/your-project/work/2026-06-02-note.md"
 
 
 class DetectorTests(unittest.TestCase):

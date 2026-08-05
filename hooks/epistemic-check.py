@@ -129,7 +129,13 @@ When in doubt, BLOCK. It is better to force one moment of reflection than to let
             try:
                 from datetime import datetime
                 gov_log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"  # Full UUID (P1-D fix 2026-04-09)
+                # Prefer the payload's own session_id and fall back to the
+                # transcript stem, in that order. Deriving from the stem alone
+                # discards a real session_id, and "unknown" is matched by the
+                # test-session filter, so those records read as synthetic
+                # downstream and vanish from every real-traffic count.
+                from _governance_logger import session_from
+                session_id = session_from(payload)
                 entry = json.dumps({"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "block", "hook": "epistemic-check", "session": session_id, "reason": haiku_eval.get("reason", ""), "schema": 2})
                 with open(gov_log_path, "a", encoding="utf-8") as f:
                     f.write(entry + "\n")

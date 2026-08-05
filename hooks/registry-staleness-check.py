@@ -8,7 +8,7 @@ When the registry is fresh the hook emits nothing (zero noise). When the
 registry is MISSING it emits a one-line gentle note to generate it (useful on
 first run), never an alarm. All failure paths swallow errors and exit 0.
 
-Output contract: stdout JSON per SessionStart hook spec.  Never blocks 
+Output contract: stdout JSON per SessionStart hook spec.  Never blocks :
 errors silently swallowed, clean exit 0 on every failure path.
 """
 import json
@@ -81,11 +81,34 @@ def build_warning() -> str:
     )
 
 
-def main() -> None:
+_SESSION = None  # set from the payload in main(); None when identity is absent
+
+
+def _log_fire(decision, detail=None):
+    """Record this firing to hook-activity.jsonl. Never raises (contract C1)."""
     try:
-        sys.stdin.read()
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from _governance_logger import log_fire
+        log_fire("registry-staleness-check", decision=decision, detail=detail,
+                 session=_SESSION)
     except Exception:
         pass
+
+
+def main() -> None:
+    global _SESSION
+    raw = ""
+    try:
+        raw = sys.stdin.read()
+    except Exception:
+        pass
+
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from _governance_logger import session_from
+        _SESSION = session_from(raw)
+    except Exception:
+        _SESSION = None
 
     try:
         warning = build_warning()
@@ -93,7 +116,10 @@ def main() -> None:
         warning = ""
 
     if not warning:
+        _log_fire("fresh")
         return  # Fresh registry: emit nothing, zero noise
+
+    _log_fire("stale", warning[:120])
 
     output = {
         "hookSpecificOutput": {

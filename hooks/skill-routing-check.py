@@ -177,14 +177,17 @@ def main():
             }
         }
         print(json.dumps(result))
-        # Log deny event
+        # Log deny event (contract C7: emit through the shared writer)
         try:
-            from datetime import datetime
-            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"  # Full UUID (P1-D fix 2026-04-09)
-            entry = json.dumps({"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "deny", "hook": "skill-routing-check", "session": session_id, "attempted": skill_name, "expected": expected_skill, "type": last_type, "schema": 2})
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(entry + "\n")
+            from _event_emit import emit_event
+            from _governance_logger import session_from
+            session_id = session_from(payload)
+            emit_event(
+                event="deny",
+                hook="skill-routing-check",
+                session=session_id,
+                extra={"attempted": skill_name, "expected": expected_skill, "type": last_type},
+            )
         except Exception:
             pass
         return

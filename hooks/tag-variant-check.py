@@ -32,7 +32,7 @@ LOG_PATH = LOG_DIR / "tag-variant-check.log"
 DISABLED = os.environ.get("TAG_VARIANT_CHECK_DISABLED", "0") == "1"
 VERBOSE = os.environ.get("TAG_VARIANT_CHECK_VERBOSE", "0") == "1"
 
-# Source of truth: your tag taxonomy spec (see your vault's structure spec § R4)
+# Source of truth: Projects/Vault-Maintenance/work/2026-05-11-target-structure-spec.md § R4
 CANONICAL_TAGS = {
     "idea", "research", "analysis", "planning", "task", "personal",
     "moc", "wiki", "vault", "vault-log",
@@ -54,7 +54,7 @@ ALIASES = {
     "review": "analysis",
     "company-research": "research",
     "vault-stewardship": "vault",
-    "agent-governance": "project/agent-governance-research",
+    "agent-governance": "project/your-project",
     "plan": "planning",
     "inventory": "analysis",
     "blueprint": "planning",
@@ -152,7 +152,7 @@ def emit_advisory(suggestions, file_path):
         else:
             msg += f"  - `{variant}` → use `{canonical_suggest}` (canonical)\n"
     msg += (
-        "\nReference: your tag taxonomy spec (the structure spec § R4 section) "
+        "\nReference: Projects/Vault-Maintenance/work/2026-05-11-target-structure-spec.md § R4 "
         "for the full canonical taxonomy + alias table."
     )
     try:

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Governance-log failure miner: v1-minimal (REV-1..REV-6).
+"""Governance-log failure miner: v1-minimal (REV-1..REV-6, 2026-06-08).
 
-Pure-stdlib helper. Scans governance-log.jsonl for recurring failure patterns
-keyed by (event_label, agent_type, hook, normalized_reason).
+Pure-stdlib helper. Scans .claude/hooks/governance-log.jsonl for recurring
+failure patterns keyed by (event_label, agent_type, hook, normalized_reason).
 Returns flagged sig records sorted severity-high-first then count-desc.
 
-Used by the process-governance-mine skill and callable standalone via __main__.
+Spec: Projects/your-project/work/archive/2026-06-07-governance-miner-spec.md
 """
 
 import hashlib
@@ -65,6 +65,31 @@ FAILURE_OUTCOME = "no_classification"
 FAILURE_REASON = "empty_must_dispatch_on_non_quick"
 
 # ---------------------------------------------------------------------------
+# SESSION ADMISSION  (REV-7, 2026-07-30: owner-authorized)
+# ---------------------------------------------------------------------------
+# The log is shared with hook test suites, which stamp synthetic session values
+# ("unknown" = subprocess default, "session" = fixture literal). In the live
+# 30d window at adoption time, 14,491 of 15,792 admitted lines were synthetic
+# (92%), inflating 6 of 16 flagged sigs into pure test artifacts.
+# Doctrine: filter TO real UUID sessions, not merely exclude "session"
+# (finding_governance_deny_log_dominated_by_test_pollution).
+#
+# Rule: if a record CARRIES a session field, it must look like a real session id
+# (uuid-ish hex prefix). A record with NO session field is still admitted :
+# every live admitted record carries the field, so lenience only preserves
+# older log shapes and existing test fixtures, and cannot re-admit the two
+# observed pollution markers. sig_id derivation is untouched (REV-6 safe).
+_RE_REAL_SESSION = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{3,}", re.IGNORECASE)
+
+
+def _real_session(record: dict) -> bool:
+    """False iff the record carries a session field that is not a real session id."""
+    if "session" not in record:
+        return True
+    s = record.get("session")
+    return isinstance(s, str) and bool(_RE_REAL_SESSION.match(s))
+
+# ---------------------------------------------------------------------------
 # NORMALIZATION  (light v1: applied to reason text for sig_key)
 # ---------------------------------------------------------------------------
 
@@ -74,7 +99,7 @@ _RE_DIGITS = re.compile(r"\d+")
 # like "50/100" or "3/10".
 #
 # Three accepted forms:
-#   [A-Za-z]:[/\\]  : Windows drive letter (C:\, D:/)
+#   [A-Za-z]:[/\\]: Windows drive letter (C:\, D:/)
 #   (?:\.\.?|~)[/\\]: explicit relative (./), parent-relative (../), or home-dir (~/)
 #   (?<!\d)/[^\s'"]{3,}: POSIX absolute path (/home/foo): bare leading /
 #                         but NOT preceded by a digit (excludes "50/100", "3/10")
@@ -87,7 +112,7 @@ _RE_PATH = re.compile(
 )
 # Quoted paths
 _RE_QUOTED_PATH = re.compile(r"'[^']{3,}'")
-# SHA-256 prefix or bare hex runs >=8 chars
+# SHA-256 prefix or bare hex runs ≥8 chars
 _RE_HASH = re.compile(r"(?:sha256:)?[0-9a-f]{8,}", re.IGNORECASE)
 
 _NORM_MAX = 200
@@ -130,6 +155,8 @@ def _sig_id(key: tuple) -> str:
 
 def _admitted(record: dict) -> bool:
     """Return True iff this log record should enter the miner."""
+    if not _real_session(record):  # REV-7 session gate: synthetic lines never enter
+        return False
     event = record.get("event", "") or ""
     outcome = record.get("outcome", "") or ""
     reason = record.get("reason", "") or ""
@@ -149,7 +176,7 @@ def _admitted(record: dict) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# FAILURE LABEL : most-specific label for the sig_key
+# FAILURE LABEL: most-specific label for the sig_key
 # ---------------------------------------------------------------------------
 
 def _failure_label(record: dict) -> str:
@@ -185,7 +212,7 @@ def _failure_label(record: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# REASON TEXT : best reason text for normalization
+# REASON TEXT: best reason text for normalization
 # ---------------------------------------------------------------------------
 
 def _reason_text(record: dict) -> str:
@@ -276,11 +303,11 @@ def mine(
     window_days : int
         Rolling window width in calendar days (default WINDOW_DAYS=30).
     resolved_ledger_path : str or None
-        Path to miner-resolved.jsonl. None or missing file -> no suppression.
+        Path to miner-resolved.jsonl. None or missing file → no suppression.
 
     Returns
     -------
-    list of dict : flagged (or regression-surfaced) sig records,
+    list of dict: flagged (or regression-surfaced) sig records,
                     sorted severity-high-first then count-desc.
     """
     if isinstance(now_date, str):
@@ -354,10 +381,10 @@ def mine(
 
             if sid not in sig_meta:
                 # Initial severity:
-                #   fabrication_detected (and any other ALWAYS_HIGH_SEVERITY_EVENTS) -> high.
-                #   dark-zone -> determined per-record below (starts normal, upgraded if any
+                #   fabrication_detected (and any other ALWAYS_HIGH_SEVERITY_EVENTS) → high.
+                #   dark-zone → determined per-record below (starts normal, upgraded if any
                 #               admitted record carries severity=="high").
-                #   everything else -> normal.
+                #   everything else → normal.
                 initial_sev = "high" if label in ALWAYS_HIGH_SEVERITY_EVENTS else "normal"
                 sig_meta[sid] = {
                     "sig_id": sid,
@@ -483,14 +510,12 @@ def mine(
 if __name__ == "__main__":
     from datetime import date as _date
 
-    # Resolve the repo root: hooks/ is one level below the repo root
-    # (hooks/mine_governance.py -> repo root)
-    _REPO = os.path.normpath(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    _VAULT = os.path.normpath(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
     )
-    _LOG = os.path.join(_REPO, ".claude", "hooks", "governance-log.jsonl")
+    _LOG = os.path.join(_VAULT, ".claude", "hooks", "governance-log.jsonl")
     _LEDGER = os.path.join(
-        _REPO, ".claude", "hooks", "aggregates", "miner-resolved.jsonl"
+        _VAULT, ".claude", "hooks", "aggregates", "miner-resolved.jsonl"
     )
 
     _today = _date.today()

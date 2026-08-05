@@ -94,6 +94,20 @@ def main() -> int:
     agent_type = payload.get("agent_type") or payload.get("description") or "unknown"
     now = datetime.now().isoformat()
 
+    def _log_verdict(decision, detail=None):
+        """Record this verdict to hook-activity.jsonl. Never raises (contract C2).
+
+        Deliberately NOT named _log: the module-level _log() above writes the
+        separate subagent-scope-log.jsonl sink and is a different function.
+        """
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from _governance_logger import log_fire, session_from
+            log_fire("subagent-scope-check", decision=decision, detail=detail,
+                     session=session_from(payload))
+        except Exception:
+            pass
+
     state = _load_state()
     porc_now = _git_porcelain()
 
@@ -105,6 +119,9 @@ def main() -> int:
             "baseline": porc_now,
         }
         _save_state(state)
+        # State recorded, no verdict computed. Contract C1 state-writer wording
+        # applied at branch level, which is why this is pass and not allow.
+        _log_verdict("pass", "baseline %s" % agent_type)
         return 0
 
     if event == "SubagentStop":
@@ -138,9 +155,13 @@ def main() -> int:
                 f".claude/hooks/subagent-scope-log.jsonl for paths.",
                 file=sys.stderr,
             )
+            _log_verdict("warn", "%s %d new" % (agent_type, len(new_changes)))
+        else:
+            _log_verdict("allow", agent_type)
         return 0
 
     # Unknown event: silent no-op
+    _log_verdict("skip", event or "unknown")
     return 0
 
 

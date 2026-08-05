@@ -45,6 +45,17 @@ if diff >= 300:
 else:
     context = KNOWLEDGE_REMINDER
 
+# Contract C1. Logged only past the 60s throttle above: this is a PostToolUse hook,
+# so an entry-point log would write one record per tool call.
+try:
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from _governance_logger import log_fire
+    log_fire("checkpoint", decision=("checkpoint" if diff >= 300 else "save-check"),
+             detail="idle_s=%d" % diff)
+except Exception:
+    pass
+
 print(json.dumps({
     "hookSpecificOutput": {
         "hookEventName": "PostToolUse",

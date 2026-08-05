@@ -169,7 +169,7 @@ def make_workflow_three_entry(wf_name: str, relay_text: str) -> list[str]:
     """Return the full three-entry Workflow transcript shape as JSONL lines.
 
     Entry 1: assistant: Workflow tool_use
-    Entry 2: user    : tool_result wrapper (NOT a real user turn)
+    Entry 2: user: tool_result wrapper (NOT a real user turn)
     Entry 3: assistant: relay text (contains SCOPE / QA REPORT blocks)
 
     Acceptance criterion (plan Step 2 item i): fixtures MUST contain all three entries
@@ -651,3 +651,184 @@ class WorkflowProcessSkillDetectionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+# ---------------------------------------------------------------------------
+# Stage 1 instrumentation (ratified 2026-08-01 proposal): step-check observation
+# ---------------------------------------------------------------------------
+
+class TestStepCheckObservation(unittest.TestCase):
+    """observe_step_checks(lines) counts CHECK: clauses in TaskCreate descriptions."""
+
+    @staticmethod
+    def _tc_line(description):
+        return json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "TaskCreate",
+             "input": {"subject": "s", "description": description}}]}})
+
+    def _observe(self, lines):
+        import importlib.util, os as _os
+        spec = importlib.util.spec_from_file_location(
+            "psc_s1", _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "process-step-check.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.observe_step_checks(lines)
+
+    def test_counts_present_and_absent(self):
+        lines = [self._tc_line("do X. CHECK: pytest test_x.py green"),
+                 self._tc_line("do Y with no clause"),
+                 self._tc_line("do Z. CHECK: none-exists (pure prose judgment)")]
+        obs = self._observe(lines)
+        self.assertEqual(obs["task_creates"], 3)
+        self.assertEqual(obs["with_check"], 2)
+        self.assertEqual(obs["types"].get("none-exists"), 1)
+
+    def test_type_classification(self):
+        lines = [self._tc_line("a. CHECK: pytest suite green"),
+                 self._tc_line("b. CHECK: n8n_validate_workflow returns zero errors"),
+                 self._tc_line("c. CHECK: separate agent re-derives the count"),
+                 self._tc_line("d. CHECK: it looks correct and complete")]
+        obs = self._observe(lines)
+        self.assertEqual(obs["types"].get("test"), 1)
+        self.assertEqual(obs["types"].get("tool-call"), 1)
+        self.assertEqual(obs["types"].get("re-derivation"), 1)
+        # (d) names no executable action: since the pentest HIGH fix it is typed
+        # weak, not "other" (the original expectation encoded the blind spot).
+        self.assertEqual(obs["types"].get("weak"), 1)
+        self.assertIsNone(obs["types"].get("other"))
+
+    def test_weak_check_over_120_chars(self):
+        long_clause = "verify that everything is fully correct and works properly " * 3
+        obs = self._observe([self._tc_line("a. CHECK: " + long_clause)])
+        self.assertEqual(obs["weak_check"], 1)
+
+    def test_no_taskcreates_returns_none(self):
+        self.assertIsNone(self._observe([json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "Bash", "input": {"command": "ls"}}]}})]))
+
+    def test_malformed_lines_tolerated(self):
+        obs = self._observe(["not json", "", self._tc_line("x. CHECK: bash exit 0")])
+        self.assertEqual(obs["task_creates"], 1)
+        self.assertEqual(obs["with_check"], 1)
+
+    def test_emit_end_to_end_subprocess(self):
+        """Wiring test: the hook run as a subprocess must APPEND the observation
+        event (catches unwired/import-broken emit paths the unit tests miss)."""
+        import subprocess, tempfile, os as _os
+        hook_dir = _os.path.dirname(_os.path.abspath(__file__))
+        # Follow the suite-wide redirect (conftest) rather than asserting against
+        # the live log. The point of this test is that the emit path is WIRED,
+        # which the subprocess still proves; where it lands is not the assertion.
+        log = _os.environ.get("GOVERNANCE_LOG_PATH") or _os.path.join(hook_dir, "governance-log.jsonl")
+        fd, tp = tempfile.mkstemp(prefix="synthetic-test-", suffix=".jsonl")
+        try:
+            with _os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(self._tc_line("wire X. CHECK: pytest test_x.py green") + "\n")
+            before = _os.path.getsize(log) if _os.path.isfile(log) else 0
+            r = subprocess.run(["python", _os.path.join(hook_dir, "process-step-check.py")],
+                               input=json.dumps({"transcript_path": tp}),
+                               capture_output=True, text=True, timeout=60)
+            self.assertEqual(r.returncode, 0)
+            with open(log, encoding="utf-8", errors="replace") as fh:
+                fh.seek(before)
+                new = fh.read()
+            self.assertIn('"step_check_observation"', new)
+            self.assertIn('"with_check": 1', new)
+        finally:
+            _os.unlink(tp)
+
+    def test_weak_check_detects_goal_restating_theater(self):
+        """PENTEST HIGH (2026-08-01): short goal-restating clauses are the doctrine's
+        canonical WEAK_CHECK, but length-only detection scored them 0."""
+        theater = ["a. CHECK: the module is fully implemented and correct",
+                   "b. CHECK: step is done when the doc reads well",
+                   "c. CHECK: verify the change works"]
+        obs = self._observe([self._tc_line(t) for t in theater])
+        self.assertEqual(obs["weak_check"], 3, "goal-restating clauses must count as weak")
+        self.assertEqual(obs["types"].get("weak"), 3)
+
+    def test_real_executable_clauses_not_flagged_weak(self):
+        """Guard against over-flagging: genuine checks, including keyword-free ones."""
+        real = ["a. CHECK: pytest test_x.py exits 0",
+                "b. CHECK: run the script and confirm output equals 42",
+                "c. CHECK: n8n_validate_workflow returns zero errors",
+                "d. CHECK: separate agent re-derives the row count from settings.json",
+                "e. CHECK: none-exists (prose judgment, no executable oracle)"]
+        obs = self._observe([self._tc_line(r) for r in real])
+        self.assertEqual(obs["weak_check"], 0, f"false positives: {obs}")
+
+    def test_obs_key_distinguishes_different_tasks_with_same_clause(self):
+        """Self-caught 2026-08-01: keying on clause text alone collides when two
+        different steps carry identical CHECK clauses, so a consumer deduping on
+        (session, obs_key) would drop a genuinely new observation."""
+        same = self._observe([self._tc_line("build the parser. CHECK: pytest green")])
+        other = self._observe([self._tc_line("build the emitter. CHECK: pytest green")])
+        self.assertNotEqual(same["obs_key"], other["obs_key"])
+
+    def test_obs_key_stable_for_identical_transcript(self):
+        a = self._observe([self._tc_line("build the parser. CHECK: pytest green")])
+        b = self._observe([self._tc_line("build the parser. CHECK: pytest green")])
+        self.assertEqual(a["obs_key"], b["obs_key"])
+
+    def test_obs_key_covers_tasks_without_check_clause(self):
+        a = self._observe([self._tc_line("task one. CHECK: pytest green")])
+        b = self._observe([self._tc_line("task one. CHECK: pytest green"),
+                           self._tc_line("task two with no clause at all")])
+        self.assertNotEqual(a["obs_key"], b["obs_key"])
+
+    def test_regex_rejects_recheck_and_midsentence_prose(self):
+        """PENTEST HIGH: no word anchor meant RECHECK: and 'double CHECK:' parsed
+        as declared clauses."""
+        obs = self._observe([self._tc_line("do a thing. RECHECK: rerun later"),
+                             self._tc_line("please double CHECK: the docs")])
+        self.assertEqual(obs["task_creates"], 2)
+        self.assertEqual(obs["with_check"], 0)
+
+    def test_regex_does_not_swallow_next_line_as_clause(self):
+        """PENTEST HIGH: DOTALL + \s* captured the following unrelated line when
+        the clause itself was empty."""
+        obs = self._observe([self._tc_line("do a thing. CHECK:\nDeploy notes: unrelated prose")])
+        self.assertEqual(obs["with_check"], 0, f"empty clause must not capture prose: {obs}")
+
+    def test_multiple_clauses_in_one_description(self):
+        """PENTEST HIGH: only the first clause was read; a weak first clause hid a
+        real second one (and vice versa)."""
+        obs = self._observe([self._tc_line(
+            "step. CHECK: it works well\nCHECK: pytest test_x.py exits 0")])
+        self.assertEqual(obs["with_check"], 1)
+        self.assertEqual(obs["weak_check"], 0, "a real clause present means the step is checked")
+        self.assertEqual(obs["types"].get("test"), 1)
+
+    def test_taxonomy_word_boundary_no_latest_attests_collision(self):
+        """PENTEST HIGH: substring 'test' inside 'latest'/'attests' stole tool-call
+        and re-derivation clauses, corrupting the emitted histogram."""
+        obs = self._observe([
+            self._tc_line("a. CHECK: n8n_validate_workflow on the latest execution returns no errors"),
+            self._tc_line("b. CHECK: a separate agent attests the row count independently"),
+        ])
+        self.assertEqual(obs["types"].get("tool-call"), 1, f"got {obs['types']}")
+        self.assertEqual(obs["types"].get("re-derivation"), 1, f"got {obs['types']}")
+        self.assertIsNone(obs["types"].get("test"))
+
+    def test_observation_window_is_larger_than_gate_window_and_flags_truncation(self):
+        """QA-caught 2026-08-01: the 200KB gate window is 0.05% of a long transcript,
+        so observation reads its own bounded window and stamps truncation."""
+        import importlib.util, os as _os, tempfile
+        hook = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "process-step-check.py")
+        spec = importlib.util.spec_from_file_location("psc_w", hook)
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        self.assertGreater(mod.OBSERVE_READ_BYTES, mod.READ_BYTES)
+        fd, tp = tempfile.mkstemp(suffix=".jsonl")
+        try:
+            with _os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(self._tc_line("early step. CHECK: pytest green") + "\n")
+                # padding larger than the GATE window but smaller than the observation window
+                fh.write(json.dumps({"type": "assistant", "message": {"content": [
+                    {"type": "text", "text": "x" * (mod.READ_BYTES + 5000)}]}}) + "\n")
+            lines, truncated = mod._read_observation_window(tp)
+            self.assertFalse(truncated)
+            obs = mod.observe_step_checks(lines)
+            self.assertIsNotNone(obs, "TaskCreate beyond the 200KB gate window must still be observed")
+            self.assertEqual(obs["with_check"], 1)
+        finally:
+            _os.unlink(tp)

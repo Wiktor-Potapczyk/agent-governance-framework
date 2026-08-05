@@ -125,13 +125,20 @@ def main():
 
     # --- Observability v2: event 1 classification_emitted (every classification, Quick or not) ---
     if emit_event is not None:
-        session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+        from _governance_logger import session_from
+        session_id = session_from(payload)
         type_match = re.search(r'(?:TASK TYPE|CLASSIFICATION):\s*(Quick|Research|Analysis|Content|Build|Planning|Compound)', last_classifier_text, re.IGNORECASE)
         domain_match = re.search(r'DOMAIN:\s*([^\n]+)', last_classifier_text, re.IGNORECASE)
         implies_match = re.search(r'IMPLIES:\s*([^\n]+)', last_classifier_text, re.IGNORECASE)
         approach_match = re.search(r'APPROACH:\s*([^\n]+)', last_classifier_text, re.IGNORECASE)
         missed_match = re.search(r'MISSED:\s*([^\n]+)', last_classifier_text, re.IGNORECASE)
         must_dispatch_match_e = re.search(r'MUST DISPATCH:\s*([^\n]+)', last_classifier_text, re.IGNORECASE)
+        # Two-Gate (2026-06-16, B6): ACCEPT (never require) the advisory autonomy fields.
+        # Captured into the emitted event so REVERSIBILITY/DETECTABILITY are measurable in
+        # governance-log.jsonl. They are NEVER added to `missing` and never block: the
+        # HARD stop is the Gate-1 PreToolUse deny, not this Stop hook.
+        reversibility_match = re.search(r'REVERSIBILITY:\s*([^\n]+)', last_classifier_text, re.IGNORECASE)
+        detectability_match = re.search(r'DETECTABILITY:\s*([^\n]+)', last_classifier_text, re.IGNORECASE)
         emit_event(
             event="classification_emitted",
             hook="classifier-field-check",
@@ -144,6 +151,8 @@ def main():
                 "approach": (approach_match.group(1).strip()[:200] if approach_match else None),
                 "missed": (missed_match.group(1).strip()[:200] if missed_match else None),
                 "must_dispatch_raw": (must_dispatch_match_e.group(1).strip()[:300] if must_dispatch_match_e else None),
+                "reversibility": (reversibility_match.group(1).strip()[:60] if reversibility_match else None),
+                "detectability": (detectability_match.group(1).strip()[:60] if detectability_match else None),
                 "missing_fields": missing,
                 "complete": len(missing) == 0,
             },
@@ -154,7 +163,8 @@ def main():
         block_json = json.dumps({"decision": "block", "reason": reason})
         print(block_json)
         # Observability v2: emit event 2 classifier_field_missing (replaces legacy "block" emit).
-        session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+        from _governance_logger import session_from
+        session_id = session_from(payload)
         if emit_event is not None:
             emit_event(
                 event="classifier_field_missing",

@@ -33,7 +33,7 @@ Defaults (overridable via env vars):
     COOLDOWN  = 1800 seconds (30 minutes after trip, then breaker auto-resets)
 
 Override:
-    MCP_HEALTH_FAIL_OPEN=1 : bypass the breaker for the next call
+    MCP_HEALTH_FAIL_OPEN=1: bypass the breaker for the next call
     MCP_BREAKER_RESET=<server>: clear the breaker for a specific server
 
 Exit codes: 0 always. Hook never crashes the parent session: fail-open.
@@ -176,28 +176,19 @@ def _emit_deny(server: str, server_state: dict, now: datetime) -> None:
 def _log_event(event: str, server: str, payload: dict, extra: dict | None = None) -> None:
     """Append to governance-log.jsonl. Silent on I/O failure."""
     try:
-        log_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "governance-log.jsonl",
-        )
+        from _event_emit import emit_event
         transcript_path = payload.get("transcript_path", "")
-        session_id = (
-            os.path.splitext(os.path.basename(transcript_path))[0]
-            if transcript_path
-            else "unknown"
-        )
-        entry = {
-            "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "schema": 2,
-            "event": event,
-            "hook": "mcp-circuit-breaker",
-            "session": session_id,
-            "server": server,
-        }
+        from _governance_logger import session_from
+        session_id = session_from(payload)
+        merged = {"server": server}
         if extra:
-            entry.update(extra)
-        with open(log_path, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry) + "\n")
+            merged.update(extra)
+        emit_event(
+            event=event,
+            hook="mcp-circuit-breaker",
+            session=session_id,
+            extra=merged,
+        )
     except Exception:
         pass
 

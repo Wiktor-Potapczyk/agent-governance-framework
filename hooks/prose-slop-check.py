@@ -7,7 +7,7 @@ hallmark words an LLM reaches for that a terse human technical writer never
 does (delve, tapestry, multifaceted, furthermore, ...). The two are disjoint:
 prose-codes-check has zero vocabulary coverage (verified 2026-06-02).
 
-SCOPE: generated prose written to the wiki/work layer 
+SCOPE: generated prose written to the wiki/work layer :
   Resources/KB/**.md  and  Projects/*/work/**.md
 NOT chat responses (those are already terse per CLAUDE.md minimum-length rule)
 and NOT raw-layer files (Inbox/Clippings/Daily Notes: owner- or externally-
@@ -127,17 +127,23 @@ def main():
     if not content:
         return 0
 
-    try:
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from _governance_logger import log_fire
-        log_fire("prose-slop-check")
-    except Exception:
-        pass
+    def _log(decision, detail=None):
+        """Record this verdict to hook-activity.jsonl. Never raises (contract C2)."""
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from _governance_logger import log_fire, session_from
+            log_fire("prose-slop-check", decision=decision, detail=detail,
+                     session=session_from(payload))
+        except Exception:
+            pass
 
     distinct, total, hits = find_slop(content)
     if not should_warn(distinct, total):
+        _log("allow")
         return 0
 
+    # Warn first, log second. Nothing between the verdict and the advisory may
+    # be able to swallow it (idiom inherited from routing-table-validation.py).
     pretty = ", ".join(f"`{w}`x{n}" if n > 1 else f"`{w}`" for w, n in hits[:8])
     sys.stderr.write(
         f"[prose-slop-check WARN] {os.path.basename(file_path)} contains "
@@ -146,6 +152,7 @@ def main():
         f"-> 'show'; 'furthermore/moreover' -> just continue the sentence). "
         f"Codes/tables/fences are not checked. (advisory: write was kept.)\n"
     )
+    _log("warn", pretty)
     return 0
 
 

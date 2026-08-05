@@ -5,9 +5,9 @@ Hard-blocks edits to vault load-bearing config files unless an explicit override
 env var is set. Inspired by ECC's `config-protection.js`.
 
 Protected paths (any path whose basename matches one of these, anywhere on disk):
-  - .claude/settings.local.json    : agent allow/deny + hook chain registration
-  - .claude/registry.json          : agent/skill registry catalog
-  - MEMORY.md                      : root memory-index file
+  - .claude/settings.local.json: agent allow/deny + hook chain registration
+  - .claude/registry.json: agent/skill registry catalog
+  - MEMORY.md: root memory-index file
 
 Override mechanism:
   - Set env var CONFIG_PROTECTION_ALLOW=1 in the parent shell to permit subsequent
@@ -111,28 +111,20 @@ def _is_overridden() -> bool:
 def _log_deny(basename: str, file_path: str, tool_name: str, payload: dict) -> None:
     """Append one deny record to governance-log.jsonl. Silent on I/O failure."""
     try:
-        log_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "governance-log.jsonl",
-        )
+        from _event_emit import emit_event
         transcript_path = payload.get("transcript_path", "")
-        session_id = (
-            os.path.splitext(os.path.basename(transcript_path))[0]
-            if transcript_path
-            else "unknown"
+        from _governance_logger import session_from
+        session_id = session_from(payload)
+        emit_event(
+            event="deny",
+            hook="config-protection",
+            session=session_id,
+            extra={
+                "tool": tool_name,
+                "basename": basename,
+                "file_prefix": file_path[:120],
+            },
         )
-        entry = json.dumps({
-            "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "schema": 2,
-            "event": "deny",
-            "hook": "config-protection",
-            "session": session_id,
-            "tool": tool_name,
-            "basename": basename,
-            "file_prefix": file_path[:120],
-        })
-        with open(log_path, "a", encoding="utf-8") as fh:
-            fh.write(entry + "\n")
     except Exception:
         pass
 
@@ -179,28 +171,20 @@ def main() -> int:
     if _is_overridden():
         # Override active: let it through (and log the override for observability)
         try:
-            log_path = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)),
-                "governance-log.jsonl",
-            )
+            from _event_emit import emit_event
             transcript_path = payload.get("transcript_path", "")
-            session_id = (
-                os.path.splitext(os.path.basename(transcript_path))[0]
-                if transcript_path
-                else "unknown"
+            from _governance_logger import session_from
+            session_id = session_from(payload)
+            emit_event(
+                event="override",
+                hook="config-protection",
+                session=session_id,
+                extra={
+                    "tool": tool_name,
+                    "basename": basename,
+                    "file_prefix": file_path[:120],
+                },
             )
-            entry = json.dumps({
-                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "schema": 2,
-                "event": "override",
-                "hook": "config-protection",
-                "session": session_id,
-                "tool": tool_name,
-                "basename": basename,
-                "file_prefix": file_path[:120],
-            })
-            with open(log_path, "a", encoding="utf-8") as fh:
-                fh.write(entry + "\n")
         except Exception:
             pass
         return 0

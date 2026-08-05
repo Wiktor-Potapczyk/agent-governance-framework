@@ -37,8 +37,11 @@ def run_hook_with_payload(payload_json, log_path):
     spec.loader.exec_module(mod)
     mod.LOG_PATH = log_path
 
-    # Provide stdin
-    with patch.object(sys, 'stdin', io.StringIO(payload_json)):
+    # The governance-log write goes through _event_emit since the C7 migration,
+    # and that helper resolves its own path, so patching this module's LOG_PATH
+    # no longer reaches it. GOVERNANCE_LOG_PATH is the override it provides.
+    with patch.object(sys, 'stdin', io.StringIO(payload_json)), \
+         patch.dict(os.environ, {"GOVERNANCE_LOG_PATH": str(log_path)}):
         mod.main()
 
     # Read back what was written
@@ -52,16 +55,42 @@ def run_hook_with_payload(payload_json, log_path):
 
 class TestSessionStartLog(unittest.TestCase):
 
+    # Sentinel date with no governance-log data → the dashboard aggregate produces no
+    # alerts → no dashboard_alert entry is appended to the temp log. Without this the
+    # hook's best-effort dashboard path reads the REAL governance-log.jsonl for
+    # "yesterday", and on any day with a classifier block it appends a dashboard_alert
+    # line (which has no `source` key) to the temp log; the test then reads that last
+    # line and the source/session assertions fail. Pinning to a dead date isolates the
+    # unit under test from live observability data (review-flagged 2026-06-16).
+    DASHBOARD_DEAD_DATE = "1970-01-01"
+
     def setUp(self):
         # Create a temp log file for each test
         self.tmp = tempfile.NamedTemporaryFile(
             mode='w', delete=False, suffix='.jsonl', encoding='utf-8')
         self.tmp.close()
         self.log_path = self.tmp.name
+        # Isolate from live governance-log dashboard data (see DASHBOARD_DEAD_DATE note).
+        self._prev_dash_date = os.environ.get("DASHBOARD_TARGET_DATE")
+        os.environ["DASHBOARD_TARGET_DATE"] = self.DASHBOARD_DEAD_DATE
 
     def tearDown(self):
         if os.path.exists(self.log_path):
             os.remove(self.log_path)
+        # Restore the env var to its prior state.
+        if self._prev_dash_date is None:
+            os.environ.pop("DASHBOARD_TARGET_DATE", None)
+        else:
+            os.environ["DASHBOARD_TARGET_DATE"] = self._prev_dash_date
+        # Clean up the junk aggregate file the dead-date dashboard run wrote.
+        agg_junk = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "aggregates", "daily", f"{self.DASHBOARD_DEAD_DATE}.json")
+        if os.path.exists(agg_junk):
+            try:
+                os.remove(agg_junk)
+            except OSError:
+                pass
 
     def test_session_id_from_payload(self):
         payload = json.dumps({

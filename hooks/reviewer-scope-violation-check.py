@@ -1,7 +1,7 @@
 """
 Reviewer Scope Violation Check - PreToolUse Hook (matcher: Write|Edit|MultiEdit)
 
-Design: Projects/your-project/work/2026-05-25-reviewer-scope-violation-check-design.md
+Design: Projects/your-project/work/archive/2026-05-25-reviewer-scope-violation-check-design.md
 AW-5 Finding 2: evaluative-reviewer sub-agents with Write access can edit the
 artifact they were dispatched to review, then produce a critique of their own edit.
 This is the runtime enforcement layer (~90% compliance) on top of the prompt-level
@@ -70,8 +70,13 @@ def _norm_path(p):
 try:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from _event_emit import emit_event  # type: ignore
+    from _governance_logger import session_from  # type: ignore
 except Exception:
     emit_event = None  # type: ignore
+
+    def session_from(_payload):  # type: ignore
+        """Fallback when the helper is unreachable: no identity, never a guess."""
+        return None
 
 # Governance log lives alongside all other hook artefacts.
 _HOOK_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -81,20 +86,18 @@ _GOVERNANCE_LOG = os.path.join(_HOOK_DIR, "governance-log.jsonl")
 def _log_block(session_id, agent_type, tool_name, file_path, reason):
     """Append a reviewer_scope_violation block entry to governance-log.jsonl."""
     try:
-        from datetime import datetime
-        entry = json.dumps({
-            "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "schema": 2,
-            "event": "reviewer_scope_violation",
-            "hook": "reviewer-scope-violation-check",
-            "session": session_id,
-            "agent_type": agent_type,
-            "tool_name": tool_name,
-            "file_path": file_path,
-            "block_reason": reason,
-        }, ensure_ascii=False)
-        with open(_GOVERNANCE_LOG, "a", encoding="utf-8") as fh:
-            fh.write(entry + "\n")
+        from _event_emit import emit_event
+        emit_event(
+            event="reviewer_scope_violation",
+            hook="reviewer-scope-violation-check",
+            session=session_id,
+            extra={
+                "agent_type": agent_type,
+                "tool_name": tool_name,
+                "file_path": file_path,
+                "block_reason": reason,
+            },
+        )
     except Exception:
         # Governance log failure must never break the block itself.
         pass
@@ -136,15 +139,17 @@ def _extract_agent_type_from_transcript(transcript_path):
         return None
 
     try:
-        file_size = os.path.getsize(transcript_path)
-        read_bytes = min(READ_BYTES, file_size)
-
+        # The dispatch prompt is the FIRST entry of a sub-agent transcript, so read
+        # the HEAD. This previously seeked to file_size - READ_BYTES and scanned the
+        # tail, which returned None for every sub-agent transcript larger than the
+        # window because the prompt it needs sits at the opposite end of the file.
+        # The bug survived 24,890 synthetic runs (fixtures are small enough that the
+        # tail IS the whole file) while producing zero real firings. Fixed 2026-08-04.
         with open(transcript_path, "r", encoding="utf-8", errors="replace") as fh:
-            fh.seek(max(0, file_size - read_bytes))
-            tail = fh.read()
+            head = fh.read(READ_BYTES)
 
         # Walk lines looking for first user entry: that's the dispatch prompt
-        for raw_line in tail.split("\n"):
+        for raw_line in head.split("\n"):
             raw_line = raw_line.strip()
             if not raw_line:
                 continue
@@ -210,10 +215,11 @@ def main():
     agent_type = (payload.get("agent_type") or "").strip().lower()
 
     transcript_path = payload.get("transcript_path") or ""
-    session_id = (
-        os.path.splitext(os.path.basename(transcript_path))[0]
-        if transcript_path else "unknown"
-    )
+    # session_id first, then the transcript stem. This hook is the single largest
+    # writer of unattributed records (23,976 of the log's 43,601 unknown-session
+    # rows when measured), and "unknown" is matched by is_test_session, so every
+    # one of those real scope violations read as test traffic downstream.
+    session_id = session_from(payload)
 
     # FALLBACK: if agent_type absent, try transcript walking.
     if not agent_type:
@@ -273,8 +279,17 @@ def main():
         f"review-output naming convention (work/YYYY-MM-DD-*-review-*.md)."
     )
 
-    # Structured block decision to stdout (CC PreToolUse block protocol).
-    print(json.dumps({"decision": "block", "reason": block_reason}))
+    # PreToolUse denial protocol: CC requires the hookSpecificOutput wrapper with
+    # permissionDecision="deny". The older {"decision":"block"} form is the
+    # SubagentStop protocol and is SILENTLY IGNORED on PreToolUse: which is why
+    # this hook logged "blocked" for 14 days while blocking nothing (fixed 2026-06-07).
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": block_reason,
+        }
+    }))
 
     # Governance log entry for audit trail.
     _log_block(session_id, agent_type, tool_name, file_path, block_reason)
@@ -367,14 +382,17 @@ if __name__ == "__main__":
     tp1_rc, tp1_out, tp1_err = run_hook(tp1_payload)
     try:
         tp1_json = json.loads(tp1_out.strip())
-        tp1_blocked = tp1_json.get("decision") == "block"
+        # PreToolUse denial protocol: hookSpecificOutput.permissionDecision == "deny".
+        tp1_blocked = (
+            tp1_json.get("hookSpecificOutput", {}).get("permissionDecision") == "deny"
+        )
     except (json.JSONDecodeError, ValueError):
+        tp1_json = {}
         tp1_blocked = False
     assert_test(
-        "TP1 - architect-reviewer Edit existing artifact -> BLOCK",
+        "TP1 - architect-reviewer Edit existing artifact -> BLOCK (deny)",
         tp1_rc == 0 and tp1_blocked,
-        f"exit={tp1_rc} decision={tp1_json.get('decision') if tp1_blocked else 'parse-failed'}"
-        if tp1_blocked else f"exit={tp1_rc} stdout={repr(tp1_out[:120])}",
+        f"exit={tp1_rc} permissionDecision={tp1_json.get('hookSpecificOutput', {}).get('permissionDecision', 'parse-failed')}",
     )
 
     # ------------------------------------------------------------------

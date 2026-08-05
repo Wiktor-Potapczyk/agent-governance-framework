@@ -97,15 +97,32 @@ def main():
     if not is_wiki_path(rel_path):
         return 0
 
+    def _log(decision, detail=None):
+        """Record this verdict to hook-activity.jsonl. Never raises (contract C2).
+
+        Placed past the wiki-path gate on purpose: this hook fires on every
+        Write and Edit in the vault and only wiki-layer files are in its scope,
+        so a record per non-wiki write measures nothing.
+        """
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from _governance_logger import log_fire, session_from
+            log_fire("wiki-citation-check", decision=decision, detail=detail,
+                     session=session_from(payload))
+        except Exception:
+            pass
+
     try:
         content = Path(file_path).read_text(encoding="utf-8", errors="replace")
     except Exception:
+        _log("skip", "unreadable")
         return 0
 
     # For unconditional wiki paths (Resources/KB/), check applies regardless of tag.
     # For by-tag paths (Notes/, Projects/*/archive/), require #wiki tag.
     if is_wiki_path_by_tag(rel_path) and not is_wiki_path_unconditional(rel_path):
         if not has_wiki_tag(content):
+            _log("skip", "no-wiki-tag")
             return 0
     elif is_wiki_path_unconditional(rel_path):
         # KB files SHOULD have #wiki tag; missing it gets flagged separately by validate
@@ -117,6 +134,8 @@ def main():
 
     log_decision(rel_path, findings, blocked=False)
 
+    # Emit first, log second. Nothing between the verdict and the stdout payload
+    # may be able to swallow it (idiom from routing-table-validation.py).
     if findings:
         msg = format_findings_message(rel_path, findings, has_blocking)
         try:
@@ -129,6 +148,9 @@ def main():
             print(json.dumps(out))
         except Exception:
             pass
+        _log("warn", "%s %d finding(s)" % (rel_path, len(findings)))
+    else:
+        _log("allow", rel_path)
 
     return 0
 

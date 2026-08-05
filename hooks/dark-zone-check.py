@@ -145,26 +145,35 @@ def main():
     else:
         severity = "low"  # Adequate utilization (citations + file writes)
 
+    # Extract effort.level from the Week-19 hook payload (additive telemetry,
+    # mirrors the pattern applied to governance-log.py in 2026-05-22 loop iter 7).
+    # str()-hardened; null when absent or malformed. Zero behavioural change.
+    effort_level = None
+    effort = payload.get("effort")
+    if isinstance(effort, dict):
+        lvl = effort.get("level")
+        if lvl is not None:
+            effort_level = str(lvl)
+
     # Log to governance log (monitoring only)
     try:
-        from datetime import datetime
-        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-        session_id = os.path.splitext(os.path.basename(transcript_path))[0]  # Full UUID (P1-D fix 2026-04-09)
-        log_entry = json.dumps({
-            "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "event": "dark-zone",
-            "hook": "dark-zone-check",
-            "session": session_id,
-            "agents": agents_dispatched,
-            "agent_count": agent_count,
-            "citation_count": citation_count,
-            "files_written": files_written,
-            "ratio": round(effective_ratio, 2),
-            "severity": severity,
-            "schema": 2,
-        })
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(log_entry + "\n")
+        from _event_emit import emit_event
+        from _governance_logger import session_from
+        session_id = session_from(payload)
+        emit_event(
+            event="dark-zone",
+            hook="dark-zone-check",
+            session=session_id,
+            extra={
+                "agents": agents_dispatched,
+                "agent_count": agent_count,
+                "citation_count": citation_count,
+                "files_written": files_written,
+                "ratio": round(effective_ratio, 2),
+                "severity": severity,
+                "effort_level": effort_level,
+            },
+        )
     except Exception:
         pass
 

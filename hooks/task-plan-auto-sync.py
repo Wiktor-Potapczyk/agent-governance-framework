@@ -7,12 +7,14 @@ the active project's task_plan.md, marks it `[x]`, and appends a 1-line summary.
 
 Non-blocking: always exits 0. Failures log to .claude/hooks/logs/h4-sync.log.
 
-v1: pure-regex matching only (73% coverage). Haiku fallback gated behind
+Design: Projects/your-project/work/2026-05-10-h4-design.md (status #approved).
+
+v1: pure-regex matching only (73% coverage on AGR). Haiku fallback gated behind
 H4_ENABLE_HAIKU=1 env var (off by default until regex path is empirically validated).
 
 v1.1 (2026-05-10): regex broadened to match multi-segment IDs like OBS-V2-A and
 ECC-LEARN-A2 (alpha trailing + 5+ char prefixes). Old regex required <=4-char prefix
-+ numeric-only trailing segment, missing ~27% of IDs. New regex allows up to
++ numeric-only trailing segment, missing ~27% of vault IDs. New regex allows up to
 10-char prefix and arbitrary alphanumeric trailing segments. False-positive defense unchanged: still
 gated by `**` boundary + lookahead, and SCOPE-first extraction (Issue 1) remains
 the primary prose-mention guard.
@@ -418,13 +420,13 @@ def _invoke_haiku_fallback(prose: str) -> tuple:
     Invoke `claude -p --model haiku` to extract a TASK-ID from *prose*.
 
     Returns (extracted_id_or_None, outcome_string) where outcome is one of:
-      "hit"           : ID extracted, validated against PATTERN_TASK_ID
-      "miss"          : Haiku returned NONE or empty
-      "error"         : Haiku subprocess returned non-zero exit code
-      "timeout"       : subprocess.TimeoutExpired (6-sec budget)
+      "hit": ID extracted, validated against PATTERN_TASK_ID
+      "miss": Haiku returned NONE or empty
+      "error": Haiku subprocess returned non-zero exit code
+      "timeout": subprocess.TimeoutExpired (6-sec budget)
       "invalid_output": Haiku output doesn't match PATTERN_TASK_ID or is unparseable
-      "cli_absent"    : `claude` binary not on PATH
-      "interrupted"   : User-initiated Ctrl-C during Haiku subprocess; sink entry recorded, then re-raised
+      "cli_absent": `claude` binary not on PATH
+      "interrupted": User-initiated Ctrl-C during Haiku subprocess; sink entry recorded, then re-raised
 
     Caller MUST call regex_match() against task_plan.md before using the result to
     distinguish "hit + in plan" from "hit + not in plan". This function validates

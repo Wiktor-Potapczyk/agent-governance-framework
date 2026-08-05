@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-08-05: hook and test sync, and two gates that were not gating
+
+The repository had drifted roughly a week behind the working system it documents. This brings across every hook change and, more importantly, the tests that make those changes checkable. **Two of the repo's own quality gates turned out to be passing vacuously; both are now real, and both immediately failed on this very changeset, which is how their fix was verified.**
+
+### Added
+
+- **`hooks/conftest.py`**. Its absence was the load-bearing gap. Several hooks resolve their log destination through an environment override so a test run cannot write to the live log, and nothing in this repo set those variables. Measured before it landed: one suite run wrote 105 real records into `governance-log.jsonl` and 48 into `hook-activity.jsonl`, the exact pollution the override exists to prevent, invisible because both files are gitignored.
+- **Enforcement hooks** (5): `lint-cadence-trigger.py`, `post-compact.py`, `raw-frontmatter-check.py`, `mcp-qmd-health-probe.py`, `qmd-recall-nudge.py`. The last two assume a local search MCP server and are inert without one; they ship because the pattern is reusable, not because they work unconfigured.
+- **Test files** (14 new, 38 total). Several cover hooks the repo has shipped untested since the beginning, including `config-protection.py`, `memory-schema-check.py`, `mcp-circuit-breaker.py` and both `_log_path()` resolvers.
+- **`exclude_globs`** in the `count_files` expectation of `skills/core/doc-consistency/check_doc_consistency.py`. A single glob cannot express "`*.py` but not `_*` or `test_*`", and character-class tricks silently drop real entries, so any count needing exclusions had to be hand-set as a literal.
+
+### Changed
+
+- **43 hooks and 12 test files** updated to their current implementations.
+- **CI now runs the hook suite.** It was excluded by a committed comment asserting the tests "cannot pass standalone" because they need a live governance environment. That was measured and is false: in a clean clone with no registry and no settings state, the suite passes. The cases that genuinely need a populated registry now skip themselves rather than fail, which is the honest signal. **The cheapest real check in the repository was switched off on an assumption nobody had tested.**
+- **`.doc-consistency.json` now derives both hook counts from source instead of hand-set literals**, via a new `count_matches` expectation (distinct regex matches in a file) alongside the existing `count_files`. The step is named "counts vs on-disk source", but for these keys it compared documents against a number typed into a config file, so it could detect documents disagreeing with each other and never the source changing underneath them. Live, it caught two wrong numbers inside this changeset.
+- **The two hook counts are now stated as two counts.** `active-enforcement-hooks` (36) means "registered by `settings/settings.json.template`" and is derived from that file. The new `hooks-on-disk` (46) means the directory inventory and is derived from the directory. Previously only the first existed, the second was never stated anywhere, and readers had no way to tell that 36 and the separately-documented 12 referred to two different template files rather than contradicting each other. `README.md`, `docs/architecture.md` and `hooks/README.md` now say both numbers and what each means.
+- **`hooks/epistemic-check.py`** now derives its session identity through `_governance_logger.session_from` instead of the transcript filename stem. The stem fallback yields `"unknown"`, which the test-session filter matches, so every block it logged was being counted as synthetic traffic. Found by a drift guard ported in this release, and only findable here: this hook exists in the public repository and not in the system it was ported from.
+- **`scripts/shared/known_names.py`** regenerated from the hooks rather than maintained alongside them.
+- **`hooks/disabled/`**: `em-dash-guard.py`, `prose-codes-check.py` and `routing-table-validation.py` updated in place. Newer versions of all three were briefly promoted to the top level before `pytest.ini` made the prior decision explicit; they belong where the repository had already put them.
+- **Genericized** an internal deploy target and project name that had been reachable in a deny-pattern exemption key. The exemption is matching logic rather than a comment, so the rename is a behavioural change: adopters using that pattern should set it to their own project name.
+
+### Not shipped, and why
+
+- **Hooks that hardcode a private workspace layout or embed a maintainer-specific matching list.** Scrubbing them means rewriting live matching logic, not redacting text, so they are held rather than published in a broken form.
+- **A larger default registration set.** The templates still register 12. Which hooks a project wants enforcing is a project's decision, and shipping 49 enabled by default would teach reflexive bypassing, which is the failure mode this framework exists to avoid.
+
 ## 2026-07-29: Two-Gate Autonomy completed, shared-library expansion, reference coverage
 
 ### Added

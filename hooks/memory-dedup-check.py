@@ -97,22 +97,40 @@ def main():
         print("{}")
         return
 
+    def _log(decision, detail=None):
+        """Record this verdict to hook-activity.jsonl. Never raises (contract C2).
+
+        Placed past the memory-path gate on purpose: this hook fires on every
+        Write in the vault and only memory files are in its scope, so a record
+        per non-memory Write measures nothing.
+        """
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from _governance_logger import log_fire, session_from
+            log_fire("memory-dedup-check", decision=decision, detail=detail,
+                     session=session_from(payload))
+        except Exception:
+            pass
+
     # Extract description from the content being written
     new_desc = extract_description_from_content(content)
     if not new_desc:
         print("{}")
+        _log("skip", "no-description")
         return
 
     new_tokens = tokenize(new_desc)
     if len(new_tokens) < 3:
         # Too few tokens for meaningful comparison
         print("{}")
+        _log("skip", "too-few-tokens")
         return
 
     target_filename = os.path.basename(file_path)
     memory_dir = get_memory_dir(file_path)
     if not memory_dir or not os.path.isdir(memory_dir):
         print("{}")
+        _log("skip", "no-memory-dir")
         return
 
     # Compare against all existing memory files
@@ -135,8 +153,11 @@ def main():
                 duplicates.append((filename, sim))
     except OSError:
         print("{}")
+        _log("skip", "listdir-error")
         return
 
+    # Emit first, log second. Nothing between the verdict and the stdout payload
+    # may be able to swallow it (idiom from routing-table-validation.py).
     if duplicates:
         duplicates.sort(key=lambda x: -x[1])
         top = duplicates[0]
@@ -147,8 +168,10 @@ def main():
                 f"Consider updating the existing file instead of creating a new one."
             )
         }))
+        _log("warn", f"{target_filename} ~{top[1]:.0%} {top[0]}")
     else:
         print("{}")
+        _log("allow", target_filename)
 
 
 if __name__ == "__main__":

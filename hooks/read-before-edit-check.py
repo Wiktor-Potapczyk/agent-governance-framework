@@ -1,7 +1,7 @@
 """
 Read-Before-Edit Check - Stop Hook (instrumentation layer)
 
-Owner note (SA-1 closure, 2026-05-25): "edit their system prompts to
+the owner 2026-05-25 SA-1 closure (Q1 second half): "edit their system prompts to
 not edit existing files i guess. then we could use a stop hook to first read a
 file before editing it or something like this."
 
@@ -122,10 +122,8 @@ def main():
 
     # Emit governance + warn (non-blocking)
     if edits_without_read:
-        session_id = (
-            os.path.splitext(os.path.basename(transcript_path))[0]
-            if transcript_path else "unknown"
-        )
+        from _governance_logger import session_from
+        session_id = session_from(payload)
         for tool, path in edits_without_read:
             if emit_event is not None:
                 try:

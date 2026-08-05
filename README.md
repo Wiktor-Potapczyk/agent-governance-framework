@@ -18,7 +18,13 @@ The framework operationalizes three research-backed principles: classify before 
 
 ## Architecture
 
-The framework operates across four layers, with 36 active enforcement hooks (distinct scripts registered in the settings template, plus nine shared libraries):
+The framework operates across four layers. The repository ships **46 hooks**, **9 shared libraries** they import, and **38 test files** covering them.
+
+**Two numbers describe the hooks and they are worth keeping apart.** `settings/settings.json.template` is the full recommended configuration and registers 36 of them. `settings/settings.json.example` and `settings.local.json.example` register 12: a minimal starter set, the smallest group that makes all four layers below actually enforce something. Start from the 12, add from the 36 as you want them, and treat the remainder as worked examples. `docs/reference/hooks.md` says what each one does and which event it binds to.
+
+A further set lives in `hooks/disabled/`, excluded from the default test run by `pytest.ini` so a clean clone runs green. Some are there after an instructive failure, documented in `hooks/disabled/README.md`; others simply ship unregistered.
+
+Two hooks (`qmd-recall-nudge.py`, `mcp-qmd-health-probe.py`) assume a local search MCP server and are inert without one. They are included because the pattern is reusable, not because they work out of the box.
 
 | Layer | What it does | Hook events |
 |---|---|---|
@@ -67,7 +73,7 @@ framework-repo/
 ├── workflows/               # 6 deterministic process-skill workflow scripts (the enforced procedure layer)
 ├── settings/
 │   ├── settings.json.example        # Global hook registration template
-│   └── settings.local.json.example  # Project-level override (registers 12 default hooks; remaining 5 active hooks are opt-in)
+│   └── settings.local.json.example  # Project-level override (same minimal 12; settings.json.template registers 36)
 ├── docs/                    # Architecture reference and customization guides
 ├── LICENSE.txt
 └── INSTALL.md

@@ -39,6 +39,54 @@ _LOG_PATH = os.path.join(
 )
 
 
+def _log_path():
+    """Resolve the destination at call time, not import time.
+
+    HOOK_ACTIVITY_LOG_PATH overrides the module constant. This is the twin of
+    _event_emit's GOVERNANCE_LOG_PATH: without it the test suite writes into the
+    live stream on every run (measured at 117 records per hooks-suite run), and
+    those synthetic records are not merely analytics noise. hook_activity_report
+    derives its fire counts and dark-hook list from this file, and the Step-11
+    competence gate reads a bounded tail of the other one, so test writes evict
+    real history. Resolving here rather than at import also keeps _LOG_PATH
+    monkeypatchable, which is how the existing tests target this module.
+    """
+    override = os.environ.get("HOOK_ACTIVITY_LOG_PATH", "")
+    if isinstance(override, str) and override.strip():
+        return override.strip()
+    return _LOG_PATH
+
+
+def session_from(payload):
+    """Best-effort real session id from a hook payload. Never raises, never guesses.
+
+    Accepts the payload dict a hook already parsed, or the raw stdin text before
+    parsing. Returns the session id string, or None when the payload carries no
+    identity (contract C3: a record that carries a session must carry a REAL one,
+    and a record that cannot know its session carries null rather than a placeholder).
+
+    Fallback order matches the established convention in session-start-log.py:
+    session_id first, then the transcript filename stem.
+    """
+    try:
+        if isinstance(payload, bytes):
+            payload = payload.decode("utf-8", errors="replace")
+        if isinstance(payload, str):
+            payload = json.loads(payload or "{}")
+        if not isinstance(payload, dict):
+            return None
+        sid = payload.get("session_id")
+        if isinstance(sid, str) and sid.strip():
+            return sid.strip()
+        tpath = payload.get("transcript_path")
+        if isinstance(tpath, str) and tpath.strip():
+            stem = os.path.splitext(os.path.basename(tpath.strip()))[0]
+            return stem or None
+    except Exception:
+        pass
+    return None
+
+
 def log_fire(hook, decision=None, detail=None, session=None):
     """Append one hook-firing record to hook-activity.jsonl. Never raises.
 
@@ -56,7 +104,7 @@ def log_fire(hook, decision=None, detail=None, session=None):
             "detail": (str(detail)[:200] if detail is not None else None),
             "session": session,
         }
-        with open(_LOG_PATH, "a", encoding="utf-8") as f:
+        with open(_log_path(), "a", encoding="utf-8") as f:
             f.write(json.dumps(record) + "\n")
     except Exception:
         # Instrumentation must never crash the host hook.

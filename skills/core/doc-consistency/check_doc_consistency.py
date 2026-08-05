@@ -69,9 +69,31 @@ def compute_expected(expect: dict, root: str) -> tuple[str | None, str | None]:
         if not os.path.isdir(d):
             return None, f"count_files dir not found: {d}"
         matches = globmod.glob(os.path.join(d, pattern))
+        # Optional exclusions. A single glob cannot express "*.py but not the
+        # ones starting with _ or test_", and character-class tricks like
+        # [!_t]*.py silently drop real entries (tag-variant-check.py,
+        # token-breakdown.py). Without this, a count that needs exclusions has
+        # to be hand-set as a literal, and a hand-set count is not a check: it
+        # only detects docs disagreeing with each other, never the source
+        # changing underneath them.
+        for ex in spec.get("exclude_globs", []):
+            excluded = set(globmod.glob(os.path.join(d, ex)))
+            matches = [m for m in matches if m not in excluded]
         # files only (a glob may catch subdirs); count regular files
         n = sum(1 for m in matches if os.path.isfile(m))
         return str(n), None
+    if "count_matches" in expect:
+        # Distinct regex-group matches in one file. Needed for "how many hooks
+        # does this settings template register", which is neither a file count
+        # nor a line count: one line can register a hook, and the same hook can
+        # appear on several lines under different events.
+        spec = expect["count_matches"]
+        f = _resolve(root, spec["file"])
+        if not os.path.isfile(f):
+            return None, f"count_matches file not found: {f}"
+        found = set(re.findall(spec["pattern"], _read(f)))
+        found -= set(spec.get("exclude", []))
+        return str(len(found)), None
     if "count_lines" in expect:
         spec = expect["count_lines"]
         f = _resolve(root, spec["file"])

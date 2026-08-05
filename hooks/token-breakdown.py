@@ -5,17 +5,17 @@ Emits a single 'token_breakdown' event to governance-log.jsonl via _event_emit.p
 Does NOT block: telemetry only.
 
 Schema v2 event fields (extra dict passed to emit_event):
-  turn_total_tokens           int  : RAW sum of all four token fields (input+output+cache_read+cache_creation)
+  turn_total_tokens           int: RAW sum of all four token fields (input+output+cache_read+cache_creation)
                                        plus subagent totalTokens. Fields are non-overlapping per Anthropic API
                                        (input_tokens is fresh-only, cache_read_input_tokens is separate),
                                        so this is a workload-size proxy: NOT equivalent to billable cost
                                        (cache-read tokens are priced differently).
-  main_session                dict : aggregated message.usage across all assistant entries in turn
-  by_subagent                 list : one entry per Agent tool call, resolved from toolUseResult.usage.
+  main_session                dict: aggregated message.usage across all assistant entries in turn
+  by_subagent                 list: one entry per Agent tool call, resolved from toolUseResult.usage.
                                        Entries with no matching Agent dispatch in the current turn are SKIPPED
                                        (prevents cross-turn attribution pollution).
-  tool_calls                  dict : {tool_name: count} for every tool_use block this turn
-  skill_names                 list : (only if Skill calls > 0) list of invoked skill names
+  tool_calls                  dict: {tool_name: count} for every tool_use block this turn
+  skill_names                 list: (only if Skill calls > 0) list of invoked skill names
 """
 
 import sys
@@ -36,6 +36,67 @@ except Exception:
 
 # Read last 200 KB: same window as other Stop hooks
 READ_BYTES = 204800
+
+# ---------------------------------------------------------------------------
+# Model pricing for ECC-LEARN-E2 USD cost surface.
+#
+# Source: Anthropic public pricing pages (anthropic.com/pricing). These rates
+# are the published list-price for direct-API consumption; subscription-tier
+# costs (Max 5x, Pro, Team) are NOT reflected here: the value is a "what would
+# this turn cost without the subscription" upper bound, useful for relative
+# comparison across turns and for projecting if the user ever moves to direct API.
+#
+# Rates as of 2026-05-23. Update PRICE_RATES_AS_OF when refreshed.
+# Each entry: per MILLION tokens, USD.
+#   input  / output / cache_read / cache_creation
+# ---------------------------------------------------------------------------
+PRICE_RATES_AS_OF = "2026-05-23"
+
+PRICES_USD_PER_MTOK: dict = {
+    # Opus family
+    "claude-opus-4-7": (15.00, 75.00, 1.50, 18.75),
+    "claude-opus-4-6": (15.00, 75.00, 1.50, 18.75),
+    "claude-opus-4":   (15.00, 75.00, 1.50, 18.75),
+    # Sonnet family
+    "claude-sonnet-4-6": (3.00, 15.00, 0.30, 3.75),
+    "claude-sonnet-4":   (3.00, 15.00, 0.30, 3.75),
+    # Haiku family
+    "claude-haiku-4-5":   (1.00, 5.00, 0.10, 1.25),
+    "claude-haiku-4-5-20251001": (1.00, 5.00, 0.10, 1.25),
+}
+
+# When a model name has a 1m-context variant suffix (e.g. "claude-opus-4-7[1m]"),
+# strip the bracket suffix before lookup.
+def _normalise_model_key(model: str) -> str:
+    if not isinstance(model, str):
+        return ""
+    base = model.split("[")[0].strip()
+    return base
+
+
+def _lookup_rate(model: str) -> tuple | None:
+    """Return (in, out, cache_read, cache_creation) USD-per-MTok for model, or None."""
+    key = _normalise_model_key(model)
+    rate = PRICES_USD_PER_MTOK.get(key)
+    if rate is not None:
+        return rate
+    # Family-prefix fallback: try "claude-opus-4-7" if exact is missing
+    for k, v in PRICES_USD_PER_MTOK.items():
+        if key.startswith(k):
+            return v
+    return None
+
+
+def _compute_cost_usd(input_t: int, output_t: int, cache_r: int, cache_c: int, rate: tuple) -> float:
+    """Apply rate to token counts and return USD. Tokens are total (not per-MTok)."""
+    r_in, r_out, r_cr, r_cc = rate
+    cost = (
+        input_t * r_in / 1_000_000.0
+        + output_t * r_out / 1_000_000.0
+        + cache_r * r_cr / 1_000_000.0
+        + cache_c * r_cc / 1_000_000.0
+    )
+    return round(cost, 6)
 
 LOG_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -161,6 +222,14 @@ def aggregate_turn(lines: list) -> dict:
         "cache_read_input_tokens": 0,
         "cache_creation_input_tokens": 0,
     }
+    # Per-model token accumulation for cost computation (ECC-LEARN-E2).
+    # Key: normalised model id. Value: dict with the 4 token counters.
+    main_session_by_model: dict = defaultdict(lambda: {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0,
+    })
     tool_calls: dict = defaultdict(int)
     skill_names: list = []
 
@@ -171,14 +240,22 @@ def aggregate_turn(lines: list) -> dict:
 
         # Accumulate message.usage (present on every assistant entry)
         usage = msg.get("usage") or {}
-        main_session["input_tokens"] += _safe_int(usage.get("input_tokens", 0))
-        main_session["output_tokens"] += _safe_int(usage.get("output_tokens", 0))
-        main_session["cache_read_input_tokens"] += _safe_int(
-            usage.get("cache_read_input_tokens", 0)
-        )
-        main_session["cache_creation_input_tokens"] += _safe_int(
-            usage.get("cache_creation_input_tokens", 0)
-        )
+        in_t = _safe_int(usage.get("input_tokens", 0))
+        out_t = _safe_int(usage.get("output_tokens", 0))
+        cr_t = _safe_int(usage.get("cache_read_input_tokens", 0))
+        cc_t = _safe_int(usage.get("cache_creation_input_tokens", 0))
+        main_session["input_tokens"] += in_t
+        main_session["output_tokens"] += out_t
+        main_session["cache_read_input_tokens"] += cr_t
+        main_session["cache_creation_input_tokens"] += cc_t
+
+        # Per-model bucket (key = "" when model is absent)
+        model_key = _normalise_model_key(msg.get("model", "")) or "unknown"
+        bucket = main_session_by_model[model_key]
+        bucket["input_tokens"] += in_t
+        bucket["output_tokens"] += out_t
+        bucket["cache_read_input_tokens"] += cr_t
+        bucket["cache_creation_input_tokens"] += cc_t
 
         # Scan tool_use blocks
         for block in msg.get("content", []):
@@ -240,7 +317,7 @@ def aggregate_turn(lines: list) -> dict:
                 break  # Take first block only (RISK-P2-B)
 
         # Skip entries whose tool_use_id doesn't map to an Agent dispatch in this turn.
-        # This can happen when an Agent dispatched in a prior turn returns in this turn 
+        # This can happen when an Agent dispatched in a prior turn returns in this turn :
         # attributing those tokens to the current turn with subagent_type="unknown" would
         # pollute by_subagent. Better to lose the data point than corrupt attribution.
         if matched_tool_use_id is None or matched_tool_use_id not in agent_map:
@@ -274,12 +351,59 @@ def aggregate_turn(lines: list) -> dict:
     for agent in by_subagent:
         turn_total += agent.get("totalTokens", 0)
 
+    # ------------------------------------------------------------------
+    # Step 6: compute USD cost (ECC-LEARN-E2)
+    # ------------------------------------------------------------------
+    # Main session: per-model accumulation lets a turn span model switches
+    # (e.g. compaction → smaller model) without misattributing tokens.
+    # Cost is the sum of (tokens × rate) for each model the turn touched.
+    cost_by_model: dict = {}
+    main_session_cost = 0.0
+    for model_key, bucket in main_session_by_model.items():
+        rate = _lookup_rate(model_key)
+        if rate is None:
+            cost_by_model[model_key] = None
+            continue
+        c = _compute_cost_usd(
+            bucket["input_tokens"],
+            bucket["output_tokens"],
+            bucket["cache_read_input_tokens"],
+            bucket["cache_creation_input_tokens"],
+            rate,
+        )
+        cost_by_model[model_key] = c
+        main_session_cost += c
+
+    # Subagents: the transcript carries no model field for sub-results, but vault
+    # standing rule is `model: "sonnet"` for Explore / general-purpose / Plan / most
+    # dispatched agents (see feedback_sonnet_for_heavy_reads). Default to sonnet 4.6
+    # for cost estimation. This is an UPPER bound on subagent cost since haiku is
+    # cheaper, and a LOWER bound when an agent explicitly opts into opus.
+    sonnet_rate = _lookup_rate("claude-sonnet-4-6")
+    subagent_cost = 0.0
+    if sonnet_rate is not None:
+        for agent in by_subagent:
+            subagent_cost += _compute_cost_usd(
+                agent.get("input_tokens", 0),
+                agent.get("output_tokens", 0),
+                agent.get("cache_read_input_tokens", 0),
+                agent.get("cache_creation_input_tokens", 0),
+                sonnet_rate,
+            )
+
+    turn_cost_usd = round(main_session_cost + subagent_cost, 6)
+
     return {
         "turn_total_tokens": turn_total,
         "main_session": main_session,
+        "main_session_by_model": {k: dict(v) for k, v in main_session_by_model.items()},
         "by_subagent": by_subagent,
         "tool_calls": dict(tool_calls),
         "skill_names": skill_names,
+        "turn_cost_usd": turn_cost_usd,
+        "cost_by_model": cost_by_model,
+        "subagent_cost_usd_estimated": round(subagent_cost, 6),
+        "price_rates_as_of": PRICE_RATES_AS_OF,
     }
 
 
@@ -302,7 +426,8 @@ def main():
         return
 
     # Extract session_id from transcript filename (same pattern as governance-log.py)
-    session_id = os.path.splitext(os.path.basename(transcript_path))[0]
+    from _governance_logger import session_from
+    session_id = session_from(payload)
 
     # Read last 200 KB of transcript
     try:
@@ -341,8 +466,13 @@ def main():
     extra = {
         "turn_total_tokens": result["turn_total_tokens"],
         "main_session": result["main_session"],
+        "main_session_by_model": result["main_session_by_model"],
         "by_subagent": result["by_subagent"],
         "tool_calls": result["tool_calls"],
+        "turn_cost_usd": result["turn_cost_usd"],
+        "cost_by_model": result["cost_by_model"],
+        "subagent_cost_usd_estimated": result["subagent_cost_usd_estimated"],
+        "price_rates_as_of": result["price_rates_as_of"],
     }
     if result["skill_names"]:
         extra["skill_names"] = result["skill_names"]

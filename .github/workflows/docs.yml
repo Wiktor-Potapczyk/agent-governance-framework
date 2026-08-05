@@ -79,10 +79,15 @@ jobs:
           print("all JSON valid")
           PY
 
-      # NOTE: the hooks/test_*.py suite is intentionally NOT run here. Those
-      # tests verify a live governance environment (a populated registry, the
-      # maintainer's agent/skill inventory, settings state) that does not exist
-      # in this framework-only public repo, so they cannot pass standalone. They
-      # run in the maintainer's own environment, not in public CI. Public CI
-      # validates only what is self-contained in this repo: doc consistency,
-      # link integrity, and JSON validity (the steps above).
+      # The hook suite DOES run here. It was excluded until 2026-08-05 on the
+      # stated belief that it "cannot pass standalone" because it needs a live
+      # governance environment. That was measured and is false: in a clean clone
+      # with no registry and no settings state, the suite passes. The handful of
+      # cases that genuinely need a populated registry skip themselves rather
+      # than fail, which is the honest signal (a skip says "not exercised here",
+      # a failure would say "the hook is broken", and only the first is true).
+      #
+      # This is the cheapest real check in the repo and it was switched off on
+      # an assumption nobody had tested.
+      - name: Hook suite
+        run: python -m pytest hooks/ -q

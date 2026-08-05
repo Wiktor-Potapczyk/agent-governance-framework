@@ -41,8 +41,13 @@ def _run(payload: dict, log_dir: Path) -> tuple[int, str]:
     payload_str = json.dumps(payload)
     captured = io.StringIO()
     exit_code = None
-    # Redirect log_path and gov_log_path by patching os.path.dirname of __file__
+    # Redirect the hook's own .log file by patching os.path.dirname of __file__.
+    # The governance-log write goes through _event_emit since the C7 migration,
+    # and that helper resolves its own path from its own __file__, so patching
+    # this module's abspath cannot reach it. GOVERNANCE_LOG_PATH is the override
+    # _event_emit provides for exactly this case.
     with mock.patch.object(sqc.os.path, "abspath", return_value=str(log_dir / "subagent-quality-check.py")), \
+         mock.patch.dict(os.environ, {"GOVERNANCE_LOG_PATH": str(log_dir / "governance-log.jsonl")}), \
          mock.patch.object(sys, "stdin", io.StringIO(payload_str)), \
          redirect_stdout(captured):
         try:
@@ -253,6 +258,119 @@ class SubagentQualityBoundaryTests(unittest.TestCase):
         )
         self.assertGreater(len(report), 500)
         self.assertFalse(_blocked(report))
+
+
+class BoldMarkerCheck3RegressionTests(unittest.TestCase):
+    """Regression tests for bold-marker detection added to check_3 (2026-07-10).
+
+    Root cause: workflow-subagent batch-status outputs using **bold** markers as their
+    only structure signal were incorrectly blocked by check_3_no_structure because the
+    original condition only recognised headers, bullets, tables, code blocks, numbered
+    lists, label-value lines, and report headers.  Bold detection was added after
+    `has_report_header` per the governance-mine triage verdict for sig_id 97fe087cb6cb.
+    """
+
+    def test_bold_only_510_char_message_passes_check3(self):
+        """A 510+ char message whose only structure is **bold** markers must not block."""
+        # Mirrors the real violation_excerpts from the triage: "**Batch 31 audit complete**"
+        # style outputs that are substantive but use bold as their primary structure signal.
+        core = "**Analysis notes** processing complete. All items reviewed successfully. "
+        filler = "Item details follow: no anomalies detected in any of the processed records. "
+        msg = core + filler * 6  # ensure > 510 chars, no headers/bullets/tables/code
+        self.assertGreater(len(msg), 510)
+        self.assertNotIn('```', msg)
+        self.assertFalse(_blocked(msg))
+
+    def test_long_no_structure_no_bold_still_blocks(self):
+        """A 510+ char message with NO structure and NO bold markers must still block."""
+        prose = "This is completely unstructured plain prose without any formatting. " * 9
+        self.assertGreater(len(prose), 510)
+        self.assertNotIn('**', prose)
+        self.assertTrue(_blocked(prose))
+
+
+class PassEventEmissionTests(unittest.TestCase):
+    """Step-11 competence gate (2026-07-13): PASS events persist to
+    governance-log.jsonl as a mirror of Shape D minus the block-only fields."""
+
+    # Shape D field set (block entries): non-regression reference. `environment`
+    # was added 2026-08-01 when this writer moved onto _event_emit under contract
+    # C7: the helper stamps it on every record, and gaining it is the stated
+    # point of convergence. Every other field is unchanged. These sets stay
+    # exact-match rather than subset checks, so any further drift still fails.
+    BLOCK_FIELDS = {
+        "ts", "schema", "event", "hook", "session", "environment", "agent_type",
+        "agent_id", "message_len", "check_failed", "violation_excerpt",
+        "block_reason",
+    }
+    PASS_FIELDS = {
+        "ts", "schema", "event", "hook", "session", "environment", "agent_type",
+        "agent_id", "message_len",
+    }
+
+    def test_pass_input_emits_exactly_one_pass_entry(self):
+        msg = "Found 3 files matching the pattern."
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "fixture-agent",
+                "agent_id": "fix-123",
+                "last_assistant_message": msg,
+                "transcript_path": "/tmp/session-fixture.jsonl",
+            }, Path(td))
+            self.assertEqual(out, "")  # PASS path stays silent on stdout
+            gov_log = Path(td) / "governance-log.jsonl"
+            self.assertTrue(gov_log.exists())
+            lines = gov_log.read_text(encoding="utf-8").strip().splitlines()
+            self.assertEqual(len(lines), 1)
+            entry = json.loads(lines[0])
+            self.assertEqual(entry["event"], "pass")
+            self.assertEqual(entry["hook"], "subagent-quality-check")
+            self.assertEqual(entry["agent_type"], "fixture-agent")
+            self.assertEqual(entry["agent_id"], "fix-123")
+            self.assertEqual(entry["message_len"], len(msg))
+            self.assertEqual(entry["schema"], 2)
+            self.assertEqual(entry["session"], "session-fixture")
+            # No block-only fields on a pass entry
+            self.assertEqual(set(entry.keys()), self.PASS_FIELDS)
+            for f in ("check_failed", "violation_excerpt", "block_reason"):
+                self.assertNotIn(f, entry)
+
+    def test_block_path_shape_d_unchanged(self):
+        """Non-regression: blocking input still emits the identical Shape D
+        entry field-set and the identical stdout block response."""
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "fixture-agent",
+                "agent_id": "fix-456",
+                "last_assistant_message": "",
+                "transcript_path": "/tmp/session-fixture.jsonl",
+            }, Path(td))
+            result = json.loads(out)
+            self.assertEqual(result["decision"], "block")
+            self.assertEqual(set(result.keys()), {"decision", "reason"})
+            gov_log = Path(td) / "governance-log.jsonl"
+            lines = gov_log.read_text(encoding="utf-8").strip().splitlines()
+            self.assertEqual(len(lines), 1)
+            entry = json.loads(lines[0])
+            self.assertEqual(entry["event"], "block")
+            self.assertEqual(set(entry.keys()), self.BLOCK_FIELDS)
+
+    def test_gov_log_write_failure_fails_silent(self):
+        """Unwritable governance-log path: no raise, stdout unchanged."""
+        with tempfile.TemporaryDirectory() as td:
+            # A directory at the gov-log path makes open(..., 'a') raise.
+            (Path(td) / "governance-log.jsonl").mkdir()
+            rc, out = _run({
+                "agent_type": "fixture-agent",
+                "agent_id": "fix-789",
+                "last_assistant_message": "Found 3 files matching the pattern.",
+                "transcript_path": "",
+            }, Path(td))
+            self.assertEqual(out, "")  # silent PASS despite failed emit
+            # Plain-text log still written (independent try block)
+            qlog = Path(td) / "subagent-quality.log"
+            self.assertTrue(qlog.exists())
+            self.assertIn("result=PASS", qlog.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

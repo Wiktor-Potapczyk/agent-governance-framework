@@ -59,7 +59,7 @@ FAILURE_LANGUAGE_PATTERNS = [
 # Vault-root for path-existence resolution. Hook fires from .claude/hooks/, so
 # vault root is two levels up.
 VAULT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# Note: broader verbs (creates, returns, works, updates) deliberately excluded 
+# Note: broader verbs (creates, returns, works, updates) deliberately excluded :
 # they appear in legitimate static-analysis QA claims that Read can verify
 # (e.g., "verified the function returns a string"). Architect-reviewer
 # 2026-05-25 flagged false-positive risk; tightened to strong-behavioral verbs only.
@@ -117,7 +117,7 @@ def main():
     # B-2/B-3 flags (2026-06-11): set when QA/pentest ran inside a Workflow invocation.
     # The workflow's Bash/MCP calls run inside the subagent and never appear in the
     # main transcript's tool list, so the execution_tools list is empty on the relay
-    # turn. B-3 suppresses CHECK 1's zero-execution-tools block when the flag is set 
+    # turn. B-3 suppresses CHECK 1's zero-execution-tools block when the flag is set :
     # the execution-evidence obligation moves into the workflow script's typed per-claim
     # fields (Part C process-qa note). The suppression is keyed on the workflow-invocation
     # flag specifically, never on mere presence of any Workflow tool_use.
@@ -145,7 +145,7 @@ def main():
     # Workflow tool_use blocks that precede the tool_result wrapper entry.
     # The Workflow transcript shape is three entries:
     #   1. assistant: Workflow tool_use       ← we need to see this
-    #   2. user     : tool_result wrapper     ← last_user_idx points HERE
+    #   2. user: tool_result wrapper     ← last_user_idx points HERE
     #   3. assistant: relay text (QA REPORT)  ← last_user_idx+1 scan starts here
     # The Workflow tool_use (entry 1) is before last_user_idx, so the main scan misses it.
     # We use the real-last-user-idx (same logic as CHECK 4 below) to scan from the
@@ -192,6 +192,15 @@ def main():
         if entry.get("type") != "assistant":
             continue
         for block in entry.get("message", {}).get("content", []):
+            # Tool census over the whole human turn (fixed 2026-08-04). This was
+            # collected only in the last_user_idx loop below, which starts after the
+            # most recent tool_result. Tool results are `user` entries, so every tool
+            # call before the final one vanished and the hook reported "0 tools this
+            # turn" on turns containing many, which it did to the main session earlier
+            # today. Same root cause as the process-qa detection below.
+            if block.get("type") == "tool_use":
+                last_turn_tools.append(block.get("name", ""))
+
             if block.get("type") == "tool_use" and block.get("name") == "Workflow":
                 inp = block.get("input", {})
                 if isinstance(inp, str):
@@ -210,6 +219,27 @@ def main():
                 elif wf_name == "process-pentest":
                     has_process_pentest = True
                     pentest_via_workflow = True
+
+            # Same boundary problem, Skill path (fixed 2026-08-04). The B2 fix above
+            # was applied only to Workflow; a Skill(process-qa) invocation was still
+            # detected solely by the last_user_idx loop below, which starts AFTER the
+            # most recent tool_result wrapper. Since tool results are `user` entries,
+            # running the verification tools that QA requires pushed the boundary past
+            # the invocation and erased the evidence QA had run. Net effect: the gate
+            # passed the lazy path (invoke, then immediately write the report) and
+            # blocked the diligent one. Detect it from the real human-turn boundary.
+            if block.get("type") == "tool_use" and block.get("name") == "Skill":
+                inp = block.get("input", {})
+                if isinstance(inp, str):
+                    try:
+                        inp = json.loads(inp)
+                    except (json.JSONDecodeError, TypeError):
+                        inp = {}
+                skill_name = (inp.get("skill") or "").strip().lower()
+                if skill_name == "process-qa":
+                    has_process_qa = True
+                elif skill_name == "process-pentest":
+                    has_process_pentest = True
 
     # Process everything after the last user message
     for i in range(last_user_idx + 1, len(lines)):
@@ -343,19 +373,17 @@ def main():
             )
             print(json.dumps({"decision": "block", "reason": reason}))
             try:
-                from datetime import datetime
-                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
-                entry = json.dumps({
-                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "event": "block",
-                    "hook": "work-verification-check",
-                    "session": session_id,
-                    "check": "inline-qa-without-skill",
-                    "schema": 2,
-                })
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(entry + "\n")
+                # Module-level import at line 70. A local re-import here would
+                # rebind emit_event as a function-local and break every earlier
+                # reference to it in this same function.
+                from _governance_logger import session_from
+                session_id = session_from(payload)
+                emit_event(
+                    event="block",
+                    hook="work-verification-check",
+                    session=session_id,
+                    extra={"check": "inline-qa-without-skill"},
+                )
             except Exception:
                 pass
             return
@@ -367,19 +395,14 @@ def main():
             )
             print(json.dumps({"decision": "block", "reason": reason}))
             try:
-                from datetime import datetime
-                log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-                session_id = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
-                entry = json.dumps({
-                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "event": "block",
-                    "hook": "work-verification-check",
-                    "session": session_id,
-                    "check": "inline-pentest-without-skill",
-                    "schema": 2,
-                })
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(entry + "\n")
+                from _governance_logger import session_from
+                session_id = session_from(payload)
+                emit_event(
+                    event="block",
+                    hook="work-verification-check",
+                    session=session_id,
+                    extra={"check": "inline-pentest-without-skill"},
+                )
             except Exception:
                 pass
             return
@@ -389,7 +412,7 @@ def main():
     # where path X was NOT actually written via Write/Edit/MultiEdit tool_use in
     # this turn AND does NOT exist on disk. Per Q9 (PRD §9): combine Write-trace
     # absence + path-existence + tool_result block parsing (catches sub-agent
-    # fabrications, not just main-session). Per Q8: ergonomic automation framing 
+    # fabrications, not just main-session). Per Q8: ergonomic automation framing :
     # prefer false-negative (miss some) over false-positive (block legitimate).
     #
     # Walks the same last-turn window already collected above. Also rescans for
@@ -534,23 +557,20 @@ def main():
         # If user wants block, this is the swap point: replace WARN block with the
         # `print(json.dumps({"decision": "block", "reason": ...})); return` pattern.
         try:
-            from datetime import datetime
-            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id_f = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+            from _governance_logger import session_from
+            session_id_f = session_from(payload)
             for claim, snip in unique_fabrications:
-                entry = json.dumps({
-                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "event": "fabrication_detected",
-                    "hook": "work-verification-check",
-                    "session": session_id_f,
-                    "check": "file-existence-check",
-                    "claimed_path": claim,
-                    "actual_exists": False,
-                    "snippet": snip[:200],
-                    "schema": 2,
-                })
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(entry + "\n")
+                emit_event(
+                    event="fabrication_detected",
+                    hook="work-verification-check",
+                    session=session_id_f,
+                    extra={
+                        "check": "file-existence-check",
+                        "claimed_path": claim,
+                        "actual_exists": False,
+                        "snippet": snip[:200],
+                    },
+                )
         except Exception:
             pass
         warn_msg = (
@@ -597,22 +617,23 @@ def main():
     warn_emitted = False
     if is_non_quick and tool_count == 0:
         try:
-            from datetime import datetime
-            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0]  # Full UUID (P1-D fix 2026-04-09)
-            log_entry = json.dumps({
-                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "event": "warn",
-                "hook": "work-verification-check",
-                "session": session_id,
-                "check": "zero-work-non-quick",
-                "tool_count": 0,
-                "has_qa_report": has_qa_report,
-                "is_non_quick": is_non_quick,
-                "schema": 2,
-            })
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(log_entry + "\n")
+            from _governance_logger import session_from
+            session_id = session_from(payload)
+            emit_event(
+                event="warn",
+                hook="work-verification-check",
+                session=session_id,
+                extra={
+                    "check": "zero-work-non-quick",
+                    "tool_count": 0,
+                    "has_qa_report": has_qa_report,
+                    "is_non_quick": is_non_quick,
+                },
+            )
+            # Set on attempt, not on confirmed write. emit_event swallows I/O
+            # errors and returns nothing, so a failed write can no longer fall
+            # through to the pass branch and record a misleading pass for a turn
+            # that warned. On failure this turn now records neither.
             warn_emitted = True
         except Exception:
             pass
@@ -624,7 +645,8 @@ def main():
     # session_start entry in governance-log for this session, if findable).
     if emit_event is not None:
         try:
-            session_id_h = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+            from _governance_logger import session_from
+            session_id_h = session_from(payload)
             turn_count = 0
             for _line in lines:
                 _line = _line.strip()
@@ -691,7 +713,8 @@ def main():
                 fail_lines.append(claim[:200])
         if fail_lines:
             try:
-                session_id_e = os.path.splitext(os.path.basename(transcript_path))[0] if transcript_path else "unknown"
+                from _governance_logger import session_from
+                session_id_e = session_from(payload)
                 emit_event(
                     event="qa_fail_reported",
                     hook="work-verification-check",
@@ -710,23 +733,20 @@ def main():
     # Skip if warn was already emitted this turn (prevents double-counting)
     if (is_non_quick or has_qa_report or has_pentest_report) and not warn_emitted:
         try:
-            from datetime import datetime
-            log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.jsonl")
-            session_id = os.path.splitext(os.path.basename(transcript_path))[0]  # Full UUID (P1-D fix 2026-04-09)
-            log_entry = json.dumps({
-                "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "event": "pass",
-                "hook": "work-verification-check",
-                "session": session_id,
-                "tool_count": tool_count,
-                "execution_tools": len(execution_tools),
-                "has_qa_report": has_qa_report,
-                "has_pentest_report": has_pentest_report,
-                "response_asks_user": response_asks_user,
-                "schema": 2,
-            })
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(log_entry + "\n")
+            from _governance_logger import session_from
+            session_id = session_from(payload)
+            emit_event(
+                event="pass",
+                hook="work-verification-check",
+                session=session_id,
+                extra={
+                    "tool_count": tool_count,
+                    "execution_tools": len(execution_tools),
+                    "has_qa_report": has_qa_report,
+                    "has_pentest_report": has_pentest_report,
+                    "response_asks_user": response_asks_user,
+                },
+            )
         except Exception:
             pass
 

@@ -1,4 +1,4 @@
-"""Smoke tests for bash-safety-guard.py — PreToolUse on Bash.
+"""Smoke tests for bash-safety-guard.py: PreToolUse on Bash.
 
 Minimal coverage of: the dangerous-pattern deny path, the benign-pass path,
 the Windows-reserved-filename guard, and the inert-context-stripping
@@ -62,7 +62,7 @@ class InertContextStripTests(unittest.TestCase):
         self.assertIn("ls -la", cleaned)
 
     def test_hash_inside_double_quotes_is_not_a_comment(self):
-        # Security invariant: `#` inside quotes is literal — a substitution after it
+        # Security invariant: `#` inside quotes is literal: a substitution after it
         # still executes, so it must NOT be stripped.
         cleaned = bsg.strip_inert_contexts('mycmd "label # rm -rf /etc"')
         self.assertIn("rm -rf /etc", cleaned)
@@ -80,7 +80,7 @@ class MainFlowTests(unittest.TestCase):
         self.assertEqual(out, "")
 
     def test_python_c_with_rm_rf_inside_string_passes(self):
-        # rm -rf is inside a python -c literal — not actually executed
+        # rm -rf is inside a python -c literal: not actually executed
         rc, out = _run({
             "tool_name": "Bash",
             "tool_input": {"command": 'python -c "print(\'rm -rf /\')"'},
@@ -144,6 +144,19 @@ class TwoGateIrreversibleBashTests(unittest.TestCase):
         _, out = _run({"tool_name": "Bash", "tool_input": {"command": command}})
         self.assertIsNone(_decision(out), f"expected PASS for: {command!r} (got {out!r})")
 
+    def _warn(self, command):
+        """Permitted, but carrying a caution (owner ruling 2026-08-05, normal push).
+
+        Deliberately distinct from _pass: a warn must actually SAY something. A
+        silent allow would satisfy "not blocked" while losing the reminder the
+        ruling asked for, so the reason text is asserted, not just the decision.
+        """
+        _, out = _run({"tool_name": "Bash", "tool_input": {"command": command}})
+        self.assertEqual(_decision(out), "allow", f"expected WARN+ALLOW for: {command!r}")
+        self.assertIn("warning, not a block", _reason(out),
+                      f"warn carried no caution text for: {command!r}")
+        return out
+
     # --- P1: unflagged relative single-file rm ---
     def test_p1_tp_unflagged_relative_rm_denies(self):
         self._deny("rm important-notes.md")
@@ -165,23 +178,31 @@ class TwoGateIrreversibleBashTests(unittest.TestCase):
         self._pass("rm D:/data/scratch.tmp")                   # unquoted Windows abs
 
     # --- P2: normal (non-force) git push ---
-    def test_p2_tp_normal_push_denies(self):
-        self._deny("git push origin main")
+    def test_p2_tp_normal_push_warns_not_denies(self):
+        # CHANGED 2026-08-05 by the owner's ruling. This asserted a hard deny, on the
+        # theory that the human gate was him re-running the push himself via the
+        # `!`-prefix bypass. In practice the command he pasted was the one the agent
+        # had just composed and handed him verbatim, so no decision moved to a human;
+        # it only cost a round trip. A normal push is additive and revertable, unlike
+        # the force-push below, which still denies.
+        self._warn("git push origin main")
 
-    def test_p2_tp_global_flags_before_push_deny(self):
+    def test_p2_tp_global_flags_before_push_warn(self):
         # Regression (review 2026-06-16): a git GLOBAL option between `git` and `push`
-        # broke the old `\bgit\s+push\b` adjacency and let the push through. Hard deny.
-        self._deny("git -C /path push")
-        self._deny("git --no-pager push")
-        self._deny("git -c user.email=x push")
-        self._deny("git -c a=b -c c=d push origin main")
+        # broke the old `\bgit\s+push\b` adjacency and let the push through SILENTLY.
+        # The pattern still has to match every one of these; what changed 2026-08-05
+        # is the verdict, deny -> warn. A silent pass here would be the original bug.
+        self._warn("git -C /path push")
+        self._warn("git --no-pager push")
+        self._warn("git -c user.email=x push")
+        self._warn("git -c a=b -c c=d push origin main")
 
     def test_p2_fp_guards_pass(self):
         self._pass("git log -n 5")
         self._pass("git status")
         self._pass('git commit -m "mention git push in message"')  # inert-stripped
         self._pass("git diff -- push.txt")          # push.txt is a path arg, not the subcommand
-        self._pass("git diff HEAD push.txt")        # same — no global-flag chain reaches `push`
+        self._pass("git diff HEAD push.txt")        # same: no global-flag chain reaches `push`
         self._pass("git branch push-feature")       # branch name, not the push subcommand
 
     def test_p2_force_push_keeps_force_description(self):
@@ -299,7 +320,7 @@ class TwoGateIrreversibleBashTests(unittest.TestCase):
 
     def test_p4_fp_multi_curl_pipeline_all_loopback_or_reads_pass(self):
         # The inverse over-block guard for the multi-curl loop: a chain where EVERY curl
-        # is a loopback write or a remote read must NOT deny — the new loop must not
+        # is a loopback write or a remote read must NOT deny: the new loop must not
         # mis-attribute a later read/loopback as a remote write.
         c = self._C
         self._pass(f"{c} -X POST http://localhost:5678/a | {c} -X POST http://127.0.0.1:8080/b")  # both loopback writes
@@ -341,7 +362,7 @@ class TwoGateIrreversibleBashTests(unittest.TestCase):
         self._pass("docker build -t myimg:v1.2 .")        # versioned tag, not :latest
 
     def test_p5_fp_build_oracle_isolated_stage_passes(self):
-        # 2026-06-18 exemption (Wiktor: "the guard is too harsh"): the isolated, reversible
+        # 2026-06-18 exemption (the owner: "the guard is too harsh"): the isolated, reversible
         # build-oracle stage (-p example-build-oracle, throwaway DB, down -v) is the opposite
         # of a prod deploy and MUST be allowed; the real prod deploys above still deny.
         self._pass("docker compose -p example-build-oracle -f docker-compose.build-oracle.yml up --exit-code-from tests --abort-on-container-exit")
@@ -357,10 +378,13 @@ class TwoGateIrreversibleBashTests(unittest.TestCase):
         self._pass("docker ps # remember to rm old-image.tar afterwards")
 
     def test_dangerous_command_before_comment_still_denies(self):
-        # The comment strip must only remove text AFTER the marker — a real command
+        # The comment strip must only remove text AFTER the marker: a real command
         # before the `#` is still scanned and blocked.
         self._deny("DROP TABLE users # cleanup task")
-        self._deny("git push origin main # ship it")
+        # Normal push warns rather than denies since 2026-08-05, but the point this
+        # test defends is unchanged: the command BEFORE the `#` must still be seen.
+        # A silent pass here would mean the comment strip had eaten it.
+        self._warn("git push origin main # ship it")
 
     def test_hash_inside_quotes_does_not_hide_destructive_command(self):
         # Security invariant: `#` inside double quotes is literal, so a destructive
@@ -370,7 +394,7 @@ class TwoGateIrreversibleBashTests(unittest.TestCase):
     def test_substitution_with_comment_then_destructive_tail_still_denies(self):
         # Review 2026-06-16: comment-stripping must NOT hide a `; cmd` tail that bash
         # executes after a command/process substitution closes. Empirically the
-        # backtick and $'...' forms DO execute the tail — these were real under-block
+        # backtick and $'...' forms DO execute the tail: these were real under-block
         # holes introduced by the first comment-strip cut. The substitution-unsafe
         # bail-out leaves the whole command scannable so the tail is still caught.
         self._deny("y=`echo hi # info`; rm -rf /etc")        # backtick subst (confirmed exec)
@@ -381,14 +405,22 @@ class TwoGateIrreversibleBashTests(unittest.TestCase):
     def test_import_still_clean_after_extend(self):
         # bash-safety-guard must still import and carry the extended pattern list.
         # The old P4 curl regex was removed (now a predicate, not a BLOCKED_PATTERNS
-        # entry), so the appended count dropped 9 -> 8.
-        self.assertGreaterEqual(len(bsg.BLOCKED_PATTERNS), 17 + 8)
+        # entry), so the appended count dropped 9 -> 8. Then 2026-08-05 the normal
+        # git-push pattern moved OUT of BLOCKED_PATTERNS into WARN_PATTERNS per
+        # the owner's ruling, dropping the floor one further, 25 -> 24.
+        self.assertGreaterEqual(len(bsg.BLOCKED_PATTERNS), 17 + 7)
+        # The push pattern must have MOVED, not been deleted. Losing it entirely
+        # would make a push silent, which is the outcome the ruling explicitly did
+        # not ask for: it asked for a reminder, not for nothing.
+        self.assertEqual(len(bsg.WARN_PATTERNS), 1)
+        self.assertIn("git push", bsg.WARN_PATTERNS[0][1])
+        self.assertNotIn(bsg.WARN_PATTERNS[0][1], [d for _, d in bsg.BLOCKED_PATTERNS])
         # And the curl predicate is importable + wired (no curl regex remains).
         self.assertTrue(hasattr(bsg, "curl_external_write"))
 
 
 class FamilyCDenyCalibrationTests(unittest.TestCase):
-    """Family-C Gate-1 deny-pattern calibration (Fixes A + B, ratified by Wiktor
+    """Family-C Gate-1 deny-pattern calibration (Fixes A + B, ratified by the owner
     2026-07-15). Encodes the mandatory deny/pass matrix from the implementation plan
     [[2026-07-15-family-c-deny-calibration-plan]] / review
     [[2026-07-14-family-c-deny-calibration-review]].
@@ -402,7 +434,7 @@ class FamilyCDenyCalibrationTests(unittest.TestCase):
 
     Declarative-first: this class is authored BEFORE the pattern edit; the "MUST now
     PASS" cases are expected to FAIL against the un-patched hook (proving the tests are
-    load-bearing). This is a Gate-1 FLOOR calibration — every "MUST still DENY" case is
+    load-bearing). This is a Gate-1 FLOOR calibration: every "MUST still DENY" case is
     a floor invariant that must survive both edits."""
 
     def _deny(self, command):
@@ -426,7 +458,7 @@ class FamilyCDenyCalibrationTests(unittest.TestCase):
         # Floor hole caught during the adversarial floor-integrity pass (build 2026-07-15):
         # the FIRST-ratified Fix A regex `\.\s*(?:[^a-zA-Z.]|$)` excluded a trailing dot to
         # spare dotfiles, but `..` (parent dir) is also dot-then-dot, so `rm -rf ..` /
-        # `rm -rf ../y` slipped through to PASS — a genuine irreversible-surface floor hole
+        # `rm -rf ../y` slipped through to PASS: a genuine irreversible-surface floor hole
         # (P1 does not catch them; they carry a `-` flag). The shipped regex
         # `\.(?![a-zA-Z])` denies the dot unless it is immediately followed by a LETTER,
         # so `..`, `.`, `./` all still DENY while dotfile names still PASS.
@@ -457,7 +489,7 @@ class FamilyCDenyCalibrationTests(unittest.TestCase):
         self._pass("rm -rf /c/tmp/foo")
         self._pass("rm -rf /d/tmp/scratch")
 
-    # --- Fix B: regression guard — plain /tmp/ stays exempt ---
+    # --- Fix B: regression guard: plain /tmp/ stays exempt ---
     def test_fixB_plain_tmp_stays_exempt(self):
         self._pass("rm -rf /tmp/foo")
 
@@ -465,7 +497,7 @@ class FamilyCDenyCalibrationTests(unittest.TestCase):
 class FailOpenHardeningTests(unittest.TestCase):
     """GAP-11 (2026-07-10): if _irreversible_surface fails to import, the guard must
     (a) emit a loud gate1_surface_degraded alarm (governance-log JSONL + stderr) and
-    (b) enforce the FROZEN fallback snapshot — never an empty pattern list."""
+    (b) enforce the FROZEN fallback snapshot: never an empty pattern list."""
 
     class _BlockSurfaceImport:
         """meta_path finder that forces ImportError for _irreversible_surface."""
@@ -512,7 +544,7 @@ class FailOpenHardeningTests(unittest.TestCase):
             self.assertEqual(degraded[0].get("schema"), 2)
             # stderr warning is loud
             self.assertIn("FROZEN fallback", err)
-            # (b) the effective pattern list is NON-EMPTY — never falls back to []
+            # (b) the effective pattern list is NON-EMPTY: never falls back to []
             self.assertTrue(mod.IRREVERSIBLE_BASH_PATTERNS,
                             "fallback resolved to an empty pattern list")
             self.assertEqual(mod.IRREVERSIBLE_BASH_PATTERNS,

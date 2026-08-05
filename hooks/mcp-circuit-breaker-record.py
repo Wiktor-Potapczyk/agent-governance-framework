@@ -109,11 +109,33 @@ def classify_response(tool_response) -> str:
     return "unknown"
 
 
+_SESSION: str | None = None  # set from the payload in main(); None when absent
+
+
+def _log_fire(decision: str, detail: str | None = None) -> None:
+    """Record this firing to hook-activity.jsonl. Never raises (contract C1)."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from _governance_logger import log_fire
+        log_fire("mcp-circuit-breaker-record", decision=decision, detail=detail,
+                 session=_SESSION)
+    except Exception:
+        pass
+
+
 def main() -> int:
     try:
         payload = json.loads(sys.stdin.read() or "{}")
     except Exception:
         return 0
+
+    global _SESSION
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from _governance_logger import session_from
+        _SESSION = session_from(payload)
+    except Exception:
+        _SESSION = None
 
     tool_name = payload.get("tool_name", "")
     server = _extract_server(tool_name)
@@ -126,6 +148,10 @@ def main() -> int:
     state = load_state()
     server_state = state.get(server) or {"failures": [], "tripped_at": None, "last_success_at": None}
 
+    # Contract C1, volume-adjusted. This hook fires once per MCP tool call, the
+    # highest-frequency class in the vault, so a record per invocation would swamp
+    # hook-activity. Logged instead: the two state transitions that carry signal.
+    # A steady stream of healthy calls stays silent by design.
     if verdict == "failure":
         failures = list(server_state.get("failures") or [])
         failures.append(_now_iso())
@@ -133,8 +159,11 @@ def main() -> int:
         if len(failures) > 50:
             failures = failures[-50:]
         server_state["failures"] = failures
+        _log_fire("failure", "%s n=%d" % (server, len(failures)))
     elif verdict == "success":
         # Success resets the failure window: the server is responsive
+        if server_state.get("failures"):
+            _log_fire("recovery", "%s cleared=%d" % (server, len(server_state["failures"])))
         server_state["failures"] = []
         server_state["last_success_at"] = _now_iso()
     # 'unknown' → don't change state

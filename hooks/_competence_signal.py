@@ -58,6 +58,67 @@ def read_log_tail(path, max_bytes=TAIL_READ_BYTES):
         return ""
 
 
+def iter_completions_backwards(path, agent_type, want=None, chunk_bytes=65536):
+    """Most recent `want` completion entries for agent_type, oldest-first.
+
+    Replaces the fixed byte tail as the input to scoring. WINDOW_PER_AGENT is
+    defined in completion EVENTS, but the read that fed it was bounded in BYTES,
+    and completions for one agent are sparse in a stream every hook writes to.
+    The two therefore disagree as traffic grows: the same agent's warm-up count
+    was observed going 5, then 3, then 0 with no code change, so a low n meant
+    "did not see" rather than "has not warmed up".
+
+    Reads backwards in chunks and stops as soon as it has `want` completions, so
+    the common case touches far less than the old 1 MB and the pathological case
+    (a sparse agent in a huge log) stays correct instead of silently returning
+    zero. Memory is bounded by `want`, not by file size.
+
+    Never raises: any OS or decode problem yields what was collected so far,
+    preserving the module's fail-open contract.
+    """
+    if want is None:
+        want = WINDOW_PER_AGENT
+    found = []
+    try:
+        size = os.path.getsize(path)
+        if not size:
+            return []
+        with open(path, "rb") as fh:
+            pos = size
+            carry = b""          # partial first line of the chunk just read
+            while pos > 0 and len(found) < want:
+                step = min(chunk_bytes, pos)
+                pos -= step
+                fh.seek(pos)
+                block = fh.read(step) + carry
+                lines = block.split(b"\n")
+                # The first element is a fragment unless we reached the start of
+                # the file; carry it into the next (earlier) chunk rather than
+                # parsing it. Parsing it would raise JSONDecodeError, get
+                # swallowed, and silently drop a completion.
+                carry = b"" if pos == 0 else lines.pop(0)
+                for raw in reversed(lines):
+                    if len(found) >= want:
+                        break
+                    line = raw.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line.decode("utf-8", errors="replace"))
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                    if not isinstance(entry, dict):
+                        continue
+                    if entry.get("session") == _SYNTHETIC_SESSION:
+                        continue
+                    if _is_completion(entry, agent_type):
+                        found.append(entry)
+    except Exception:
+        pass
+    found.reverse()              # collected newest-first; scoring wants oldest-first
+    return found
+
+
 def parse_events(text):
     """Parse JSONL text to a list of dicts.
 
@@ -117,8 +178,10 @@ def get_verdict(log_path, agent_type):
     {"score": None, "n": 0, "verdict": "NO_SIGNAL", "error": True}.
     """
     try:
-        text = read_log_tail(log_path, TAIL_READ_BYTES)
-        events = parse_events(text)
+        # Read backwards until the completion window is full, rather than
+        # reading a fixed number of bytes and hoping the window fits inside it.
+        # score_agent re-filters, which is idempotent on already-filtered input.
+        events = iter_completions_backwards(log_path, agent_type, WINDOW_PER_AGENT)
         return score_agent(events, agent_type)
     except Exception:
         return {"score": None, "n": 0, "verdict": "NO_SIGNAL", "error": True}

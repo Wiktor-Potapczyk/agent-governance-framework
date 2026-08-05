@@ -31,6 +31,23 @@ LOG_PATH = os.path.join(
 )
 
 
+def _log_path():
+    """Resolve the destination at call time, not import time.
+
+    GOVERNANCE_LOG_PATH overrides the module constant. This exists so a writer
+    migrating onto this helper keeps its test isolation: several direct writers
+    redirect their own writes during tests via a per-hook env var, and without
+    an equivalent here that redirection would silently vanish and the test would
+    append to the real governance log. Resolving here rather than at import also
+    keeps `_event_emit.LOG_PATH` monkeypatchable, which is the other way tests
+    target this module.
+    """
+    override = os.environ.get("GOVERNANCE_LOG_PATH", "")
+    if isinstance(override, str) and override.strip():
+        return override.strip()
+    return LOG_PATH
+
+
 _TEST_SESSION_RE = re.compile(
     r"^(?:fixture-|pentest-|h5-|h3-|fake-|test$|test[-_]|unknown$)",
     re.IGNORECASE,
@@ -75,7 +92,7 @@ def emit_event(event, hook, session, extra=None, environment=None):
             for k, v in extra.items():
                 if k not in entry:
                     entry[k] = v
-        with open(LOG_PATH, "a", encoding="utf-8") as f:
+        with open(_log_path(), "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception:
         # Silent — telemetry must not break parent hooks.

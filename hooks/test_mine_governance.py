@@ -7,7 +7,7 @@ Two test classes:
   B) RealDataTests: property assertions against the live governance-log.jsonl
      (skipped gracefully if file absent).
 
-Run: python hooks/test_mine_governance.py
+Run: python .claude/hooks/test_mine_governance.py
 """
 
 import json
@@ -32,12 +32,11 @@ from mine_governance import (
     _normalize_reason,
 )
 
-# Repo root: hooks/ is one level below the repo root
-_REPO = os.path.normpath(os.path.join(_HOOKS_DIR, ".."))
+_VAULT = os.path.normpath(os.path.join(_HOOKS_DIR, "..", ".."))
 _FIXTURES_DIR = os.path.join(_HOOKS_DIR, "_test_fixtures")
 _FIXTURE_LOG = os.path.join(_FIXTURES_DIR, "governance-log-sample.jsonl")
 _FIXTURE_LEDGER = os.path.join(_FIXTURES_DIR, "miner-resolved-fixture.jsonl")
-_REAL_LOG = os.path.join(_REPO, ".claude", "hooks", "governance-log.jsonl")
+_REAL_LOG = os.path.join(_VAULT, ".claude", "hooks", "governance-log.jsonl")
 
 # Fixed reference date: all synthetic tests use this for determinism
 _NOW = date(2026, 6, 10)
@@ -68,7 +67,7 @@ class SyntheticFixtureTests(unittest.TestCase):
         self.assertTrue(os.path.isfile(_FIXTURE_LEDGER), f"Ledger fixture not found: {_FIXTURE_LEDGER}")
 
     # ------------------------------------------------------------------
-    # CASE A: recurring failure count=12 across 4 days -> FLAGGED
+    # CASE A: recurring failure count=12 across 4 days → FLAGGED
     # ------------------------------------------------------------------
     def test_recurring_failure_flagged(self):
         results = self._run()
@@ -83,7 +82,7 @@ class SyntheticFixtureTests(unittest.TestCase):
     # ------------------------------------------------------------------
     # CASE A (normalization): char-count variants collapse to ONE sig_id
     # The fixture has block_reason="Missing must-dispatch declaration (N items)"
-    # with varying N: 1, 2, 5, 3 -> all should collapse to same normalized reason
+    # with varying N: 1, 2, 5, 3 → all should collapse to same normalized reason
     # ------------------------------------------------------------------
     def test_normalization_collapses_digit_variants(self):
         norm_variants = [
@@ -100,7 +99,7 @@ class SyntheticFixtureTests(unittest.TestCase):
         self.assertEqual(len(block_pm), 1, f"Expected 1 block/pm-orchestrator sig, got {len(block_pm)}")
 
     # ------------------------------------------------------------------
-    # REV-1: two different agent_types with no_classification -> TWO sig_ids
+    # REV-1: two different agent_types with no_classification → TWO sig_ids
     # Fixture lines use event='agent_dispatched' + outcome='no_classification'.
     # After D2 fix: _failure_label() returns 'no_classification' (not 'agent_dispatched')
     # because agent_dispatched is a noise event.  The sig_key still includes agent_type,
@@ -124,7 +123,7 @@ class SyntheticFixtureTests(unittest.TestCase):
         self.assertEqual(arch_sig["agent_type"], "n8n-workflow-architect")
 
     # ------------------------------------------------------------------
-    # CASE C: one-off count=2 across 1 day -> NOT flagged
+    # CASE C: one-off count=2 across 1 day → NOT flagged
     # ------------------------------------------------------------------
     def test_oneoff_not_flagged(self):
         results = self._run()
@@ -133,7 +132,7 @@ class SyntheticFixtureTests(unittest.TestCase):
         self.assertIsNone(rec, "One-off (count=2, 1 day) should NOT be flagged")
 
     # ------------------------------------------------------------------
-    # REV-3: high-severity fabrication_detected at count=3 over 3 days -> FLAGGED
+    # REV-3: high-severity fabrication_detected at count=3 over 3 days → FLAGGED
     # ------------------------------------------------------------------
     def test_rev3_high_severity_flagged_at_low_count(self):
         results = self._run()
@@ -144,7 +143,7 @@ class SyntheticFixtureTests(unittest.TestCase):
         self.assertEqual(rec["distinct_days"], 3)
 
     # ------------------------------------------------------------------
-    # REV-3: normal event at count=3 -> NOT flagged (needs DEFAULT_C=10)
+    # REV-3: normal event at count=3 → NOT flagged (needs DEFAULT_C=10)
     # ------------------------------------------------------------------
     def test_rev3_normal_severity_not_flagged_at_low_count(self):
         results = self._run()
@@ -152,17 +151,17 @@ class SyntheticFixtureTests(unittest.TestCase):
         self.assertIsNone(rec, "Normal-severity event at count=3 should NOT be flagged (DEFAULT_C=10)")
 
     # ------------------------------------------------------------------
-    # CASE F: suppressed sig present in fixture ledger -> SUPPRESSED (absent from results)
+    # CASE F: suppressed sig present in fixture ledger → SUPPRESSED (absent from results)
     # sig: reviewer_scope_violation / architect-reviewer / reviewer-scope-violation-check
     # resolved_ts = 2026-05-10, all occurrences are 2026-05-14..17 (after resolved_ts)
     # Wait: architect-reviewer occurrences ARE after resolved_ts. But with only 12
     # occurrences across 4 days, AND ledger entry present, regression check:
     # post_resolved_count must also meet threshold.
     # The fixture has 12 lines for architect-reviewer, all AFTER resolved_ts 2026-05-10.
-    # So post_resolved_count=12, post_resolved_dates=4 days -> meets C=10,D=3 -> REGRESSION.
+    # So post_resolved_count=12, post_resolved_dates=4 days → meets C=10,D=3 → REGRESSION.
     # But the intent is suppression. We need the ledger resolved_ts AFTER all occurrences.
     # The fixture has resolved_ts=2026-05-10 but occurrences at 2026-05-14..17.
-    # That makes them ALL post-resolved -> regression, not suppression.
+    # That makes them ALL post-resolved → regression, not suppression.
     # FIXED DESIGN: suppression test uses ledger resolved_ts AFTER all occurrences (2026-05-20).
     # The fixture ledger has 59c75cff3762 resolved_ts=2026-05-10: this becomes regression.
     # We test suppression with a fresh ledger where resolved_ts is after last occurrence (2026-05-18).
@@ -170,7 +169,7 @@ class SyntheticFixtureTests(unittest.TestCase):
     def test_suppressed_sig_absent_from_results(self):
         # Build a temp ledger where resolved_ts is 2026-05-18: AFTER all
         # architect-reviewer occurrences (2026-05-14..17). The sig has count=12/4days
-        # but resolved_ts is past all of them, so no post-resolved occurrences -> suppressed.
+        # but resolved_ts is past all of them, so no post-resolved occurrences → suppressed.
         nr = _normalize_reason("REVIEWER SCOPE: Edit blocked")
         key = _sig_key("reviewer_scope_violation", "architect-reviewer", "reviewer-scope-violation-check", nr)
         sid = _sig_id(key)
@@ -190,7 +189,7 @@ class SyntheticFixtureTests(unittest.TestCase):
             os.unlink(ledger_path)
 
     # ------------------------------------------------------------------
-    # CASE G: regression: suppressed sig with new occurrences AFTER resolved_ts -> RE-SURFACES
+    # CASE G: regression: suppressed sig with new occurrences AFTER resolved_ts → RE-SURFACES
     # sig: reviewer_scope_violation / blueprint-mode / reviewer-scope-violation-check
     # resolved_ts = 2026-05-17, new occurrences at 2026-05-22..25
     # ------------------------------------------------------------------
@@ -202,7 +201,7 @@ class SyntheticFixtureTests(unittest.TestCase):
         self.assertFalse(rec["suppressed"])
 
     # ------------------------------------------------------------------
-    # Bad lines: unparseable JSON / missing fields / unknown schema -> no crash
+    # Bad lines: unparseable JSON / missing fields / unknown schema → no crash
     # ------------------------------------------------------------------
     def test_bad_lines_skipped_no_error(self):
         # Should not raise; bad lines are silently skipped
@@ -276,7 +275,7 @@ class SyntheticFixtureTests(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_d1_darkzone_low_records_produce_normal_severity_sig(self):
-        """D1: dark-zone sig where ALL records have severity=low -> sig severity must be normal."""
+        """D1: dark-zone sig where ALL records have severity=low → sig severity must be normal."""
         results = self._run()
         rec = self._find(results, event_label="dark-zone", agent_type="low-sev-agent")
         self.assertIsNotNone(rec, "low-severity dark-zone sig (count=12/4days) must be flagged")
@@ -284,12 +283,12 @@ class SyntheticFixtureTests(unittest.TestCase):
             rec["severity"], "normal",
             f"D1 FAIL: dark-zone sig with all low-sev records must have severity=normal, got {rec['severity']}"
         )
-        # Must flag via normal C=10 gate (count >= 10, distinct_days >= 3)
+        # Must flag via normal C=10 gate (count ≥ 10, distinct_days ≥ 3)
         self.assertGreaterEqual(rec["count"], DEFAULT_C)
         self.assertGreaterEqual(rec["distinct_days"], DEFAULT_D)
 
     def test_d1_darkzone_high_records_produce_high_severity_sig(self):
-        """D1: dark-zone sig where records have severity=high -> sig severity must be high."""
+        """D1: dark-zone sig where records have severity=high → sig severity must be high."""
         results = self._run()
         rec = self._find(results, event_label="dark-zone", agent_type="high-sev-agent")
         self.assertIsNotNone(rec, "high-severity dark-zone sig (count=3/3days) must be flagged (C=HIGH_SEV_C=3)")
@@ -303,6 +302,7 @@ class SyntheticFixtureTests(unittest.TestCase):
 
     def test_d1_darkzone_low_sig_not_flagged_at_count_three(self):
         """D1: a dark-zone sig with only 3 low-sev records should NOT flag (needs C=10 not C=3)."""
+        # Build a small temp log with 3 dark-zone low-sev records across 3 days
         import tempfile
         lines = [
             '{"ts": "2026-05-20 08:00:00", "event": "dark-zone", "hook": "dz", "severity": "low", "reason": "rate check"}\n',
@@ -323,7 +323,7 @@ class SyntheticFixtureTests(unittest.TestCase):
             os.unlink(tmp_path)
 
     # ------------------------------------------------------------------
-    # D2: noise-event (agent_dispatched) + outcome=no_classification -> label is no_classification
+    # D2: noise-event (agent_dispatched) + outcome=no_classification → label is no_classification
     # ------------------------------------------------------------------
 
     def test_d2_agent_dispatched_label_is_no_classification(self):
@@ -439,7 +439,7 @@ class RealDataTests(unittest.TestCase):
     def test_at_least_one_flagged_sig(self):
         now = self._max_log_date()
         results = mine(_REAL_LOG, now)
-        self.assertGreater(len(results), 0, "Expected >=1 flagged sig on real data")
+        self.assertGreater(len(results), 0, "Expected ≥1 flagged sig on real data")
 
     def test_rev1_no_classification_not_collapsed(self):
         """REV-1: no_classification sigs for different agent_types must have distinct sig_ids."""
@@ -505,9 +505,9 @@ class RealDataTests(unittest.TestCase):
 
 
 class AdversarialRobustnessTests(unittest.TestCase):
-    """Pentest regression locks: mine() must never crash on a malformed log line 
-    the spec requires 'skip, never error'. Each of these crashed a pre-fix build;
-    they must stay green."""
+    """Pentest regression locks (2026-06-07): mine() must never crash on a
+    malformed log line: the spec requires 'skip, never error'. Each of these
+    crashed a pre-fix build; they must stay green."""
 
     def _mine_lines(self, lines, ledger_lines=None):
         with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False,
@@ -583,3 +583,58 @@ class AdversarialRobustnessTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+# ---------------------------------------------------------------------------
+# REV-7: session admission (2026-07-30)
+# ---------------------------------------------------------------------------
+
+class TestRev7SessionAdmission(unittest.TestCase):
+    """Synthetic-session lines must not enter mining; real/legacy shapes must."""
+
+    NOW = date(2026, 6, 20)
+
+    def _mine_records(self, records):
+        import mine_governance as _mg
+        fd, path = tempfile.mkstemp(suffix=".jsonl")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                for r in records:
+                    fh.write(json.dumps(r) + "\n")
+            return _mg.mine(path, self.NOW, 30)
+        finally:
+            os.unlink(path)
+
+    @staticmethod
+    def _deny(day, session=None, include_session=True):
+        rec = {"ts": "2026-06-%02d 10:00:00" % day, "event": "deny",
+               "hook": "bash-safety-guard", "block_reason": "rm -rf guard"}
+        if include_session:
+            rec["session"] = session
+        return rec
+
+    def test_unknown_session_excluded(self):
+        recs = [self._deny(d, "unknown") for d in range(1, 15)]
+        self.assertEqual(self._mine_records(recs), [])
+
+    def test_session_literal_excluded(self):
+        recs = [self._deny(d, "session") for d in range(1, 15)]
+        self.assertEqual(self._mine_records(recs), [])
+
+    def test_uuid_session_admitted(self):
+        recs = [self._deny(d, "692cfdb4-b18") for d in range(1, 15)]
+        res = self._mine_records(recs)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["count"], 14)
+
+    def test_missing_session_field_admitted(self):
+        recs = [self._deny(d, include_session=False) for d in range(1, 15)]
+        self.assertEqual(len(self._mine_records(recs)), 1)
+
+    def test_mixed_counts_real_only(self):
+        recs = ([self._deny(d, "692cfdb4-b18") for d in range(1, 13)]
+                + [self._deny(d, "unknown") for d in range(1, 29)]
+                + [self._deny(1, "test-sess"), self._deny(2, None)])
+        res = self._mine_records(recs)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["count"], 12)

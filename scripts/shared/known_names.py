@@ -22,53 +22,69 @@ When adding new agents, skills, or aliases:
 3. Run test_known_dispatch_names_drift.py to confirm consistency
 """
 
-# Canonical set: 45 entries (31 agents + 14 skills)
+# Canonical set: 46 entries (40 agents + 6 skills)
 KNOWN_DISPATCH_NAMES = {
-    # Agents
-    "adversarial-reviewer", "api-designer", "api-security-audit",
-    "architect-review",  # declared name (MUST DISPATCH)
-    "architect-reviewer",  # runtime name (dispatched); both are valid in transcripts
-    "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
-    "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
-    "mcp-developer", "mcp-registry-navigator", "mcp-server-architect", "n8n-reviewer",
-    "nosql-specialist", "pm-orchestrator", "postgres-pro", "powershell-7-expert",
-    "prompt-engineer", "query-clarifier", "report-generator", "research-analyst",
-    "research-coordinator", "research-orchestrator", "research-synthesizer",
-    "technical-researcher", "vault-keeper", "workflow-orchestrator",
-    # Skills
-    "process-qa", "process-analysis", "process-build", "process-planning",
-    "process-research", "process-pentest", "pm", "task-classifier", "verify",
-    "ensemble", "architect-loop", "save", "maintain", "index",
+    "adversarial-reviewer",
+    "api-designer",
+    "api-security-audit",
+    "architect-loop",
+    "architect-review",
+    "architect-reviewer",
+    "blueprint-mode",
+    "competitive-analyst",
+    "content-marketer",
+    "data-engineer",
+    "debugger",
+    "ensemble",
+    "git-flow-manager",
+    "implementation-plan",
+    "index",
+    "llm-architect",
+    "maintain",
+    "mcp-developer",
+    "mcp-registry-navigator",
+    "mcp-server-architect",
+    "n8n-reviewer",
+    "n8n-workflow-architect",
+    "n8n-workflow-builder",
+    "nosql-specialist",
+    "pm",
+    "pm-orchestrator",
+    "postgres-pro",
+    "powershell-7-expert",
+    "process-analysis",
+    "process-build",
+    "process-pentest",
+    "process-planning",
+    "process-qa",
+    "process-research",
+    "prompt-engineer",
+    "query-clarifier",
+    "report-generator",
+    "research-analyst",
+    "research-coordinator",
+    "research-orchestrator",
+    "research-synthesizer",
+    "save",
+    "task-classifier",
+    "technical-researcher",
+    "vault-keeper",
+    "verify",
 }
 
 # Canonical SKILL_AGENT_ALIASES: maps skill/short names to allowed agent runtime names.
 # Used by agent-dispatch-check.py and dispatch-compliance-check.py.
 # governance-log.py does NOT use this (logging only, no alias resolution needed).
 SKILL_AGENT_ALIASES = {
-    "pm": {"pm-orchestrator"},
+    "architect-loop": {"adversarial-reviewer", "architect-reviewer"},
     "architect-review": {"architect-reviewer"},
-    "process-research": {
-        "research-orchestrator", "technical-researcher", "research-analyst",
-        "research-synthesizer", "report-generator",
-    },
-    "process-analysis": {
-        "architect-reviewer", "adversarial-reviewer",
-        "prompt-engineer", "debugger", "api-designer",
-        "data-engineer", "workflow-orchestrator", "api-security-audit",
-        "research-synthesizer", "report-generator",
-    },
-    "process-planning": {
-        "implementation-plan", "adversarial-reviewer", "architect-reviewer",
-        "technical-researcher", "research-analyst", "api-designer",
-        "llm-architect", "data-engineer", "prompt-engineer",
-    },
-    "process-build": {
-        "blueprint-mode", "architect-reviewer", "implementation-plan",
-        "prompt-engineer", "debugger",
-    },
-    "process-qa": {"debugger"},
+    "pm": {"pm-orchestrator"},
+    "process-analysis": {"adversarial-reviewer", "architect-reviewer"},
+    "process-build": {"architect-reviewer", "blueprint-mode", "implementation-plan"},
     "process-pentest": {"debugger"},
-    "architect-loop": {"architect-reviewer", "adversarial-reviewer"},
+    "process-planning": {"adversarial-reviewer", "implementation-plan"},
+    "process-qa": {"debugger"},
+    "process-research": {"research-analyst", "research-orchestrator", "technical-researcher"},
 }
 # NOTE: SKILL_AGENT_ALIASES values may include "architect-reviewer" which is
 # also now in KNOWN_DISPATCH_NAMES. The alias model stays coherent: canonical

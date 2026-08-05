@@ -79,9 +79,11 @@ def classify_subagent_output(message: str) -> tuple[bool, str, str]:
         has_code_blocks = '```' in message
         has_numbered_list = bool(re.search(r'(?m)^\s*\d+[.)]\s', message))
         has_label_value = len(LABEL_VALUE_LINE.findall(message)) >= 3
+        has_bold = bool(re.search(r'\*\*[^*]+\*\*', message))
         has_report_header = bool(REPORT_HEADER.search(message))
         if not (has_headers or has_bullets or has_tables or has_code_blocks
-                or has_numbered_list or has_label_value or has_report_header):
+                or has_numbered_list or has_label_value or has_report_header
+                or has_bold):
             return (True, "check_3_no_structure",
                     f"Agent produced {message_len} chars with no structure (no headers, bullets, "
                     f"tables, or code blocks). Structure your output with clear sections and formatting.")

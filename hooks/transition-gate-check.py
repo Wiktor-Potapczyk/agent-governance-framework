@@ -1,16 +1,16 @@
 """
-transition-gate-check.py — PreToolUse guard for SDLC phase-sentinel advances (Layer 1).
+transition-gate-check.py: PreToolUse guard for SDLC phase-sentinel advances (Layer 1).
 
 Autonomous SDLC State-Machine, Layer 1 (transition-gate hook).
-Spec: Projects/Agent-Governance-Research/work/2026-06-18-autonomous-sdlc-state-machine-spec.md
-      (§4.1 state-file schema, §4.2 transition-gate pseudocode — implemented verbatim here).
-Build plan: Projects/Agent-Governance-Research/work/2026-06-18-sdlc-enforcement-build.md
+Spec: Projects/your-project/work/2026-06-18-autonomous-sdlc-state-machine-spec.md
+      (§4.1 state-file schema, §4.2 transition-gate pseudocode: implemented verbatim here).
+Build plan: Projects/your-project/work/2026-06-18-sdlc-enforcement-build.md
 
 Fires on Write (and Edit, to deny) tool calls to `.claude/hooks/_state/sdlc-phase-<project>.json`
 sentinel files. Reads the proposed `current_phase` advance, checks the prior ENFORCED phase has
 recorded passing external-oracle evidence, and DENIES the write if that evidence is absent.
 
-Write-only restriction (spec §4.2): agents must always OVERWRITE the whole sentinel — never
+Write-only restriction (spec §4.2): agents must always OVERWRITE the whole sentinel: never
 patch it with an Edit OR a MultiEdit. An Edit to the sentinel is itself a violation -> deny.
 A MultiEdit to the sentinel is the same violation -> deny: its tool_input carries only
 old_string/new_string fragments (no `content`), so it can never overwrite the whole file; the
@@ -23,7 +23,7 @@ AUTO-ALLOWS and gates nothing. Only `deny` actually stops the action (spec §4.2
 as Gate-1 of the two-gate enforcement floor).
 
 Fail-CLOSED on sentinel parse/read errors (deny), but fail-OPEN on a truly unparseable stdin
-payload (silent exit 0 — matches every other hook in this directory). Exit code: 0 always; the
+payload (silent exit 0: matches every other hook in this directory). Exit code: 0 always; the
 structured hookSpecificOutput JSON carries the deny.
 
 stdlib-only. Every open() passes encoding="utf-8" (reference_python_windows_open_defaults_to_locale_not_utf8).
@@ -33,7 +33,7 @@ import sys
 import json
 import os
 
-# Spec §4.2 — copied verbatim.
+# Spec §4.2: copied verbatim.
 PHASE_ORDER = [
     "discovery", "requirements", "design",
     "build", "verify", "review", "release",
@@ -79,19 +79,17 @@ def _log_block(session_id, tool_name, file_path, reason):
     Wrapped so a log failure never breaks the deny itself.
     """
     try:
-        from datetime import datetime
-        entry = json.dumps({
-            "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "schema": 2,
-            "event": "transition_gate_block",
-            "hook": "transition-gate-check",
-            "session": session_id,
-            "tool_name": tool_name,
-            "file_path": file_path,
-            "block_reason": reason,
-        }, ensure_ascii=False)
-        with open(_GOVERNANCE_LOG, "a", encoding="utf-8") as fh:
-            fh.write(entry + "\n")
+        from _event_emit import emit_event
+        emit_event(
+            event="transition_gate_block",
+            hook="transition-gate-check",
+            session=session_id,
+            extra={
+                "tool_name": tool_name,
+                "file_path": file_path,
+                "block_reason": reason,
+            },
+        )
     except Exception:
         pass
 
@@ -106,11 +104,11 @@ def check(tool_name, tool_input):
         path = tool_input.get("file_path", "")
         if _is_sentinel(path):
             return "sdlc-phase sentinel: Edit to sentinel is a violation; must Write the whole file"
-        return None  # Edit on a non-sentinel — not our concern
+        return None  # Edit on a non-sentinel: not our concern
 
     # (a2) MultiEdit to a sentinel is a violation by construction (Write-only restriction, R3).
     # MultiEdit's tool_input is {file_path, edits:[{old_string,new_string},...]} with NO `content`,
-    # so it can never overwrite the whole sentinel — it only patches fragments. Any MultiEdit
+    # so it can never overwrite the whole sentinel: it only patches fragments. Any MultiEdit
     # targeting a sentinel therefore denies, keyed SOLELY off file_path (the edits array is never
     # parsed, so single-edit, multi-edit, and enforced-advance-fragment payloads deny identically).
     # Branch placed BEFORE the Write path so it never touches the absent tool_input["content"].
@@ -118,7 +116,7 @@ def check(tool_name, tool_input):
         path = tool_input.get("file_path", "")
         if _is_sentinel(path):
             return "sdlc-phase sentinel: MultiEdit to sentinel is a violation; must Write the whole file"
-        return None  # MultiEdit on a non-sentinel — not our concern
+        return None  # MultiEdit on a non-sentinel: not our concern
 
     # (b) Only intercept writes.
     if tool_name != "Write":
@@ -126,7 +124,7 @@ def check(tool_name, tool_input):
 
     path = tool_input.get("file_path", "")
 
-    # (c) Fast-path: non-sentinel Write — the dominant case.
+    # (c) Fast-path: non-sentinel Write: the dominant case.
     if not _is_sentinel(path):
         return None
 
@@ -156,7 +154,7 @@ def check(tool_name, tool_input):
     except Exception:
         return "sdlc-phase sentinel: cannot read current state"
 
-    # (g) Advisory target phase — advance allowed without oracle evidence.
+    # (g) Advisory target phase: advance allowed without oracle evidence.
     if proposed_phase in ADVISORY_PHASES:
         return None
 
@@ -177,7 +175,7 @@ def check(tool_name, tool_input):
         prior_gate = {}
     if not prior_gate or prior_gate.get("evidence_type") != "external_oracle":
         return (
-            "sdlc-phase sentinel: cannot advance to '{}' — "
+            "sdlc-phase sentinel: cannot advance to '{}': "
             "prior phase '{}' has no recorded external-oracle evidence. "
             "Run the {} DoD oracle and record its evidence first.".format(
                 proposed_phase, prior_phase, prior_phase
@@ -210,10 +208,8 @@ def main():
         tool_input = {}
 
     transcript_path = payload.get("transcript_path") or ""
-    session_id = (
-        os.path.splitext(os.path.basename(transcript_path))[0]
-        if transcript_path else "unknown"
-    )
+    from _governance_logger import session_from
+    session_id = session_from(payload)
 
     reason = check(tool_name, tool_input)
     if reason:
@@ -276,7 +272,7 @@ if __name__ == "__main__":
     def assert_test(name, condition, detail=""):
         global passed, failed
         status = "PASS" if condition else "FAIL"
-        suffix = " — {}".format(detail) if detail else ""
+        suffix = ": {}".format(detail) if detail else ""
         print("  [{}] {}{}".format(status, name, suffix))
         if condition:
             passed += 1

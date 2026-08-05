@@ -2,7 +2,7 @@ r"""
 Em-Dash Guard - Stop Hook
 
 Blocks the assistant from shipping a response that contains a "fancy" dash
-character in PROSE. Wiktor never uses these characters in writing and finds them
+character in PROSE. the owner never uses these characters in writing and finds them
 unnatural in generated text; he wants them impossible in Claude's output, not
 merely discouraged. Soft instructions land ~25% compliance per CLAUDE.md Working
 Philosophy, so this hook is the runtime enforcement.
@@ -62,15 +62,15 @@ READ_BYTES = 204800
 # Dash-like glyphs that are NOT the plain hyphen. Stored as escapes so this
 # source file does not itself contain the characters it blocks.
 BLOCKED_DASHES = [
-    ("‒", "figure dash (U+2012)"),
-    ("–", "en dash (U+2013)"),
-    ("—", "em dash (U+2014)"),
-    ("―", "horizontal bar (U+2015)"),
-    ("−", "minus sign (U+2212)"),
+    (":", "figure dash (U+2012)"),
+    (":", "en dash (U+2013)"),
+    (":", "em dash (U+2014)"),
+    (":", "horizontal bar (U+2015)"),
+    (":", "minus sign (U+2212)"),
     ("⸺", "two-em dash (U+2E3A)"),
     ("⸻", "three-em dash (U+2E3B)"),
-    ("﹘", "small em dash (U+FE58)"),
-    ("－", "fullwidth hyphen-minus (U+FF0D)"),
+    (":", "small em dash (U+FE58)"),
+    (":", "fullwidth hyphen-minus (U+FF0D)"),
 ]
 
 # A real markdown table row: optional leading whitespace, a pipe, content, a
@@ -141,25 +141,31 @@ def main():
     if payload.get("stop_hook_active"):
         return 0
 
-    # Best-effort governance fire log (matches sibling hooks). Never fatal.
-    try:
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from _governance_logger import log_fire
-        log_fire("em-dash-guard")
-    except Exception:
-        pass
+    def _log(decision, detail=None):
+        """Record this verdict to hook-activity.jsonl. Never raises (contract C2)."""
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from _governance_logger import log_fire, session_from
+            log_fire("em-dash-guard", decision=decision, detail=detail,
+                     session=session_from(payload))
+        except Exception:
+            pass
 
     transcript_path = payload.get("transcript_path") or ""
     text = get_last_assistant_text(transcript_path)
     if not text:
+        _log("skip", "no-assistant-text")
         return 0
     prose = strip_noise(text)
     found = find_fancy_dashes(prose)
     if not found:
+        _log("allow")
         return 0
 
+    # Block first, log second. Nothing between the verdict and the block may be
+    # able to swallow it (idiom inherited from routing-table-validation.py).
     sys.stderr.write(
-        "[em-dash-guard BLOCK] Your response contains a dash character Wiktor "
+        "[em-dash-guard BLOCK] Your response contains a dash character the owner "
         "never uses in writing: " + ", ".join(found) + ". Rewrite the whole "
         "response so it contains NONE of these glyphs. Replace each one with a "
         "comma, a colon, a pair of parentheses, or split the sentence in two. Do "
@@ -170,6 +176,7 @@ def main():
         "you must keep one verbatim (quoting a source or showing code) move it "
         "into a code span.\n"
     )
+    _log("block", ", ".join(found))
     return 2
 
 
