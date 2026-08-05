@@ -27,12 +27,37 @@ import subprocess
 import sys
 from pathlib import Path
 
-VAULT = Path(os.environ.get("VAULT_ROOT", ""))
-HOOKS_DIR = VAULT / ".claude" / "hooks"
-SCRIPTS_DIR = VAULT / ".claude" / "scripts"
+def _resolve_layout():
+    """Locate hooks/ and scripts/ in either layout, workspace or standalone repo.
+
+    Previously this was `Path(os.environ["VAULT_ROOT"]) / ".claude" / "hooks"`.
+    With the variable unset that resolves to the relative `.claude/hooks`, which
+    does not exist in a standalone checkout, so every existence probe below
+    failed and the gates reported hooks as untested that have tests sitting
+    beside them. **The script still exited 0**, so it read as coverage while
+    checking nothing, which is worse than having no gate at all.
+
+    Order matters: an explicit VAULT_ROOT wins, then a `.claude/` sibling, then
+    this script's own parent. The last case is the standalone repo.
+    """
+    env = os.environ.get("VAULT_ROOT", "").strip()
+    if env and (Path(env) / ".claude" / "hooks").is_dir():
+        root = Path(env)
+        return root, root / ".claude" / "hooks", root / ".claude" / "scripts"
+    here = Path(__file__).resolve().parent          # <repo>/scripts
+    repo = here.parent                              # <repo>
+    if (repo / ".claude" / "hooks").is_dir():
+        return repo, repo / ".claude" / "hooks", repo / ".claude" / "scripts"
+    return repo, repo / "hooks", here
+
+
+VAULT, HOOKS_DIR, SCRIPTS_DIR = _resolve_layout()
 SETTINGS_FILES = [
     VAULT / ".claude" / "settings.json",
     VAULT / ".claude" / "settings.local.json",
+    # standalone repo: the shipped templates are the registration source
+    VAULT / "settings" / "settings.json.template",
+    VAULT / "settings" / "settings.json.example",
 ]
 DRIFT_TEST = HOOKS_DIR / "test_known_dispatch_names_drift.py"
 
@@ -45,7 +70,9 @@ _PY_IN_CLAUDE = re.compile(r"\.claude[\\/](?:hooks|scripts)[\\/][\w\-.]+\.py", r
 # covered, then promote check_c4 severity to HARD.
 _C4_BLOCK_CLASS_HOOKS = [
     "dispatch-compliance-check", "subagent-quality-check", "process-step-check",
-    "work-verification-check", "proactivity-check", "wiki-citation-check",
+    # proactivity-check is intentionally absent: it is held from publication,
+    # so listing it here reported a missing test for a hook that does not ship.
+    "work-verification-check", "wiki-citation-check",
     "classifier-field-check", "verifier-gate-check",
 ]
 _FP_DEF = re.compile(r"def\s+test_fp_\w+", re.IGNORECASE)
@@ -105,9 +132,16 @@ def check_c3_hook_files_exist() -> dict:
                     cmd = h.get("command", "")
                     for m in _PY_IN_CLAUDE.findall(cmd):
                         checked += 1
-                        # Normalize the matched .claude/... suffix under VAULT.
+                        # A template names the INSTALLED path (.claude/hooks/x.py),
+                        # which is right for an adopter and is not where the file
+                        # sits in a standalone checkout. Resolve against the
+                        # directories actually located above, so the check means
+                        # "this registration points at a file we ship" in both
+                        # layouts rather than failing on the layout itself.
                         rel = m.replace("\\", "/")
-                        target = VAULT / rel
+                        name = rel.rsplit("/", 1)[-1]
+                        base = SCRIPTS_DIR if "/scripts/" in rel else HOOKS_DIR
+                        target = base / name
                         if not target.exists():
                             findings.append(
                                 f"{sf.name} [{event}]: registered hook file missing -> {rel}"
