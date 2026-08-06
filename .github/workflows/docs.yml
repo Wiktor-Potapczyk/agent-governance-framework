@@ -90,4 +90,10 @@ jobs:
       # This is the cheapest real check in the repo and it was switched off on
       # an assumption nobody had tested.
       - name: Hook suite
-        run: python -m pytest hooks/ -q
+        # pytest is the ONLY third-party dependency: the hooks are stdlib-only by
+        # design, and the one optional import (PyYAML, in memory-schema-check.py)
+        # is guarded with try/except, so its absence is a supported configuration
+        # rather than a failure. Steps above need nothing because they are stdlib.
+        run: |
+          python -m pip install --quiet --disable-pip-version-check pytest
+          python -m pytest hooks/ -q
