@@ -64,12 +64,41 @@ def extract_frontmatter(file_path):
     if not match:
         return None
 
+    # Mirror the shape PyYAML returns: top-level keys, plus one nested dict per
+    # unindented key that opens a block. This parser used to be flat, matching
+    # any line containing a colon regardless of indentation, so a nested key
+    # silently overwrote a top-level one of the same name. Under the
+    # nested-metadata schema that inverted the intended precedence: `type` under
+    # `metadata:` clobbered the real top-level `type`, and the hook then warned
+    # "Invalid type" about a file whose actual type was valid. A false positive
+    # on correct input, visible only where PyYAML is absent, which is the
+    # configuration nothing was testing.
     fm = {}
+    current = None          # the nested dict currently being filled, if any
     for line in match.group(1).split("\n"):
-        if ":" in line:
-            key, _, val = line.partition(":")
-            fm[key.strip()] = val.strip().strip('"').strip("'")
-    return fm
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indented = line[0] in " \t"
+        if ":" not in line:
+            continue
+        key, _, val = line.partition(":")
+        key, val = key.strip(), val.strip().strip('"').strip("'")
+        if indented:
+            if current is not None:
+                current[key] = val
+            continue
+        # unindented: a bare `key:` with no value opens a block
+        if val == "":
+            current = {}
+            fm[key] = current
+        else:
+            current = None
+            fm[key] = val
+    # Share the PyYAML path's precedence rule rather than reimplementing it:
+    # metadata sub-keys merged up, top level winning on conflict. Previously
+    # only the PyYAML path flattened, so the two parsers disagreed about the
+    # schema they were both supposed to be reading.
+    return _flatten_metadata(fm)
 
 
 def validate_yaml(file_path):

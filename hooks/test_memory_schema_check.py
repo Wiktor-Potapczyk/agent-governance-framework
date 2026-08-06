@@ -102,6 +102,19 @@ Body text.
 # Tests
 # ---------------------------------------------------------------------------
 
+# validate_yaml documents returning None when PyYAML is absent, so asserting on
+# its verdict without the package tests nothing. These three skip rather than
+# fail there: the framework treats PyYAML as OPTIONAL and the hook degrades by
+# design, so a red suite would misreport a supported configuration as broken.
+try:
+    import yaml as _yaml_probe  # noqa: F401
+    _HAS_YAML = True
+except ImportError:
+    _HAS_YAML = False
+
+_needs_yaml = unittest.skipUnless(_HAS_YAML, "PyYAML not installed; hook degrades by design")
+
+
 class TestMemorySchemaCheck(unittest.TestCase):
 
     def setUp(self):
@@ -124,6 +137,7 @@ class TestMemorySchemaCheck(unittest.TestCase):
     # ------------------------------------------------------------------
     # Test 2: unquoted colon-space → YAML INVALID warning
     # ------------------------------------------------------------------
+    @_needs_yaml
     def test_unquoted_colon_space_yaml_invalid_warning(self):
         path = _make_memory_path(self.tmp_dir, "test_bad_yaml.md")
         _write_file(path, INVALID_YAML_FRONTMATTER)
@@ -413,11 +427,13 @@ class TestValidateYamlUnit(unittest.TestCase):
             f.write(content)
         return path
 
+    @_needs_yaml
     def test_validate_yaml_ok_on_valid(self):
         path = self._write_tmp(VALID_FRONTMATTER)
         result = mod.validate_yaml(path)
         self.assertEqual(result, "OK")
 
+    @_needs_yaml
     def test_validate_yaml_error_on_colon_space(self):
         path = self._write_tmp(INVALID_YAML_FRONTMATTER)
         result = mod.validate_yaml(path)

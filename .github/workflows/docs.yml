@@ -89,11 +89,25 @@ jobs:
       #
       # This is the cheapest real check in the repo and it was switched off on
       # an assumption nobody had tested.
-      - name: Hook suite
-        # pytest is the ONLY third-party dependency: the hooks are stdlib-only by
-        # design, and the one optional import (PyYAML, in memory-schema-check.py)
-        # is guarded with try/except, so its absence is a supported configuration
-        # rather than a failure. Steps above need nothing because they are stdlib.
+      # The hooks are stdlib-only by design with ONE optional dependency: PyYAML,
+      # guarded with try/except in memory-schema-check.py. Absence is therefore a
+      # SUPPORTED configuration, not a failure, so both are exercised. Running
+      # only the PyYAML path is what let a real defect ship: the no-PyYAML
+      # fallback parser was flat, so a nested `metadata.type` overwrote the
+      # top-level one and the hook warned "Invalid type" about valid files.
+      - name: Hook suite (minimal, no optional deps)
         run: |
           python -m pip install --quiet --disable-pip-version-check pytest
+          python -m pip uninstall -y -q PyYAML 2>/dev/null || true
+          python -c "
+          try:
+              import yaml; raise SystemExit('PyYAML present: this job must run without it')
+          except ImportError:
+              print('confirmed: PyYAML absent, minimal configuration')"
+          python -m pytest hooks/ -q
+
+      - name: Hook suite (with optional deps)
+        run: |
+          python -m pip install --quiet --disable-pip-version-check PyYAML
+          python -c "import yaml; print('confirmed: PyYAML present')"
           python -m pytest hooks/ -q
