@@ -233,8 +233,20 @@ BLOCKED_PATTERNS = [
     (r'\brm\s+(-[rfRF]+\s+|--force\s+|--recursive\s+)*/(?!(?:[a-z]/)?tmp/)', "rm -rf on non-tmp directory"),
     (r'\brm\s+(-[rfRF]+\s+)+\.(?![a-zA-Z])', "rm -rf on current directory"),
     # Destructive git operations
-    (r'\bgit\s+push\s+.*--force', "git force-push"),
-    (r'\bgit\s+push\s+-f\b', "git force-push (-f)"),
+    # The option-skipping prefix is shared verbatim with the normal-push WARN row.
+    # Both rows must tolerate git's global options (-C <dir>, -c k=v, --long, -x)
+    # sitting between `git` and `push`. Without it these rows required adjacency,
+    # so `git -C <path> push --force` matched neither and fell through to the WARN
+    # built for the additive, revertible push: the one unrecoverable git operation
+    # was being downgraded to the safe one's treatment. `-f` carries a lookbehind
+    # so a branch named `my-f` cannot match. These rows also now catch the
+    # trailing-flag spelling (`git push origin main --force`) the originals missed.
+    # Documented as insights/deny-patterns-fail-on-command-spelling in the
+    # companion research repository.
+    (r'\bgit\s+(?:(?:-C\s+\S+|-c\s+\S+|--[A-Za-z][\w-]*(?:=\S+)?|-[A-Za-z])\s+)*push\s+.*--force',
+     "git force-push"),
+    (r'\bgit\s+(?:(?:-C\s+\S+|-c\s+\S+|--[A-Za-z][\w-]*(?:=\S+)?|-[A-Za-z])\s+)*push\b[^;|&]*?(?<![\w-])-f\b',
+     "git force-push (-f)"),
     (r'\bgit\s+reset\s+--hard', "git reset --hard"),
     (r'\bgit\s+clean\s+-[fdxFDX]', "git clean (destructive)"),
     (r'\bgit\s+checkout\s+--\s+\.', "git checkout -- . (discard all changes)"),
