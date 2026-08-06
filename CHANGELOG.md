@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-08-06: the configuration nobody ran, and nine hooks the reference omitted
+
+### Fixed
+
+- **`hooks/memory-schema-check.py` reported valid files as invalid when PyYAML is absent.** The hook guards its import and falls back to a hand-rolled frontmatter parser. That parser matched any line containing a colon regardless of indentation, so it produced a flat dictionary in which a nested `metadata.type` overwrote the top-level `type`, and the hook then warned "Invalid type" about a file whose type was valid. The correct precedence rule already existed in the module, fully documented, and was only ever reached from the PyYAML path. **A guarded optional import is a fork: from that line the module is two programs, and a suite run on a machine that has the package exercises exactly one of them.** The fallback now shares the primary's interpretation rule instead of reimplementing it.
+- **CI now runs the hook suite twice, once with the optional dependency and once without**, each with a step that asserts the intended configuration is actually in effect. Without that assertion the "without" run silently becomes a duplicate of the "with" run. The defect above shipped because only one configuration was ever executed, and it surfaced from a runner that happened not to have the package rather than from review.
+- **`docs/reference/hooks.md` was missing all five hooks added the previous day** plus `git-credential-scope-check.py`, which was documented correctly but filed under the wrong event heading. All six now carry full attribute tables. The preamble also claimed unregistered hooks appear only in the summary table, which four existing sections already contradicted; it now states the actual rule, that a top-level hook gets a section whether or not it is registered, because a reader deciding whether to arm one needs to know what arming it would do.
+
+### Note for adopters
+
+The five hooks added on 2026-08-05 are **not registered** by `settings/settings.json.template` and are inert until you add them yourself. Two of them (`mcp-qmd-health-probe.py`, `qmd-recall-nudge.py`) additionally assume a local search MCP server and do nothing useful without one.
+
 ## 2026-08-05: hook and test sync, and two gates that were not gating
 
 The repository had drifted roughly a week behind the working system it documents. This brings across every hook change and, more importantly, the tests that make those changes checkable. **Two of the repo's own quality gates turned out to be passing vacuously; both are now real, and both immediately failed on this very changeset, which is how their fix was verified.**

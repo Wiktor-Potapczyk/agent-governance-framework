@@ -2,7 +2,7 @@
 
 This is a Reference-mode document per the [documentation standard](../documentation-standard.md): attributes tables, no tutorial prose. **Code is the source of truth**: if a field here disagrees with the `.py` file, the code wins. Where a `test_<name>.py` file exists in `hooks/`, it is the authoritative enumeration of branches; the Logical-paths cell ends with a pointer to that file.
 
-Every production hook is listed below. Library modules (`_`-prefixed), test files (`test_`-prefixed), and the `disabled/` subdirectory are excluded from the per-hook sections; disabled and opt-in hooks appear in the [Disabled / opt-in hooks](#disabled--opt-in-hooks) section at the end.
+Every hook file in `hooks/` is listed below, whether or not it is registered by default. Library modules (`_`-prefixed), test files (`test_`-prefixed), and the `disabled/` subdirectory are excluded from the per-hook sections. An unregistered hook that still ships at the top level gets a full section with **Registered in** reading "opt-in": it is inert until you add it to your settings, and the section tells you what arming it would do. Files under `disabled/`, plus the standalone utilities that are not hooks at all, appear only in the [Disabled / opt-in hooks](#disabled--opt-in-hooks) table at the end.
 
 ---
 
@@ -46,6 +46,11 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | `verifier-gate-check.py` | Stop | Block if verification-gated-research ran without verifier agent | Yes: `settings.json.template` |
 | `task-plan-auto-sync.py` | Stop | Mark task_plan.md item done on QA PASS | Yes: `settings.json.template` |
 | `pre-compact.py` | PreCompact | Write recovery snapshot before context compaction | Yes: `settings.json.template` |
+| `post-compact.py` | PostCompact | Record the compaction event and write a staleness marker | No: opt-in |
+| `lint-cadence-trigger.py` | SessionStart | Suggest overdue periodic sweeps from four cadence state files | No: opt-in |
+| `mcp-qmd-health-probe.py` | SessionStart | Probe the qmd CLI and pre-seed the circuit breaker when it is dead | No: opt-in |
+| `qmd-recall-nudge.py` | PreToolUse (Grep) | Remind to search via qmd when grepping a qmd-indexed corpus | No: opt-in |
+| `raw-frontmatter-check.py` | PostToolUse (Write) | Advisory on missing date/tags/status in raw-layer Markdown | No: opt-in |
 | `prose-slop-check.py` | PostToolUse (Write) | Warn on LLM-register slop words in wiki/work prose | No: dormant, not registered |
 | `mcp-irreversible-guard.py` | PreToolUse (`mcp__.*`) | Gate-1 deny on enumerated destructive MCP tools | Yes: `settings.json.template` |
 | `transition-gate-check.py` | PreToolUse (Write/Edit) | Gate phase transitions on recorded evidence | No: opt-in |
@@ -104,6 +109,54 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 
 ---
 
+### `lint-cadence-trigger.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | SessionStart |
+| **Matcher** | none |
+| **Registered in** | Not registered by default: opt-in |
+| **Action** | Reads four cadence state files and emits a "consider running" suggestion for each sweep whose last run is older than its cadence, or whose state file is absent. Cadences: lint 7 days, governance-mine 7 days, work-triage 7 days, setup-audit 30 days. Also surfaces an ingest backlog older than 48 hours and unclosed governance-mine proposals. |
+| **Inputs** | stdin JSON payload (consumed). Reads `hooks/_state/lint-cadence.json`, `hooks/_state/governance-mine-cadence.json`, `hooks/_state/setup-audit-cadence.json`, `hooks/_state/work-triage-cadence.json`, the miner resolved ledger, and the most recent governance-mine proposal sheet. |
+| **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `additionalContext` containing one line per overdue sweep. Bootstraps a missing state file so the first run establishes a baseline instead of nagging every session. |
+| **Logical paths** | For each cadence: state file missing → bootstrap it and suggest; `last_iso` older than the cadence → suggest with a day count; otherwise silent. Ingest backlog and proposal-closure suggestions are computed independently and appended. All suggestions empty → no stdout. |
+| **Failure mode** | Fail-open: every read is guarded; a parse error is treated as "no state" rather than an error. Never blocks. |
+| **Rationale** | Periodic sweeps that depend on the operator remembering them do not happen. Deriving the reminder from a state file makes the cadence self-tracking, and bootstrapping on first sight avoids a permanent false alarm. |
+
+---
+
+### `mcp-qmd-health-probe.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | SessionStart |
+| **Matcher** | none |
+| **Registered in** | Not registered by default: opt-in |
+| **Action** | Runs the qmd CLI once (`status`) at session start. On failure, seeds the MCP circuit-breaker state and emits a loud warning so the session falls back to Grep/Read instead of burning turns on a dead recall layer. |
+| **Inputs** | stdin JSON payload. Resolves the CLI dynamically from `.mcp.json` on every run: `mcpServers.qmd` → `command` plus the first `args` element ending in `.js`. Never hardcodes a path. Probe timeout 20 seconds. |
+| **Outputs / Side-effects** | Writes `hooks/_state/mcp-circuit-breaker.json` (failure or success record for the `qmd` server key). stdout: `additionalContext` warning on failure or on unresolvable configuration. |
+| **Logical paths** | `.mcp.json` missing, unparseable, no `qmd` entry, or no `.js` argument → emit "recall-layer health UNKNOWN" and exit 0. Probe exits non-zero or times out → record failure, warn. Probe succeeds → record success, silent. |
+| **Failure mode** | Fail-open on the session, fail-loud on the configuration: an unresolvable config is reported rather than silently skipped, because a silent skip is indistinguishable from a healthy probe. |
+| **Rationale** | The circuit breaker only observes calls the session already made, so a server that is dead before the first call stays invisible until a turn is wasted on it. This closes the cold-start gap. **Known limitation:** the CLI probe verifies the binary and the on-disk index, not the live MCP stdio transport; a transport that dies mid-session is still only caught by the PostToolUse breaker half. |
+
+---
+
+### `git-credential-scope-check.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | SessionStart |
+| **Matcher** | `startup`, `resume` |
+| **Registered in** | not registered by default (opt-in) |
+| **Action** | Warns when the configured git credential scope is broader than the current repository requires. |
+| **Inputs** | git configuration for the active repository. |
+| **Outputs / Side-effects** | stdout: `additionalContext` warning; never blocks. |
+| **Logical paths** | Read the credential helper configuration and remote. Compare configured scope against what the repo needs. Broader than necessary, warn once per session. Otherwise silent. |
+| **Failure mode** | Fail-open, advisory only. |
+| **Rationale** | Credential scope is invisible until it leaks. Surfacing it at session start costs nothing and catches over-broad configuration before a push. |
+
+---
+
 ## UserPromptSubmit hooks
 
 ### `user-prompt-submit.py`
@@ -135,22 +188,6 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Logical paths** | Skip if subagent invocation. Skip if effort.level == "low". Skip if prompt is trivial (heuristic). Throttle check: <30min since last fire AND STATE.md mtime unchanged AND same project → skip. Else: read STATE.md → extract status + last_action → read task_plan top 5 open items → emit orientation. Any read failure → emit empty (fail-open). |
 | **Failure mode** | Fail-open: all file-read failures caught; throttle state write uses atomic temp-rename pattern to avoid corruption. |
 | **Rationale** | Reduces the need for the model to proactively re-read STATE.md each turn while avoiding per-prompt noise via throttling. |
-
----
-
-### `git-credential-scope-check.py`
-
-| Attribute | Value |
-|---|---|
-| **Event** | SessionStart |
-| **Matcher** | `startup`, `resume` |
-| **Registered in** | not registered by default (opt-in) |
-| **Action** | Warns when the configured git credential scope is broader than the current repository requires. |
-| **Inputs** | git configuration for the active repository. |
-| **Outputs / Side-effects** | stdout: `additionalContext` warning; never blocks. |
-| **Logical paths** | Read the credential helper configuration and remote. Compare configured scope against what the repo needs. Broader than necessary, warn once per session. Otherwise silent. |
-| **Failure mode** | Fail-open, advisory only. |
-| **Rationale** | Credential scope is invisible until it leaks. Surfacing it at session start costs nothing and catches over-broad configuration before a push. |
 
 ---
 
@@ -300,6 +337,22 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 
 ---
 
+### `qmd-recall-nudge.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PreToolUse |
+| **Matcher** | `Grep` |
+| **Registered in** | Not registered by default: opt-in |
+| **Action** | When a `Grep` targets a qmd-indexed corpus (the memory folder or the KB wiki directory), injects a one-line reminder to search via `mcp__qmd__query` first. Warn-only: the Grep still runs. |
+| **Inputs** | stdin JSON payload: `tool_name`, `tool_input.path`. |
+| **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `additionalContext` reminder naming the matching collection. No file writes, no block. |
+| **Logical paths** | Tool is not `Grep` → silent. Path does not resolve under the memory folder or the KB directory → silent. Path matches → emit the reminder naming the collection (`memory` or `agr-kb`). Deliberately does NOT fire on `Read`: fetching a known file by path is legitimate and qmd's `get` is optional there, not a correction. |
+| **Failure mode** | Fail-open: exit 0 always, never blocks the Grep. |
+| **Rationale** | A soft doctrine mention decays to roughly 25% adherence, so the session reaches for raw `Grep` over a corpus that has a purpose-built search index. Scoping the nudge to search intent over indexed paths only is what keeps it from becoming background noise, which is the failure mode that gets a nudge hook disabled. |
+
+---
+
 ## PostToolUse hooks
 
 ### `skill-step-reminder.py`
@@ -427,6 +480,22 @@ Every production hook is listed below. Library modules (`_`-prefixed), test file
 | **Logical paths** | Detect that the written path is a hook. Run the matching test module. Tests pass, allow. Tests fail, block and name them. |
 | **Failure mode** | Fail-open if the suite cannot be run at all. |
 | **Rationale** | Hooks are the enforcement layer. A silently broken hook removes a guarantee without removing the belief that the guarantee holds. |
+
+---
+
+### `raw-frontmatter-check.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PostToolUse |
+| **Matcher** | `Write` |
+| **Registered in** | Not registered by default: opt-in |
+| **Action** | Advisory check that raw-layer Markdown writes carry the three required frontmatter fields (`date`, `tags`, `status`). Reports what is missing; never blocks. |
+| **Inputs** | stdin JSON payload: written file path and content. Environment: `VAULT_ROOT`, plus `RAW_FRONTMATTER_CHECK_DISABLED=1` to silence and `RAW_FRONTMATTER_CHECK_VERBOSE=1` to log passes as well as failures. |
+| **Outputs / Side-effects** | stdout: `additionalContext` advisory naming the missing fields. Appends to `hooks/logs/raw-frontmatter-check.log`. |
+| **Logical paths** | Path outside the raw layer → silent. Path in an excluded class (Inbox, Templates, Clippings, Daily Notes, dotfile directories, archive and source-data subtrees) or an excluded filename (STATE.md, PROJECT.md, task_plan.md, MEMORY.md, README.md, CLAUDE.md) → silent. Path in the wiki layer, meaning the KB directory or a note tagged `#wiki` → silent, since `wiki-citation-check.py` owns those. Otherwise parse frontmatter, and emit an advisory naming any of the three required fields that is absent. |
+| **Failure mode** | Fail-open, advisory only: any exception is swallowed and the write stands. |
+| **Rationale** | Deliberately narrower than the general structure check: this hook asserts only field presence on the raw layer. Tag canonicality belongs to `tag-variant-check.py` and the anti-orphan rule applies to the wiki layer, so keeping the three concerns in separate hooks means a false positive in one does not require disarming the others. |
 
 ---
 
@@ -709,6 +778,24 @@ Note: `subagent-scope-check.py` also fires at SubagentStop: documented in the Su
 | **Logical paths** | Parse payload → read transcript tail → extract last 3 user messages → extract last classification block → list recently modified files → read all STATE.md files → extract In Progress / Shaped task_plan sections (cap) → write recovery file. Any individual read error → skip that section, continue. |
 | **Failure mode** | Fail-open: individual file read errors skipped; write failure logged to stderr; exit 0 always. |
 | **Rationale** | Provides a human-readable recovery point before each compaction so state can be restored if the compacted summary loses critical context (addresses the compaction-loses-attribution failure mode). |
+
+---
+
+## PostCompact hooks
+
+### `post-compact.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PostCompact |
+| **Matcher** | none |
+| **Registered in** | Not registered by default: opt-in |
+| **Action** | Fires after context compaction completes. Records the compaction event for instrumentation and writes a staleness marker so a later session or lint pass can tell that context was compacted and that the search index and STATE.md may be stale. |
+| **Inputs** | stdin JSON payload (PostCompact fields). |
+| **Outputs / Side-effects** | Writes `hooks/_state/last-compact.json`. Appends a compaction event to `hooks/governance-log.jsonl` and the hook-activity instrument. **Produces no stdout:** PostCompact, like PreCompact, rejects `hookSpecificOutput.additionalContext`. |
+| **Logical paths** | Parse payload → write marker → append event → exit 0. Any write failure is swallowed. |
+| **Failure mode** | Fail-open: exit 0 always; never crashes the session. |
+| **Rationale** | Closes the loop that `pre-compact.py` opens on the other side. Compaction frequency is otherwise invisible, and the marker lets downstream consumers detect the staleness rather than assume freshness. This hook only flags: it does not re-index, because that is a heavier operation than a hook should perform. Post-compaction orientation stays the job of the SessionStart recovery-file mechanism. |
 
 ---
 
