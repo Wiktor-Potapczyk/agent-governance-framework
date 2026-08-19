@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-08-19: two weeks of hook evolution, ten new guards, and a splice that had been doubling files
+
+### Fixed
+
+- **Four published hooks carried their whole body twice.** The merge tooling that ports workspace hooks into this repo splices this repo's own workspace-root resolution block into each ported file. Its block-extraction regex ended in a DOT-ALL `.*$`, which matches to the last line-end of the *file*, so the "block" was def-through-end-of-file and every splice appended a full duplicate of the file's tail. `user-prompt-state-inject.py`, `session-start-orientation.py`, `agent-registry-check.py` and `pre-compact.py` all shipped that way (still valid Python: later definitions win, so the suite stayed green, which is exactly why it went unnoticed). All four are now single-copy; `inbox-auto-ingest.py` still carries the duplication and is queued for its next sync. The splice tool now terminates on the assignment line and reads its block from `git show HEAD:` rather than the file it is about to rewrite.
+- **`scripts/shared/known_names.py` regenerated from the updated hooks** (93 entries): the canonical dispatch-name list had fallen behind the per-hook copies, and the drift-guard test caught it, which is its job. The top-level `agent-dispatch-check.py` also received the newer `extract_dispatch_names()` (recognizes `plugin:agent` colon-form names) and the current name blocks.
+
+### Added
+
+- **Nine enforcement hooks + one shared library** (all registered in `settings/settings.json.template`, taking it from 36 to 45 active hooks): `aggregate-write-guard.py` (deny wholesale-loss writes to the three singleton aggregate files), `memory-context-guard.py` (advisory wall on subagent-context memory writes), `memory-nudge.py` (turns-since-memory-write counter + nudge), `plain-language-guard.py` with its checker module `plain_language_check.py` and the rule set `plain-language-rules.md` at the repo root, `claude-md-provenance-check.py` (uncited rule-shaped CLAUDE.md changes get a warning), `deferral-resurface.py` (deferred items resurface at project close), `state-reconcile-check.py` (state file contradicting the text below its own header), `session-work-orientation.py` (work/-directory staleness line at session start), `qmd-rerank-default-guard.py` (denies qmd queries that omit `rerank: false` on CPU-only machines), plus `_project_discovery.py` (shared active-project resolution).
+- **Fifteen test files** for the hooks above and for previously untested hooks (`checkpoint.py`, `pre-compact.py`, `qmd-recall-nudge.py`, `user-prompt-state-inject.py`), taking the suite to 1157 passing without PyYAML / 1160 with. One new test fixture (`warn-miner-log-fixture.jsonl`) ships force-added because `hooks/_test_fixtures/` is gitignored while its fixtures are tracked: an inherited inconsistency, noted here rather than silently worked around.
+- **`hooks/disabled/pretooluse-payload-probe.py`**: a temporary, metadata-only diagnostic probe (payload key names and `agent_type`, never content) retained as a worked example of verifying what actually reaches a hook's stdin before building logic on it.
+- **Scripts**: `hook_activity_report.py` (telemetry vocabulary/coverage report over the governance sinks, with `--findings` and `--matrix` modes), `transcript_search.py` (search across session transcripts), `generate-home.py` (Home page generated from `Projects/*/STATE.md`), with tests.
+- **`workflows/test_process_qa_scoring.mjs`**: node test for the process-qa workflow's scoring function.
+
+### Changed
+
+- **40 hooks, 12 skills and `workflows/process-qa.js`** updated to their current implementations: two weeks of upstream evolution including the warn-tier governance miner (`mine_governance.py` `mine_warns()`), the Gate-1 warn-not-deny rebalance in `bash-safety-guard.py` (a normal `git push` warns and logs instead of hard-blocking; force-push stays denied), the curl warn-host carve-out in `_irreversible_surface.py` (templated to `n8n.internal.example.com`: adopters substitute their own self-hosted instance), and Workflow-invocation recognition in `work-verification-check.py` (a `process-qa` run via the Workflow tool no longer trips the inline-QA block, with `SessionWiringTests` covering the session-attribution fix).
+- **Docs re-reconciled to the tree**: hook counts (56 on disk, 45 active, 10 shared libraries, 53 test files), per-hook attribute tables for all nine new hooks, and the setup inventory's stale hook/skill/script counts corrected (workflows/*.js = 6 unchanged).
+
+### Held back deliberately
+
+- The workspace's `config-protection.py` was retired upstream (neutered to a no-op) on the owner's ruling; this repo **keeps the guard active** until the corresponding restructure decision (deregister + move to `hooks/disabled/` + doc update) is made deliberately rather than as a merge side effect.
+- A unicode-hygiene hook trio exists upstream but is held: its tests depend on glyph-level fixtures and workspace paths that need a fixture-shipping strategy here first.
+
 ## 2026-08-06: the configuration nobody ran, and nine hooks the reference omitted
 
 ### Fixed

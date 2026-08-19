@@ -63,6 +63,8 @@ The process skills define *which procedure to follow* (routing + prose spec). Th
 
 5. **Hook preconditions for process-qa**: `process-qa.js` relies on three hook fixes (described in its file header) in `process-step-check.py` and `work-verification-check.py`. Without these, the `work-verification-check` will false-block a Workflow-driven QA run because the execution tools run inside the workflow subagent and are invisible to the main transcript. Ship the three updated hook files before wiring the process-qa SKILL.md stub.
 
+6. **Scoring test**: `test_process_qa_scoring.mjs` exercises the process-qa workflow's PASS/FAIL scoring function directly under node (`node workflows/test_process_qa_scoring.mjs`). It is a plain node script, not part of the Python hook suite; run it after editing `process-qa.js` scoring logic.
+
 ---
 
 ## Reference

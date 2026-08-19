@@ -18,9 +18,9 @@ The framework operationalizes three research-backed principles: classify before 
 
 ## Architecture
 
-The framework operates across four layers. The repository ships **46 hooks**, **9 shared libraries** they import, and **38 test files** covering them.
+The framework operates across four layers. The repository ships **55 hooks**, **10 shared libraries** they import, and **53 test files** covering them.
 
-**Two numbers describe the hooks and they are worth keeping apart.** `settings/settings.json.template` is the full recommended configuration and registers 36 of them. `settings/settings.json.example` and `settings.local.json.example` register 12: a minimal starter set, the smallest group that makes all four layers below actually enforce something. Start from the 12, add from the 36 as you want them, and treat the remainder as worked examples. `docs/reference/hooks.md` says what each one does and which event it binds to.
+**Two numbers describe the hooks and they are worth keeping apart.** `settings/settings.json.template` is the full recommended configuration and registers 45 of them. `settings/settings.json.example` and `settings.local.json.example` register 12: a minimal starter set, the smallest group that makes all four layers below actually enforce something. Start from the 12, add from the 45 as you want them, and treat the remainder as worked examples. `docs/reference/hooks.md` says what each one does and which event it binds to.
 
 A further set lives in `hooks/disabled/`, excluded from the default test run by `pytest.ini` so a clean clone runs green. Some are there after an instructive failure, documented in `hooks/disabled/README.md`; others simply ship unregistered.
 

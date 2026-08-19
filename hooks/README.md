@@ -1,8 +1,8 @@
 # Hook Registry
 
-This directory holds 46 hook scripts across 8 event types, plus 9 shared libraries they import (`_competence_signal.py`, `_daily_aggregate.py`, `_dispatch_compliance_logic.py`, `_event_emit.py`, `_governance_logger.py`, `_haiku_summarize.py`, `_irreversible_surface.py`, `_subagent_quality_logic.py`, `_wiki_citation_logic.py`) and 38 test files.
+This directory holds 55 hook scripts across 8 event types, plus 10 shared libraries they import (`_competence_signal.py`, `_daily_aggregate.py`, `_dispatch_compliance_logic.py`, `_event_emit.py`, `_governance_logger.py`, `_haiku_summarize.py`, `_irreversible_surface.py`, `_project_discovery.py`, `_subagent_quality_logic.py`, `_wiki_citation_logic.py`) and 53 test files.
 
-**Two different numbers describe this directory and they are easy to confuse.** `settings/settings.json.template` uses 36 active enforcement hooks: that is the full recommended configuration. `settings/settings.json.example` and `settings.local.json.example` register only 12: a minimal starter set, the smallest group that makes all four enforcement layers do something. Being present in this directory means a hook is available, not that it runs.
+**Two different numbers describe this directory and they are easy to confuse.** `settings/settings.json.template` uses 45 active enforcement hooks: that is the full recommended configuration. `settings/settings.json.example` and `settings.local.json.example` register only 12: a minimal starter set, the smallest group that makes all four enforcement layers do something. Being present in this directory means a hook is available, not that it runs.
 
 Start from the 12, add from the 36 as you find you want them, and treat the rest as worked examples. The table below says what each does and which event it binds to.
 

@@ -171,6 +171,14 @@
         {
           "file": "hooks/README.md",
           "pattern": "(?:uses|holds) (\\d+) active enforcement hooks"
+        },
+        {
+          "file": "docs/reference/setup-inventory.md",
+          "pattern": "of which active enforcement \\(registered\\) \\| (\\d+)"
+        },
+        {
+          "file": "docs/reference/setup-inventory.md",
+          "pattern": "ships \\d+ production hook files; \\*\\*(\\d+)\\*\\* of them"
         }
       ]
     },
@@ -186,7 +194,8 @@
             "conftest.py",
             "mine_governance.py",
             "sidecar_loader.py",
-            "weekly-usage.py"
+            "weekly-usage.py",
+            "plain_language_check.py"
           ]
         }
       },
@@ -198,6 +207,14 @@
         {
           "file": "README.md",
           "pattern": "ships \\*\\*(\\d+) hooks\\*\\*"
+        },
+        {
+          "file": "docs/reference/setup-inventory.md",
+          "pattern": "Production hook files \\| (\\d+)"
+        },
+        {
+          "file": "docs/reference/setup-inventory.md",
+          "pattern": "ships (\\d+) production hook files"
         }
       ]
     },
@@ -213,6 +230,70 @@
         {
           "file": "docs/architecture.md",
           "pattern": "Shared hook libraries \\| (\\d+)"
+        },
+        {
+          "file": "hooks/README.md",
+          "pattern": "plus (\\d+) shared libraries"
+        },
+        {
+          "file": "README.md",
+          "pattern": "\\*\\*(\\d+) shared libraries\\*\\*"
+        }
+      ]
+    },
+    {
+      "id": "hook-test-files",
+      "expect": {
+        "count_files": {
+          "dir": "hooks",
+          "glob": "test_*.py"
+        }
+      },
+      "asserted_in": [
+        {
+          "file": "README.md",
+          "pattern": "\\*\\*(\\d+) test files\\*\\*"
+        },
+        {
+          "file": "hooks/README.md",
+          "pattern": "and (\\d+) test files"
+        }
+      ]
+    },
+    {
+      "id": "disabled-hook-files",
+      "expect": {
+        "count_files": {
+          "dir": "hooks/disabled",
+          "glob": "*.py"
+        }
+      },
+      "asserted_in": [
+        {
+          "file": "docs/reference/setup-inventory.md",
+          "pattern": "Opt-in \\(disabled\\) hook files \\| (\\d+)"
+        },
+        {
+          "file": "docs/reference/setup-inventory.md",
+          "pattern": "holds (\\d+) opt-in or diagnostic files"
+        }
+      ]
+    },
+    {
+      "id": "maintenance-scripts",
+      "expect": {
+        "count_files": {
+          "dir": "scripts",
+          "glob": "*.py",
+          "exclude_globs": [
+            "__init__.py"
+          ]
+        }
+      },
+      "asserted_in": [
+        {
+          "file": "docs/reference/setup-inventory.md",
+          "pattern": "Analysis and maintenance scripts \\| (\\d+)"
         }
       ]
     }

@@ -22,6 +22,18 @@ This directory holds hooks that ship with the framework but are NOT registered i
 
 ---
 
+## pretooluse-payload-probe.py: diagnostic (NOT a failure)
+
+**What it does:** Fires on PreToolUse for `Write|Edit|MultiEdit`. Appends ONE metadata-only JSONL record per matched call: the payload's key names, the `agent_type` value (or an explicit absent marker), the tool name, and whether a transcript path was present. Never file bodies, never prompts, never content.
+
+**Why it ships here:** It is a temporary probe by design, deregistered after its measurement window. It ships because the pattern is the reusable part: before building hook logic on a payload field (say, "does `agent_type` reach PreToolUse for all subagent types?"), run a probe like this and measure what actually arrives instead of trusting documentation or memory. The header documents the metadata-only discipline that makes such a probe safe to leave in a tree.
+
+**To arm:** register on `PreToolUse` with matcher `Write|Edit|MultiEdit`; the log appears under `hooks/_state/`. Deregister when your question is answered.
+
+**The lesson:** payload shape is an empirical question. A field being present for one agent class proves nothing about the others; a ten-line probe settles it in a day of normal traffic.
+
+---
+
 ## routing-table-validation.py: opt-in (NOT a failure)
 
 **What it does:** Fires on PreToolUse for `Edit|Write|MultiEdit`. Denies a write that would introduce a **broken dispatch-name reference**: an agent name in a clear dispatch position (`MUST DISPATCH:` line, `subagent_type:` field, or a routing-table row) inside `CLAUDE.md` or any `SKILL.md` that resolves to nothing in `registry.json`. Low-false-positive by design: it only denies the unambiguous case and ALLOWs on any ambiguity (fail-open), so it never blocks a legitimate edit.

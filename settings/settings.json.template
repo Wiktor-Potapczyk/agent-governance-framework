@@ -63,6 +63,22 @@
             "command": "python \"{{VAULT_ROOT}}/.claude/hooks/session-start-orientation.py\""
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/session-work-orientation.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/memory-nudge.py\""
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -141,6 +157,33 @@
             "command": "python \"{{VAULT_ROOT}}/.claude/hooks/mcp-circuit-breaker.py\""
           }
         ]
+      },
+      {
+        "matcher": "mcp__qmd__query",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/qmd-rerank-default-guard.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/aggregate-write-guard.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/memory-context-guard.py\""
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -198,6 +241,42 @@
           {
             "type": "command",
             "command": "python \"{{VAULT_ROOT}}/.claude/hooks/checkpoint.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/plain-language-guard.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/claude-md-provenance-check.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/deferral-resurface.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/state-reconcile-check.py\""
           }
         ]
       }
@@ -284,6 +363,14 @@
           {
             "type": "command",
             "command": "python \"{{VAULT_ROOT}}/.claude/hooks/task-plan-auto-sync.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/memory-nudge.py\""
           }
         ]
       }

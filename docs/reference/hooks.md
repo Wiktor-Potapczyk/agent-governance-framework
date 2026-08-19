@@ -56,6 +56,15 @@ Every hook file in `hooks/` is listed below, whether or not it is registered by 
 | `transition-gate-check.py` | PreToolUse (Write/Edit) | Gate phase transitions on recorded evidence | No: opt-in |
 | `git-credential-scope-check.py` | SessionStart | Warn when git credential scope is broader than the repo needs | No: opt-in |
 | `hook-write-regression-gate.py` | PostToolUse (Write/Edit) | Block hook edits that regress the test suite | No: opt-in |
+| `session-work-orientation.py` | SessionStart | Report work/ file count, stale files, closed-track exhaust for the active project | Yes: `settings.json.template` |
+| `memory-nudge.py` | SessionStart + Stop | Count turns since last memory write; nudge past the quiet-turn threshold | Yes: `settings.json.template` |
+| `qmd-rerank-default-guard.py` | PreToolUse (`mcp__qmd__query`) | Deny a qmd query that omits `rerank: false` on CPU-only machines | Yes: `settings.json.template` |
+| `aggregate-write-guard.py` | PreToolUse (Write\|Edit\|MultiEdit) | Deny wholesale-loss writes to the three singleton aggregate files | Yes: `settings.json.template` |
+| `memory-context-guard.py` | PreToolUse (Write\|Edit\|MultiEdit) | Advisory on subagent-context writes into the memory folder | Yes: `settings.json.template` |
+| `plain-language-guard.py` | PostToolUse (Write\|Edit) | Warn on plain-language rule violations in documentation surfaces | Yes: `settings.json.template` |
+| `claude-md-provenance-check.py` | PostToolUse (Write\|Edit) | Warn when a rule-shaped CLAUDE.md change carries no origin citation | Yes: `settings.json.template` |
+| `deferral-resurface.py` | PostToolUse (Write\|Edit) | Surface deferred items when a project is being closed out | Yes: `settings.json.template` |
+| `state-reconcile-check.py` | PostToolUse (Write\|Edit) | Advisory when a STATE.md/task_plan.md write contradicts text left below it | Yes: `settings.json.template` |
 
 ---
 
@@ -154,6 +163,38 @@ Every hook file in `hooks/` is listed below, whether or not it is registered by 
 | **Logical paths** | Read the credential helper configuration and remote. Compare configured scope against what the repo needs. Broader than necessary, warn once per session. Otherwise silent. |
 | **Failure mode** | Fail-open, advisory only. |
 | **Rationale** | Credential scope is invisible until it leaks. Surfacing it at session start costs nothing and catches over-broad configuration before a push. |
+
+---
+
+### `session-work-orientation.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | SessionStart |
+| **Matcher** | (none) |
+| **Registered in** | `settings/settings.json.template` |
+| **Action** | Emits one orientation line for the active project's `work/` directory: file count, files untouched over 30 days, and exhaust files belonging to closed tracks. |
+| **Inputs** | stdin JSON payload: `cwd` (preferred project signal). Filesystem: `Projects/*/` scan when `cwd` does not resolve. |
+| **Outputs / Side-effects** | stdout: `additionalContext` orientation line. No file writes. |
+| **Logical paths** | `cwd` inside a real `Projects/<name>/` → direct match. Otherwise one `os.scandir` pass over `Projects/*/` picks the active project. No project resolvable → silent. Empty `work/` → silent. See `test_session_work_orientation.py`. |
+| **Failure mode** | Fail-open: any exception exits silently. |
+| **Rationale** | Close-out metabolism: stale `work/` files are invisible until a maintenance sweep; a one-line count at session start keeps the surface observable. |
+
+---
+
+### `memory-nudge.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | SessionStart + Stop (one file, two registrations, branching on `hook_event_name`) |
+| **Matcher** | (none) |
+| **Registered in** | `settings/settings.json.template` |
+| **Action** | Stop: increments a turns-since-last-memory-write counter (skipping `stop_hook_active` continuations so Stop-chains do not double-count). SessionStart: reminds when the counter passes the quiet-turn threshold; "nothing to save" is a valid outcome. |
+| **Inputs** | stdin JSON payload: `hook_event_name`, `stop_hook_active`. State file under `hooks/_state/`. |
+| **Outputs / Side-effects** | Stop: state-file increment, prints nothing ever. SessionStart: `additionalContext` reminder past the threshold. |
+| **Logical paths** | Stop with `stop_hook_active: true` → no increment. Memory write observed → counter reset. Counter below threshold → silent. See `test_memory_nudge.py`. |
+| **Failure mode** | Fail-open: state I/O errors are swallowed; never blocks. |
+| **Rationale** | Memory-persistence discipline: the main session owns the memory folder, and a quiet-turn counter surfaces drift toward never persisting anything. |
 
 ---
 
@@ -353,6 +394,54 @@ Every hook file in `hooks/` is listed below, whether or not it is registered by 
 
 ---
 
+### `qmd-rerank-default-guard.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PreToolUse |
+| **Matcher** | `mcp__qmd__query` |
+| **Registered in** | `settings/settings.json.template` |
+| **Action** | Denies a qmd MCP query whose input omits `rerank: false`, because the tool's server-side default (`rerank: true`) runs a local LLM reranking pass that never finishes on CPU-only machines and presents as a server crash. |
+| **Inputs** | stdin JSON payload: `tool_input` of the `mcp__qmd__query` call. |
+| **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `permissionDecision: deny` + corrective reason (on omission); nothing on pass. |
+| **Logical paths** | `rerank: false` present → allow. `rerank` absent or `true` → deny with the exact parameter to add. See `test_qmd_rerank_default_guard.py`. |
+| **Failure mode** | Fail-open: malformed payloads allow. |
+| **Rationale** | The upstream package exposes no server-side rerank default, so the only reliable enforcement point is the call site; a guard beats a memory rule that must be re-remembered every session. |
+
+---
+
+### `aggregate-write-guard.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PreToolUse |
+| **Matcher** | `Write\|Edit\|MultiEdit` |
+| **Registered in** | `settings/settings.json.template` |
+| **Action** | Denies wholesale-loss writes to three singleton aggregate files (the memory head index `MEMORY.md`, `governance-log.jsonl`, `hook-activity.jsonl`): full-file `Write` over an existing aggregate, or an edit that would shrink it past the loss threshold. |
+| **Inputs** | stdin JSON payload: `tool_input.file_path`, `tool_input.content` / edit fields. Paths configurable via `AGGREGATE_WRITE_GUARD_MEMORY_PATH` / `_GOVLOG_PATH` / `_HOOKLOG_PATH` environment variables. |
+| **Outputs / Side-effects** | stdout: `permissionDecision: deny` + reason on violation; a warn record to the governance log. Nothing on pass. |
+| **Logical paths** | Target not one of the three exact paths → allow. Append-shaped change → allow. Wholesale replacement or destructive shrink → deny. See `test_aggregate_write_guard.py`. |
+| **Failure mode** | Fail-open on I/O errors; the deny fires only on a positively identified loss write. |
+| **Rationale** | Multi-session concurrency is the norm; a single wholesale write can destroy append-only history that no other copy holds. |
+
+---
+
+### `memory-context-guard.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PreToolUse |
+| **Matcher** | `Write\|Edit\|MultiEdit` |
+| **Registered in** | `settings/settings.json.template` |
+| **Action** | Advisory (never blocks) when a write into the memory folder comes from a subagent context: subagents report memory-worthy findings back; the main session decides what persists. |
+| **Inputs** | stdin JSON payload: `tool_input.file_path`, `agent_type` (present and named for subagents, absent for the main session: the empirically verified discriminator). |
+| **Outputs / Side-effects** | Warning via `additionalContext` on subagent-context writes; every memory-folder write logged to `aggregates/memory-context-warnings.jsonl`. |
+| **Logical paths** | Target outside the memory folder → silent. Main-session context → log only. Subagent context → warn + log. See `test_memory_context_guard.py`. |
+| **Failure mode** | Fail-open: classification failures log as unknown and never block. |
+| **Rationale** | Memory-folder ownership doctrine with an advisory wall: enforcement stays observational until the warning log proves the deny tier is warranted. |
+
+---
+
 ## PostToolUse hooks
 
 ### `skill-step-reminder.py`
@@ -496,6 +585,70 @@ Every hook file in `hooks/` is listed below, whether or not it is registered by 
 | **Logical paths** | Path outside the raw layer → silent. Path in an excluded class (Inbox, Templates, Clippings, Daily Notes, dotfile directories, archive and source-data subtrees) or an excluded filename (STATE.md, PROJECT.md, task_plan.md, MEMORY.md, README.md, CLAUDE.md) → silent. Path in the wiki layer, meaning the KB directory or a note tagged `#wiki` → silent, since `wiki-citation-check.py` owns those. Otherwise parse frontmatter, and emit an advisory naming any of the three required fields that is absent. |
 | **Failure mode** | Fail-open, advisory only: any exception is swallowed and the write stands. |
 | **Rationale** | Deliberately narrower than the general structure check: this hook asserts only field presence on the raw layer. Tag canonicality belongs to `tag-variant-check.py` and the anti-orphan rule applies to the wiki layer, so keeping the three concerns in separate hooks means a false positive in one does not require disarming the others. |
+
+---
+
+### `plain-language-guard.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PostToolUse |
+| **Matcher** | `Write\|Edit` |
+| **Registered in** | `settings/settings.json.template` |
+| **Action** | Warn-only plain-language check (blocks OFF) over documentation surfaces: project `work/` files (minus `work/backups/`), the knowledge-base wiki, and this repository's README + `docs/`. Thin wrapper over `plain_language_check.py`; rules of record in [`plain-language-rules.md`](../../plain-language-rules.md). |
+| **Inputs** | stdin JSON payload: `tool_input.file_path`, `tool_input.content` (Write) / `tool_input.new_string` (Edit: only the new text is visible, a documented limitation). |
+| **Outputs / Side-effects** | Advisory `additionalContext` listing rule findings; per-write JSONL log entry. MM1-marked destructive-action/safety prose is exempt from length findings. |
+| **Logical paths** | Path outside the three enforced surfaces → silent. In scope → run rule set → findings → advisory + log; clean → log only. See `test_plain_language_guard.py`. |
+| **Failure mode** | Fail-open: checker exceptions are swallowed; never blocks. |
+| **Rationale** | Advisory-first rollout of the plain-language standard: measure the finding rate before any blocking tier is considered. |
+
+---
+
+### `claude-md-provenance-check.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PostToolUse |
+| **Matcher** | `Write\|Edit` |
+| **Registered in** | `settings/settings.json.template` |
+| **Action** | Warn-only provenance guard for the workspace-root `CLAUDE.md`: a rule-shaped change with no inline origin citation gets a one-line warning. Nested `CLAUDE.md` files are out of scope. |
+| **Inputs** | stdin JSON payload: `tool_input.file_path`, written/edited content. |
+| **Outputs / Side-effects** | Advisory warning on uncited rule additions; nothing otherwise. |
+| **Logical paths** | Path is not the workspace-root CLAUDE.md → silent. Change not rule-shaped → silent. Rule-shaped + citation present → silent. Rule-shaped + no citation → warn. See `test_claude_md_provenance_check.py`. |
+| **Failure mode** | Fail-open. |
+| **Rationale** | Wiki pages require a `source:` field; the constitution required nothing, and a rule survived four months after the pointer to its own origin died. This extends citation discipline to the constitution. |
+
+---
+
+### `deferral-resurface.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PostToolUse (hook mode) + standalone CLI (`--project Projects/<Name>` sweep mode) |
+| **Matcher** | `Write\|Edit` |
+| **Registered in** | `settings/settings.json.template` |
+| **Action** | Makes deferred items visible at project close: scans `task_plan.md`, `work/`, and `archive/` for deferral-class markers (Tier 3 / MEDIUM / DEFER(RED) / HOLD, unchecked deferral items) when a close-shaped status write happens. |
+| **Inputs** | stdin JSON payload (hook mode) or `--project` path (sweep mode); project files on disk. |
+| **Outputs / Side-effects** | Advisory listing of unresolved deferrals; no file writes. |
+| **Logical paths** | Write is not close-shaped → silent. Close detected → sweep → deferral markers found → advisory list; none → silent. See `test_deferral_resurface.py`. |
+| **Failure mode** | Fail-open. |
+| **Rationale** | Deferred items died as tier-scoped markers no mechanism ever resurfaced, and a mechanical status sweep then certified unfinished business as done. |
+
+---
+
+### `state-reconcile-check.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PostToolUse |
+| **Matcher** | `Write\|Edit` |
+| **Registered in** | `settings/settings.json.template` (15s timeout: it re-reads the whole file) |
+| **Action** | Advisory when a write to `STATE.md` or `task_plan.md` leaves older text below it that contradicts the newly written status: the file then says two things and which one a reader believes depends on where they stop reading. |
+| **Inputs** | stdin JSON payload: `tool_input.file_path`, written content; the full post-write file from disk. |
+| **Outputs / Side-effects** | Advisory naming the contradicting stale region; no file writes. |
+| **Logical paths** | Target is not a state-class file → silent. New status consistent with the remainder → silent. Contradiction detected → advisory. See `test_state_reconcile_check.py`. |
+| **Failure mode** | Fail-open. |
+| **Rationale** | Measured defect: a PM checkpoint reading only the top of a state file reported work done that the bottom half still listed as pending, three times in one day. |
 
 ---
 
@@ -811,3 +964,6 @@ These files ship in `hooks/disabled/` or are present in `hooks/` but explicitly 
 | `disabled/routing-table-validation.py` | `hooks/disabled/` | Opt-in by design: correct and tested (26 tests); ships unregistered because arming a blocking hook on CLAUDE.md + SKILL.md is a deliberate decision requiring a complete registry | PreToolUse (Edit\|Write\|MultiEdit) hook that denies edits introducing broken agent-name references in CLAUDE.md or any SKILL.md |
 | `weekly-usage.py` | `hooks/` AND `hooks/disabled/` (duplicate copies) | Standalone CLI utility, not a hook -- never registered; requires `claude_monitor` package; duplicate-file state flagged for consolidation | CLI utility printing weekly token usage grouped by model and day since last Friday 8PM |
 | `prose-slop-check.py` | `hooks/` (dormant) | Opt-in: built and calibrated (0 false positives on a 19-page prose corpus); ships unregistered until the maintainer arms it | PostToolUse (Write) hook that warns on LLM-register slop vocabulary in `Resources/KB/` and `Projects/*/work/` prose |
+| `disabled/pretooluse-payload-probe.py` | `hooks/disabled/` | Diagnostic, temporary by design: a metadata-only probe (payload key names, `agent_type` value, tool name: never content) used to verify which fields reach PreToolUse payloads; deregistered after its probe window and retained as a worked example of safe payload introspection | PreToolUse (Write\|Edit\|MultiEdit) probe appending one JSONL metadata record per matched call |
+| `plain_language_check.py` | `hooks/` | Not a hook: the checker module `plain-language-guard.py` wraps; also runnable standalone against a file | Plain-language rule engine (rules of record in `plain-language-rules.md`) |
+| `mine_governance.py` | `hooks/` | Not a hook: the miner module behind the weekly `process-governance-mine` skill; proposal-only, never edits config | Mines `governance-log.jsonl` for recurring failure/warn patterns (allowlist + per-agent sig_key + severity gate + resolved-ledger suppression) |

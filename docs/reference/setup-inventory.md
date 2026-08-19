@@ -12,13 +12,14 @@ A reference catalogue of every artifact class in this framework: what is install
 | Domain-example agents | 2 | `agents/domain-examples/` |
 | Top-level agents | 1 | `agents/` (`code-simplifier`) |
 | Core skills | 17 | `skills/core/` |
-| Vault-management skills | 7 | `skills/vault/` |
-| Domain-example skills | 19 | `skills/domain-examples/` (apify, n8n) |
+| Vault-management skills | 9 | `skills/vault/` |
+| Domain-example skills | 21 | `skills/domain-examples/` (apify, n8n) |
 | Workflow scripts | 6 | `workflows/` |
-| Production hook files | 40 | `hooks/` |
-|: of which active enforcement (registered) | 28 | `settings/` |
-| Shared hook libraries | 4 | `hooks/` |
-| Opt-in (disabled) hooks | 5 | `hooks/disabled/` |
+| Production hook files | 55 | `hooks/` |
+|: of which active enforcement (registered) | 45 | `settings/` |
+| Shared hook libraries | 10 | `hooks/` |
+| Opt-in (disabled) hook files | 9 | `hooks/disabled/` |
+| Analysis and maintenance scripts | 13 | `scripts/` |
 
 ## Workflows (`workflows/`)
 
@@ -52,22 +53,23 @@ Each agent is a markdown definition with `name` / `description` / `tools` frontm
 ## Skills (`skills/`)
 
 - **`core/` (17)**: the governance spine: `task-classifier` (routes every task), the `process-*` family (`process-research`, `process-analysis`, `process-build`, `process-planning`, `process-qa`, `process-pentest`, `process-postmortem`, `process-governance-mine`), plus `pm`, `verify`, `ensemble`, `verification-gated-research`, `architect-loop`, `doc-consistency`, `db-migration-plan`, `index`.
-- **`vault/` (7)**: knowledge-management skills for an Obsidian-style vault: `daily`, `inbox`, `maintain`, `process-ingest`, `process-lint`, `save`, `standup`.
+- **`vault/` (9)**: knowledge-management skills for an Obsidian-style vault: `daily`, `inbox`, `maintain`, `process-ingest`, `process-lint`, `process-query`, `save`, `standup`, `vault-maintain`.
 - **`domain-examples/` (19)**: apify and n8n skill packs, shipped as adoption examples of the skill format applied to a real domain.
 
 Each skill is a `SKILL.md` with `name` + `description` frontmatter and a body of Use-when / Do-NOT-use-when / Steps. See [Documentation Standard §3b](../documentation-standard.md).
 
 ## Hooks (`hooks/`)
 
-The repository ships 40 production hook files; **28** of them are *active enforcement* hooks registered in `settings/` (the figure pinned in the manifest), and the remainder are logging/lifecycle handlers and shared libraries. Hooks bind to Claude Code lifecycle events (PreToolUse, PostToolUse, Stop, SubagentStart/Stop, SessionStart/End, UserPromptSubmit, Pre/PostCompact). They divide into:
+The repository ships 55 production hook files; **45** of them are *active enforcement* hooks registered in `settings/` (the figure pinned in the manifest), and the remainder are logging/lifecycle handlers and shared libraries. Hooks bind to Claude Code lifecycle events (PreToolUse, PostToolUse, Stop, SubagentStart/Stop, SessionStart/End, UserPromptSubmit, Pre/PostCompact). They divide into:
 
 - **Classification & routing gates**: verify the task-classifier ran and that dispatch references resolve.
 - **Dispatch-compliance gates**: verify that mandated agents/skills were actually invoked.
 - **Quality & anti-fabrication gates**: work-verification, subagent-quality, bias-guard, prose linters.
-- **Safety gates**: bash-safety-guard, config-protection, read-before-edit.
+- **Safety gates**: bash-safety-guard, config-protection, read-before-edit, aggregate-write-guard, memory-context-guard.
+- **Documentation-quality gates**: plain-language-guard, claude-md-provenance-check, state-reconcile-check, deferral-resurface.
 - **Logging & lifecycle**: governance-log, checkpoint, session-start orientation, compaction handlers.
 
-`hooks/disabled/` holds 5 opt-in hooks that ship unregistered (copy to the active dir + register in settings to arm). Most production hooks have a paired `test_<hook>.py`: that test file is the authoritative enumeration of the hook's branches (per [Documentation Standard §3a](../documentation-standard.md)).
+`hooks/disabled/` holds 9 opt-in or diagnostic files that ship unregistered (copy to the active dir + register in settings to arm). Most production hooks have a paired `test_<hook>.py`: that test file is the authoritative enumeration of the hook's branches (per [Documentation Standard §3a](../documentation-standard.md)).
 
 ## How this inventory stays current
 
