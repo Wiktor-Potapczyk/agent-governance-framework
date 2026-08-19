@@ -84,7 +84,7 @@ class TestPreCompactDiscoveryFailure(unittest.TestCase):
         sys.modules["_project_discovery"] = None  # forces ImportError on import
         before = len(_read_activity_records())
 
-        payload = json.dumps({"transcript_path": r"C:\fake\abc123.jsonl"})
+        payload = json.dumps({"transcript_path": "C:/fake/abc123.jsonl"})
         module = _run_hook(payload)
 
         self.assertEqual(module.projects, [])

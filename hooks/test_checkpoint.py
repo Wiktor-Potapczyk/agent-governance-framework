@@ -21,7 +21,7 @@ import unittest
 from pathlib import Path
 
 HOOK_PATH = str(Path(__file__).parent / "checkpoint.py")
-PYTHON_EXE = r"C:\Program Files\Python314\python.exe"
+PYTHON_EXE = sys.executable
 
 
 def _run(payload: dict, userprofile: str, activity_log: str) -> tuple[int, str]:
