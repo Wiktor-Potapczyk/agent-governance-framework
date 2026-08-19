@@ -62,8 +62,9 @@ def main() -> int:
     # Self-log the fire (silent-zero instrument).
     try:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from _governance_logger import log_fire
-        log_fire("qmd-recall-nudge", decision="nudge", detail=corpus)
+        from _governance_logger import log_fire, session_from
+        log_fire("qmd-recall-nudge", decision="nudge", detail=corpus,
+                  session=session_from(payload))
     except Exception:
         pass
 

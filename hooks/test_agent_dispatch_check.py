@@ -620,5 +620,28 @@ class TestFamilyBNoDenyProof(unittest.TestCase):
             self.assertNotIn("permissionDecision", f.read())
 
 
+class TestPluginDispatchNames(unittest.TestCase):
+    """Defect 5 (2026-08-07): KNOWN_DISPATCH_NAMES did not know any plugin
+    agent name, making plugin dispatches invisible to compliance parsing.
+    Reproduces the broken shape first (a plain plugin agent name that used to
+    have no membership), then asserts recognition, including the
+    plugin-namespaced form named in the acceptance instrument."""
+
+    def test_plain_plugin_agent_name_recognized(self):
+        self.assertIn("silent-failure-hunter", KNOWN_DISPATCH_NAMES)
+
+    def test_synthetic_dispatch_record_naming_plugin_agent_recognized(self):
+        self.assertEqual(
+            extract_dispatch_names("pr-review-toolkit:silent-failure-hunter"),
+            ["silent-failure-hunter"],
+        )
+
+    def test_unknown_namespace_still_rejected(self):
+        self.assertEqual(
+            extract_dispatch_names("some-plugin:totally-made-up-agent"),
+            [],
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

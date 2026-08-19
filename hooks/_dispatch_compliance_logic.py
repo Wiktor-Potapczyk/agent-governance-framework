@@ -1,7 +1,7 @@
 """Pure logic for dispatch-compliance-check.
 
 Extracted from dispatch-compliance-check.py 2026-05-14 (CC-AUTOMATION-LEARN Step 1).
-Functions here have no filesystem or stdin/stdout I/O — they operate on:
+Functions here have no filesystem or stdin/stdout I/O: they operate on:
 - raw MUST DISPATCH text (strings)
 - parsed transcript lines (lists of dicts produced by the hook wrapper)
 - declared/dispatched sets (regular Python sets)
@@ -9,7 +9,7 @@ Functions here have no filesystem or stdin/stdout I/O — they operate on:
 The hook wrapper handles stdin reading, transcript file I/O, governance-log
 writing, and stdout block emission. The logic here is what gets unit-tested.
 
-`vault_root` is not needed by this logic — transcript paths and hook directory
+`vault_root` is not needed by this logic: transcript paths and hook directory
 are passed in by the wrapper when needed.
 """
 from __future__ import annotations
@@ -21,10 +21,10 @@ from typing import TypedDict, cast
 class ScanState(TypedDict):
     """State threaded through scan_assistant_text_block across transcript blocks.
 
-    must_dispatch  — declared dispatch names from the latest classification block
-    dispatched     — dispatch names actually seen (filled by the hook wrapper)
-    found_contract — True once a classification block with MUST DISPATCH is seen
-    task_type      — lowercase TASK TYPE token from the latest classification block
+    must_dispatch: declared dispatch names from the latest classification block
+    dispatched: dispatch names actually seen (filled by the hook wrapper)
+    found_contract: True once a classification block with MUST DISPATCH is seen
+    task_type: lowercase TASK TYPE token from the latest classification block
     """
     must_dispatch: list[str]
     dispatched: set[str]
@@ -35,12 +35,12 @@ class ScanState(TypedDict):
 FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
 VALID_TASK_TYPES = r'(?:Quick|Research|Analysis|Content|Build|Planning|Compound)'
 
-# Known agent/skill names — kept in sync with governance-log.py.
+# Known agent/skill names: kept in sync with governance-log.py.
 # Used to filter must_dispatch raw text to valid names only, discarding
 # trailing reasoning text that would otherwise cause false-positive blocks.
 # NOTE: declared as a regular `set`, not `frozenset`, so the pre-existing
 # cross-file drift guard at `test_known_dispatch_names_drift.py` (which uses
-# `assertIsInstance(x, set)`) continues to fire — frozenset is not a subclass
+# `assertIsInstance(x, set)`) continues to fire: frozenset is not a subclass
 # of set. Restored 2026-05-14 per architect-reviewer HIGH finding.
 KNOWN_DISPATCH_NAMES = {
     # Agents
@@ -58,6 +58,44 @@ KNOWN_DISPATCH_NAMES = {
     "process-qa", "process-analysis", "process-build", "process-planning",
     "process-research", "process-pentest", "pm", "task-classifier", "verify",
     "ensemble", "architect-loop", "save", "maintain", "index",
+    # Plugin agents (defect 5, 2026-08-07): enumerated from registry.json's
+    # `agents` dict, every entry whose `source` starts with "plugin:" (54
+    # names: academic-research-skills 36 + claude-plugins-official 18).
+    # Without these, MUST DISPATCH text naming a plugin agent (e.g.
+    # "pr-review-toolkit:silent-failure-hunter") was invisible to this
+    # parser's compliance extraction: the vocabulary only knew vault-local
+    # agents/skills. registry.json is READ-ONLY input here, never edited.
+    # Prune follow-up (post-review, 2026-08-07): 7 of the 54 were bare or
+    # near-bare common-English compounds ("analyzer", "compliance_agent")
+    # that extract_dispatch_names could match inside ordinary prose,
+    # producing a phantom DECLARED item unrelated to any real dispatch
+    # intent. Dropped rather than kept namespace-qualified: the suffix
+    # check below reuses this SAME set for both the bare-candidate test and
+    # the post-colon suffix test, so a namespace-only bucket needs a second
+    # set (out of scope for this fix) or a hardcoded "plugin:name" literal
+    # whose namespace slug can't be verified from registry.json's
+    # marketplace-level "source" field (compare "claude-plugins-official"
+    # above with the real dispatch namespace "pr-review-toolkit" in the
+    # silent-failure-hunter example). Dropped: analyzer, comparator,
+    # compliance_agent, formatter_agent, grader, intake_agent,
+    # monitoring_agent.
+    "abstract_bilingual_agent", "agent-creator", "agent-sdk-verifier-py",
+    "agent-sdk-verifier-ts", "argument_builder_agent",
+    "atomic-explorer", "atomic-reviewer", "bibliography_agent",
+    "citation_compliance_agent", "code-architect", "code-explorer",
+    "code-reviewer", "collaboration_depth_agent", "comment-analyzer",
+    "conversation-analyzer",
+    "devils_advocate_agent", "devils_advocate_reviewer_agent", "domain_reviewer_agent",
+    "draft_writer_agent", "editor_in_chief_agent", "editorial_synthesizer_agent",
+    "eic_agent", "ethics_review_agent", "field_analyst_agent",
+    "integrity_verification_agent", "literature_strategist_agent", "meta_analysis_agent",
+    "methodology_reviewer_agent", "peer_reviewer_agent",
+    "perspective_reviewer_agent", "pipeline_orchestrator_agent", "plugin-validator",
+    "pr-test-analyzer", "report_compiler_agent", "research_architect_agent",
+    "research_question_agent", "revision_coach_agent", "risk_of_bias_agent",
+    "silent-failure-hunter", "skill-reviewer", "socratic_mentor_agent",
+    "source_verification_agent", "state_tracker_agent", "structure_architect_agent",
+    "synthesis_agent", "type-design-analyzer", "visualization_agent",
 }
 
 # Skill/short-name → agent-name aliases (must match agent-dispatch-check.py exactly).
@@ -79,7 +117,7 @@ def extract_dispatch_names(raw_text: str) -> list[str]:
 
     Filters trailing reasoning text (P0 fix 2026-04-09). "none"/"n/a" returns [].
     Splits on commas, then for each segment tries up to 3-word agent names from
-    the start (greedy match) — first hit in KNOWN_DISPATCH_NAMES wins per segment.
+    the start (greedy match): first hit in KNOWN_DISPATCH_NAMES wins per segment.
     """
     if not raw_text:
         return []
@@ -96,7 +134,40 @@ def extract_dispatch_names(raw_text: str) -> list[str]:
             if candidate in KNOWN_DISPATCH_NAMES:
                 found.append(candidate)
                 break
+            # Defect 5 (2026-08-07): a plugin-namespaced dispatch name (e.g.
+            # "pr-review-toolkit:silent-failure-hunter") is a single
+            # whitespace-free token, so the word-count loop above never sees
+            # it split apart. registry.json's own agent names are plain
+            # (unqualified), so recognize the token by its post-colon suffix
+            # instead of requiring every specific plugin's namespace prefix
+            # to be hardcoded here.
+            if ":" in candidate:
+                suffix = candidate.rsplit(":", 1)[-1].strip()
+                if suffix in KNOWN_DISPATCH_NAMES:
+                    found.append(suffix)
+                    break
     return found
+
+
+def normalize_dispatched_name(name: str) -> str:
+    """Normalize a raw tool_use dispatch identifier to the bare form used
+    throughout KNOWN_DISPATCH_NAMES / must_dispatch.
+
+    Defect 5 follow-up (2026-08-07): extract_dispatch_names already reduces a
+    plugin-namespaced DECLARATION (e.g. "pr-review-toolkit:silent-failure-hunter")
+    to its post-colon suffix before it enters must_dispatch. The wrapper's
+    dispatched-name construction did not apply the same reduction, so a real
+    Agent dispatch under its namespaced runtime name never matched a bare
+    declaration (or even an identically-namespaced one, since the declared
+    side had already been normalized down to the suffix and the dispatched
+    side had not). This is the smaller of the two possible fixes named in the
+    finding: normalize the dispatched side to match the declared side, rather
+    than requiring every declaration to spell out a plugin namespace the
+    classifier has no reliable way to know.
+    """
+    if name and ":" in name:
+        return name.rsplit(":", 1)[-1].strip()
+    return name
 
 
 def strip_fences(text: str) -> str:
@@ -209,7 +280,7 @@ def scan_assistant_text_block(
     if raw:
         new_state["must_dispatch"] = extract_dispatch_names(raw)
         new_state["found_contract"] = True
-    # dict(state) is statically `dict`, not `ScanState` — cast to keep the
+    # dict(state) is statically `dict`, not `ScanState`: cast to keep the
     # declared return type accurate for mypy/pyright (architect-review Finding 2).
     return cast(ScanState, new_state)
 

@@ -1,21 +1,21 @@
 """
-_irreversible_surface.py — single source of the NEW canonical irreversible surface.
+_irreversible_surface.py: single source of the NEW canonical irreversible surface.
 
 Two-Gate Autonomy Enforcement, Gate-1 (reversibility HARD FLOOR).
-Spec: Projects/Agent-Governance-Research/work/2026-06-15-two-gate-enforcement-spec.md
+Spec: Projects/your-project/work/2026-06-15-two-gate-enforcement-spec.md
 Build plan: .../work/2026-06-16-two-gate-build-implementation-plan.md
 
 This module is imported by BOTH Gate-1 hooks so the canonical surface is defined
 exactly once ("extend, do not duplicate"):
   - bash-safety-guard.py  imports IRREVERSIBLE_BASH_PATTERNS and appends it to its
     existing BLOCKED_PATTERNS list. The force-push / rm-rf / hook-bypass block that
-    already lives in bash-safety-guard.py is NOT moved here — it stays verbatim in
+    already lives in bash-safety-guard.py is NOT moved here: it stays verbatim in
     its existing block (KEEP-verbatim constraint), and it stays ABOVE these new
     patterns in iteration order so its description fidelity is preserved.
   - mcp-irreversible-guard.py imports IRREVERSIBLE_MCP_TOOLS (PreToolUse mcp__.*).
 
 Every surface here maps to permissionDecision:"deny" in ALL contexts (the vault is
-universal bypassPermissions, so "ask" is a no-op — deny is the only stop). The human
+universal bypassPermissions, so "ask" is a no-op: deny is the only stop). The human
 gate is the established !-prefix manual-bash bypass (skips PreToolUse hooks), identical
 to today's force-push handling.
 
@@ -33,18 +33,18 @@ Regex-composition notes (handed to architect-reviewer):
 import re
 
 # ---------------------------------------------------------------------------
-# Gate-1 Bash surface — appended to bash-safety-guard.BLOCKED_PATTERNS.
+# Gate-1 Bash surface: appended to bash-safety-guard.BLOCKED_PATTERNS.
 # Each tuple is (regex_string, human-description). Matched with re.IGNORECASE
 # against the inert-context-stripped command, exactly like the existing patterns.
 # ---------------------------------------------------------------------------
 IRREVERSIBLE_BASH_PATTERNS = [
-    # P1 — unflagged relative single-file rm (spec row 1b). The existing rm rules
+    # P1: unflagged relative single-file rm (spec row 1b). The existing rm rules
     # only fire on a destructive flag OR a leading-/ path; a plain `rm notes.md`
     # (no flag, relative, non-/tmp) escapes them and executes. Deny it.
     # Target must NOT start with:
     #   - '-' (a flag)
-    #   - '/' (Unix absolute — that is 1a's job, and /tmp stays allowed)
-    #   - an optional quote then a Windows drive root [A-Za-z]:[/\] (absolute — the
+    #   - '/' (Unix absolute: that is 1a's job, and /tmp stays allowed)
+    #   - an optional quote then a Windows drive root [A-Za-z]:[/\] (absolute: the
     #     analog of 1a's leading-/; P1 is the RELATIVE-file rule). Without this guard
     #     `rm "C:/Users/.../x.py"` was a confirmed false-positive deny (review 2026-06-16):
     #     the `"` is not `/`, so the old (?!/) guard treated the quoted Windows abs path
@@ -52,10 +52,10 @@ IRREVERSIBLE_BASH_PATTERNS = [
     # strip_inert_contexts removes rm inside echo/-m/quoted strings before this runs.
     (r'\brm\s+(?!-)(?!/)(?!["\']?[A-Za-z]:[/\\])[^\s;|&><]+', "rm on unflagged relative file (irreversible delete)"),
 
-    # P2 — normal (non-force) git push (spec row 3, hard deny per Wiktor 2026-06-16).
+    # P2: normal (non-force) git push (spec row 3, hard deny per the owner 2026-06-16).
     # Force-push (--force / -f) is denied by the EXISTING block above this one, so it
     # keeps its own description; this catches every other push.
-    # The (?:...)* group tolerates git GLOBAL options before the `push` subcommand —
+    # The (?:...)* group tolerates git GLOBAL options before the `push` subcommand :
     # `git -C <path> push`, `git -c name=value push`, `git --no-pager push` were all
     # confirmed bypasses (review 2026-06-16) because the old `\bgit\s+push\b` required
     # push to immediately follow git. Each alternative consumes one global-option token
@@ -66,9 +66,9 @@ IRREVERSIBLE_BASH_PATTERNS = [
     (r'\bgit\s+(?:(?:-C\s+\S+|-c\s+\S+|--[A-Za-z][\w-]*(?:=\S+)?|-[A-Za-z])\s+)*push\b',
      "git push (publication is effectively irreversible)"),
 
-    # P3 — DB destructive DDL/DML (spec row 2). DROP TABLE/DATABASE/SCHEMA, TRUNCATE,
+    # P3: DB destructive DDL/DML (spec row 2). DROP TABLE/DATABASE/SCHEMA, TRUNCATE,
     # and unbounded DELETE (no WHERE clause). A DROP/DELETE inside an echo/-c string
-    # is inert-stripped first — accepted gap.
+    # is inert-stripped first: accepted gap.
     (r'\bDROP\s+(?:TABLE|DATABASE|SCHEMA)\b', "SQL DROP TABLE/DATABASE/SCHEMA (destructive DDL)"),
     (r'\bTRUNCATE\s+(?:TABLE\s+)?\w', "SQL TRUNCATE (destructive DML)"),
     # The WHERE lookahead is scoped to the CURRENT statement via [^;]* (not .*): a
@@ -77,7 +77,7 @@ IRREVERSIBLE_BASH_PATTERNS = [
     # suppressing the deny on the unbounded DELETE. [^;]* stops at the statement boundary.
     (r'\bDELETE\s+FROM\s+\w+(?![^;]*\bWHERE\b)', "SQL unbounded DELETE (no WHERE clause)"),
 
-    # P4 — external curl write: now handled by curl_external_write() predicate, wired
+    # P4: external curl write: now handled by curl_external_write() predicate, wired
     # as a dedicated block in bash-safety-guard.py main(). The old whole-segment
     # loopback lookahead was a confirmed under-block (pentest wf_aeee55d3-224 HIGH #B):
     # a loopback token anywhere in the segment (query param / path / header value / -d
@@ -86,12 +86,12 @@ IRREVERSIBLE_BASH_PATTERNS = [
     # the curl argv, isolates the TARGET URL(s) from flag VALUES, and denies a write
     # only when a target host is non-loopback. It is NOT a regex tuple in this list.
 
-    # P5 — prod deploy (spec row 6): docker compose up, docker build -t *:latest,
-    # and the `git archive HEAD | ssh root@...` VPS-deploy pipe.
+    # P5: prod deploy (spec row 6): docker compose up, docker build -t *:latest,
+    # and the `git archive HEAD` piped-to-a-remote-shell VPS-deploy pipe.
     #
-    # EXEMPTION (2026-06-18, Wiktor "the guard is too harsh"): the isolated build-oracle
+    # EXEMPTION (2026-06-18, the owner "the guard is too harsh"): the isolated build-oracle
     # test stage is invoked as `docker compose -p example-build-oracle ...up` and is the
-    # REVERSIBLE opposite of a prod deploy — a throwaway, host-port-less, own-network/own-
+    # REVERSIBLE opposite of a prod deploy: a throwaway, host-port-less, own-network/own-
     # volume project torn down with `down -v` before+after, zero prod contact (the build-
     # oracle spec's 6 isolation invariants). Gate-1 is a reversibility floor, so a provably
     # reversible isolated stage must NOT be on it. The negative lookahead exempts ONLY that
@@ -99,10 +99,10 @@ IRREVERSIBLE_BASH_PATTERNS = [
     # bare `docker compose up`, or anything without `-p example-build-oracle`) is STILL denied.
     # The lookahead is segment-scoped ([^|;&\n]*), matching the existing P4/P5 idiom; it is
     # keyed to the honest-agent threat model (an honest agent does not forge the project name
-    # to smuggle a prod deploy — the verifier's stated threat model, not an adversary).
+    # to smuggle a prod deploy: the verifier's stated threat model, not an adversary).
     # `compose(?=\s)` requires compose to be the SUBCOMMAND word (followed by whitespace),
     # so the `-f docker-compose.build-oracle.yml` FILENAME token (compose followed by '.')
-    # is NOT matched as the command — without this, the filename occurrence (which has no
+    # is NOT matched as the command: without this, the filename occurrence (which has no
     # `-p example-build-oracle` ahead of it) defeated the exemption and false-denied the stage.
     (r'\bdocker[\s-]+compose(?=\s)(?![^|;&\n]*-p\s+example-build-oracle\b)[^|;&\n]*\bup\b',
      "docker compose up (prod deploy; isolated -p example-build-oracle stage exempt)"),
@@ -112,7 +112,7 @@ IRREVERSIBLE_BASH_PATTERNS = [
 
 
 # ---------------------------------------------------------------------------
-# Gate-1 MCP surface — imported by mcp-irreversible-guard.py.
+# Gate-1 MCP surface: imported by mcp-irreversible-guard.py.
 #
 # NO blanket / wildcard entries (a `mcp__.*` deny would block read tools). Every key
 # is an EXACT mcp__<server>__<tool> name. The value is either:
@@ -130,7 +130,7 @@ NAME_SUFFICIENT = "name-sufficient"
 def _n8n_activation_flip(tool_input):
     """Deny an n8n partial/full workflow update ONLY when it flips active:true
     (spec row 5 'activation flip'). A normal partial edit (the core of the n8n build
-    loop) must stay allowed — a blanket name-deny would break the build workflow."""
+    loop) must stay allowed: a blanket name-deny would break the build workflow."""
     if not isinstance(tool_input, dict):
         return False
     if tool_input.get("active") is True:
@@ -191,7 +191,7 @@ def mcp_tool_is_irreversible(tool_name, tool_input):
 
 
 # ---------------------------------------------------------------------------
-# Gate-1 Bash predicate — external curl write (replaces the old P4 regex).
+# Gate-1 Bash predicate: external curl write (replaces the old P4 regex).
 #
 # Wired as a DEDICATED check block in bash-safety-guard.py main() (mirroring the
 # Windows-reserved-filename block), NOT as a BLOCKED_PATTERNS regex tuple. Why a
@@ -206,7 +206,7 @@ def mcp_tool_is_irreversible(tool_name, tool_input):
 # The one compiled helper-regex (_CURL_SCHEME_RE) is screened at import below.
 # ---------------------------------------------------------------------------
 
-# scheme:// prefix (http://, https://, ftp://, ws://, ...) — bounded, anchored,
+# scheme:// prefix (http://, https://, ftp://, ws://, ...): bounded, anchored,
 # single class star; no backtracking risk. Screened at import.
 _CURL_SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.\-]*://")
 
@@ -216,7 +216,7 @@ _CURL_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0", "::1"})
 
 # Write methods (explicit -X / --request) that mutate remote state.
 _CURL_WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
-# Explicit non-mutating methods — an explicit GET/HEAD/etc never denies even with a body.
+# Explicit non-mutating methods: an explicit GET/HEAD/etc never denies even with a body.
 _CURL_READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 
 # Body-bearing flags → implicit write intent when no explicit method is given.
@@ -234,7 +234,7 @@ _CURL_BODY_FLAGS = frozenset({
 # target URL. The load-bearing entries are the ones whose values are where incidental
 # loopback tokens live (-H/--header/--referer/-e/-d/--data*/-b/--cookie/-F/--form/
 # -T/--upload-file). -X/--request and the rest are consumed so their values aren't
-# mistaken for targets either. (--url is handled specially — its value IS a target.)
+# mistaken for targets either. (--url is handled specially: its value IS a target.)
 _CURL_VALUE_FLAGS = frozenset({
     "-H", "--header",
     "--referer", "-e",
@@ -256,7 +256,7 @@ _CURL_VALUE_FLAGS = frozenset({
     "--resolve",
 })
 
-# Bare segment separators shlex leaves as standalone tokens — end of the curl invocation.
+# Bare segment separators shlex leaves as standalone tokens: end of the curl invocation.
 _CURL_SEPARATORS = frozenset({"|", ";", "&", "&&", "||"})
 
 # Single-CHARACTER short flags for the bundle walker (Step C glued short-form). In a
@@ -315,7 +315,7 @@ def _curl_token_looks_like_target(tok):
     # scheme-less: accept host[:port]/path or bare host. Require a dot (domain) or a
     # ':' (host:port) or a '/' (host/path) so that a stray non-URL positional (rare)
     # is not mistaken for a host. A bare 'localhost' has none of these but is handled
-    # because the loopback set is checked directly — but a bare 'localhost' with no
+    # because the loopback set is checked directly: but a bare 'localhost' with no
     # path is a read by default anyway. Conservative: treat host-with-dot/colon/slash
     # OR an exact loopback label as a target.
     head = tok.split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
@@ -332,7 +332,7 @@ def _curl_eval_single_invocation(tokens, start):
     `tokens` argv. Parses from `start + 1` up to (but not including) the first bare
     segment separator shlex preserved. Returns (is_remote_write: bool, end_index: int)
     where end_index is the index of the separator that terminated this invocation (or
-    len(tokens) if none) — the caller resumes the search for the NEXT curl from there.
+    len(tokens) if none): the caller resumes the search for the NEXT curl from there.
 
     is_remote_write is True iff this invocation has WRITE intent (explicit
     -X POST/PUT/PATCH/DELETE OR implicit body-bearing POST) AND at least one TARGET
@@ -391,7 +391,7 @@ def _curl_eval_single_invocation(tokens, start):
                     if not rest and i + 1 < n:
                         consumed_next = True  # value is the next token (consumed, not a target)
                     break  # value consumes the remainder
-                # else: boolean short flag (e.g. -s, -S, -L, -k) — consumes nothing,
+                # else: boolean short flag (e.g. -s, -S, -L, -k): consumes nothing,
                 # keep scanning the bundle for a later value-taking flag.
             i += 2 if consumed_next else 1
             continue
@@ -420,7 +420,7 @@ def _curl_eval_single_invocation(tokens, start):
             i += 2 if (i + 1 < n) else 1
             continue
 
-        # bare value-taking flag : consume its value (value is NOT a target — this is
+        # bare value-taking flag : consume its value (value is NOT a target: this is
         # exactly where incidental loopback tokens live in headers / cookies / referer)
         if tok in _CURL_VALUE_FLAGS:
             i += 2 if (i + 1 < n) else 1
@@ -476,7 +476,7 @@ def _curl_eval_single_invocation(tokens, start):
 def curl_external_write(command):
     """Return (True, reason) to DENY a curl that mutates REMOTE state; (False, None)
     otherwise. A loopback-target write (local API testing) is allowed; a remote-target
-    write — explicit -X POST/PUT/PATCH/DELETE OR implicit body-bearing POST — is denied,
+    write: explicit -X POST/PUT/PATCH/DELETE OR implicit body-bearing POST: is denied,
     even when localhost tokens appear in non-target positions (headers, body, query,
     path, referer). Fail-toward-allow only when no target can be identified.
 
@@ -524,6 +524,58 @@ def curl_external_write(command):
         i += 1
 
     return (False, None)
+
+
+# ---------------------------------------------------------------------------
+# WIKTOR RULING 2026-08-13: a curl write to infrastructure we own WARNS, it does
+# not deny. This extends the 2026-08-05 normal-push ruling to the same failure
+# mode, in his words: "cant you call it yourself? my only job here is to fucking
+# copy and paste a command". The `!`-prefix ritual moves no decision to a human
+# when the command he pastes is the one the agent just composed and handed him.
+#
+# Scope is deliberately narrow. Only hosts listed here warn; EVERYTHING else on
+# the external-write surface still denies, specifically including the production
+# n8n instance, every third-party API, and every outbound message sender. A write
+# to a dev instance we administer is recoverable (workflows have version history
+# and we snapshot before editing); a write to prod or to someone else's system is
+# the class the Gate-1 floor exists for.
+#
+# Adding a host here widens the autonomous surface, so it is a deliberate act:
+# see finding_narrowing_gate1_deny_pattern_can_open_floor_hole for why this is a
+# host-scoped carve-out rather than a loosened pattern. The call is still LOGGED
+# to governance-log.jsonl as a `warn`, so the audit trail keeps every write.
+# ---------------------------------------------------------------------------
+CURL_WARN_HOSTS = frozenset({
+    "n8n.internal.example.com",
+})
+
+_CURL_URL_HOST_RE = re.compile(r"https?://([^/\s\"'>\\]+)", re.IGNORECASE)
+
+
+def curl_write_targets_warn_hosts_only(command):
+    """True only when the command contains at least one http(s) URL and EVERY one
+    of them points at a host in CURL_WARN_HOSTS.
+
+    Conservative by construction: no URL found, or any URL outside the allowlist,
+    returns False so the caller keeps denying. A chain that touches a warn host
+    AND a third-party host therefore still denies, which is the point -- the
+    carve-out must not become a laundering route for an off-list write.
+
+    Pure stdlib; never raises for normal input."""
+    hosts = _CURL_URL_HOST_RE.findall(command or "")
+    if not hosts:
+        return False
+    for raw in hosts:
+        host = raw.strip().lower()
+        if "@" in host:            # strip user:pass@
+            host = host.rsplit("@", 1)[-1]
+        if host.startswith("[") and "]" in host:   # bracketed IPv6
+            host = host[1:host.index("]")]
+        elif ":" in host:          # strip :port
+            host = host.rsplit(":", 1)[0]
+        if host not in CURL_WARN_HOSTS:
+            return False
+    return True
 
 
 # Self-screen: every Bash pattern must compile. Done at import so a broken regex

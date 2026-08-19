@@ -2,9 +2,22 @@
 """PostToolUse hook: periodic save checkpoint reminder."""
 import json
 import os
+import sys
 import time
 
 CHECKPOINT_FILE = os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), ".claude", "last-checkpoint")
+
+# Defect 2 fix (2026-08-07): this hook never read stdin at all, so the log_fire
+# call below always logged session=None (no wiring, not just a dropped param)
+# even though CC's PostToolUse payload carries session_id like every other
+# event. Read+parse stdin defensively (never raise, never change any other
+# behavior below: this hook's own logic is entirely time-file based).
+try:
+    _payload = json.loads(sys.stdin.read() or "{}")
+    if not isinstance(_payload, dict):
+        _payload = {}
+except Exception:
+    _payload = {}
 
 now = int(time.time())
 
@@ -48,11 +61,10 @@ else:
 # Contract C1. Logged only past the 60s throttle above: this is a PostToolUse hook,
 # so an entry-point log would write one record per tool call.
 try:
-    import sys
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from _governance_logger import log_fire
+    from _governance_logger import log_fire, session_from
     log_fire("checkpoint", decision=("checkpoint" if diff >= 300 else "save-check"),
-             detail="idle_s=%d" % diff)
+             detail="idle_s=%d" % diff, session=session_from(_payload))
 except Exception:
     pass
 

@@ -504,6 +504,384 @@ def mine(
 
 
 # ---------------------------------------------------------------------------
+# HERMES P4 - WARN-EVENT MINING PASS (2026-08-18)
+#
+# Plan of record: Projects/your-project/work/
+#   2026-08-17-hermes-p4-warn-event-miner-plan.md (revision 2, approved)
+# Build plan: .../2026-08-18-hermes-p4-build-implementation-plan.md
+#
+# Second pass over the same log. mine(), _admitted(), _normalize_reason(),
+# _sig_key(), _sig_id(), _load_resolved() are NOT edited (REV-6: every
+# existing failure sig_id stays byte-stable).
+#
+# Safety properties (constitutional, approved plan section 1):
+#   1. Proposal-only forever. This pass computes and returns; it writes nothing.
+#   2. The Gate-1 irreversible surface is never proposed for loosening. Every
+#      deny-tier value is derived AT RUN TIME from the live guard and surface
+#      modules; no private copy of any pattern, description, or suffix exists
+#      here (a copy can drift and silently open a floor hole). If derivation
+#      fails for ANY reason, the pass fails CLOSED: zero candidates plus the
+#      exclusion_unavailable sentinel. There is no fallback snapshot.
+# ---------------------------------------------------------------------------
+
+# Warn-specific gates (C and D are reused from the failure pass above).
+WARN_MIN_SESSIONS = 3     # distinct-session floor: one long session cannot promote alone
+WARN_ACCEPT_WINDOW_MIN = 10  # acceptance-proxy lookforward window, minutes
+
+# Fixed synthetic probe for call-deriving the curl deny reason. TEST-NET-3
+# address (RFC 5737), never routable; the predicate is pure (tokenize + return).
+_WARN_PROBE_COMMAND = "curl -X POST https://203.0.113.7/hermes-probe -d x=1"
+
+# Loud-note module constants: the renderer (process-governance-mine Step 3b)
+# and the tests reference these exact strings.
+WARN_DERIVATION_UNAVAILABLE_NOTE = (
+    "WARN MINING SKIPPED THIS RUN: canonical-surface derivation failed, "
+    "zero proposals emitted."
+)
+WARN_DENY_TIER_DRIFT_PREFIX = "DENY-TIER PATTERN SEEN IN WARN LOG"
+
+# One-sentence blindness statement, embedded verbatim in every candidate's
+# acceptance_note (approved plan section 3).
+WARN_ACCEPTANCE_BLINDNESS_NOTE = (
+    "Acceptance figures are an upper bound: the log cannot see abandonment "
+    "after a warn, later human regret such as a git revert, or the different "
+    "semantics of advisory Stop-hook warns versus PreToolUse action-gating warns."
+)
+
+_MINER_HOOKS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _load_module_from_path(mod_name, path):
+    """importlib load of a hooks-dir module file. The hooks dir goes on
+    sys.path first so the guard's own `from _irreversible_surface import ...`
+    lines resolve. Raises on any failure (caller decides fail-closed)."""
+    import importlib.util
+    if _MINER_HOOKS_DIR not in sys.path:
+        sys.path.insert(0, _MINER_HOOKS_DIR)
+    if not os.path.isfile(path):
+        raise ImportError("module file not found: %s" % path)
+    spec = importlib.util.spec_from_file_location(mod_name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError("cannot build import spec for %s" % path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _load_guard_module(path=None):
+    """Load bash-safety-guard.py (hyphenated filename, so plain import cannot
+    reach it) under a private module name."""
+    return _load_module_from_path(
+        "_warn_miner_guard",
+        path or os.path.join(_MINER_HOOKS_DIR, "bash-safety-guard.py"))
+
+
+def _load_surface_module(path=None):
+    """Load _irreversible_surface.py under a private module name."""
+    return _load_module_from_path(
+        "_warn_miner_surface",
+        path or os.path.join(_MINER_HOOKS_DIR, "_irreversible_surface.py"))
+
+
+def _derive_exclusion_sets(guard_module=None, surface_module=None,
+                           guard_path=None, surface_path=None):
+    """Derive (W, D) live from the canonical modules. Approved plan 4.2:
+
+      W = description strings of the guard's own WARN_PATTERNS partition.
+      curl_reason = second element of surface.curl_external_write(PROBE),
+        valid ONLY when the call returns (True, <non-empty str>).
+      D = ({descriptions of surface.IRREVERSIBLE_BASH_PATTERNS}
+           | {tool names of surface.IRREVERSIBLE_MCP_TOOLS}
+           | {curl_reason}) - W.
+
+    The subtraction mirrors the guard's own lift-out and is load-bearing: the
+    push description exists in IRREVERSIBLE_BASH_PATTERNS too.
+
+    The surface loads FIRST: if it is broken, we fail before ever loading the
+    guard, whose own broken-surface fallback would alarm to the live log.
+
+    Any exception propagates; mine_warns() converts it to the fail-closed
+    sentinel. The module-object parameters exist for test injection only."""
+    S = surface_module if surface_module is not None else _load_surface_module(surface_path)
+    probe = S.curl_external_write(_WARN_PROBE_COMMAND)
+    if not (isinstance(probe, tuple) and len(probe) == 2 and probe[0] is True
+            and isinstance(probe[1], str) and probe[1]):
+        raise ValueError("curl_external_write probe did not yield (True, reason)")
+    curl_reason = probe[1]
+    G = guard_module if guard_module is not None else _load_guard_module(guard_path)
+    W = set(desc for _pat, desc in G.WARN_PATTERNS)
+    d_bash = set(desc for _pat, desc in S.IRREVERSIBLE_BASH_PATTERNS)
+    d_mcp = set(S.IRREVERSIBLE_MCP_TOOLS.keys())
+    D = (d_bash | d_mcp | {curl_reason}) - W
+    return (W, D)
+
+
+def _warn_parse_dt(ts):
+    """Full-datetime parse of a log ts; None when unparseable."""
+    from datetime import datetime
+    try:
+        return datetime.strptime(ts[:19], "%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return None
+
+
+def mine_warns(
+    log_path,
+    now_date,
+    window_days: int = WINDOW_DAYS,
+    resolved_ledger_path: str = None,
+    _derive=None,
+) -> dict:
+    """Mine governance-log.jsonl for recurring warn-tier promotion candidates.
+
+    Returns a dict with EXACTLY these keys (frozen contract, build-plan flag 4):
+      candidates           list of candidate dicts (see below), count-desc
+      exclusion_unavailable  True iff derivation failed (fail-closed sentinel)
+      drift_lines          loud notes: deny-tier pattern seen in warn-tier data
+      warn_variant_counts  {pattern: count} startswith-a-D-member variants
+      unrecognized_counts  {pattern: count} everything else non-proposable
+      family_counts        {hook: count} real-session warns with NO pattern field
+
+    Candidate fields: sig_id, pattern, hook, agent_type, severity ("normal"),
+    count, distinct_days, distinct_sessions, top_session_share, first_seen,
+    last_seen, accepted_count, acceptance_note, command_prefix_samples (<=3),
+    suppressed, regression.
+
+    Admission (structural): event == "warn" AND non-empty pattern AND the
+    record passes the existing _real_session filter (REV-7, reused).
+    Gates: DEFAULT_C occurrences, DEFAULT_D distinct days, WARN_MIN_SESSIONS
+    distinct sessions. Always severity "normal" (HIGH_SEV_C never applies).
+    Suppression/regression: same ledger, same _load_resolved, same semantics
+    as mine().
+
+    Acceptance proxy (approved plan section 3): a warn is "accepted" when the
+    same session logs no deny/block from the same hook within the
+    WARN_ACCEPT_WINDOW_MIN minutes after it. Figures are an upper bound (see
+    WARN_ACCEPTANCE_BLINDNESS_NOTE).
+
+    _derive is a test-injection hook returning (W, D); production always uses
+    _derive_exclusion_sets. Any derivation failure returns the fail-closed
+    sentinel: NO fallback snapshot exists by design."""
+    result = {
+        "candidates": [],
+        "exclusion_unavailable": False,
+        "drift_lines": [],
+        "warn_variant_counts": {},
+        "unrecognized_counts": {},
+        "family_counts": {},
+    }
+
+    try:
+        W, D = (_derive or _derive_exclusion_sets)()
+        if not isinstance(W, (set, frozenset)) or not isinstance(D, (set, frozenset)):
+            raise ValueError("derivation returned non-set exclusion data")
+    except Exception:
+        return {
+            "candidates": [],
+            "exclusion_unavailable": True,
+            "drift_lines": [],
+            "warn_variant_counts": {},
+            "unrecognized_counts": {},
+            "family_counts": {},
+        }
+
+    if isinstance(now_date, str):
+        now_date = date.fromisoformat(now_date)
+    window_start = now_date - timedelta(days=window_days)
+    resolved = _load_resolved(resolved_ledger_path)
+
+    warn_meta = {}     # sid -> aggregates
+    deny_index = {}    # (session, hook) -> [datetime, ...]
+    drift_counts = {}  # deny-tier pattern -> count
+
+    try:
+        fh = open(log_path, "r", encoding="utf-8")
+    except OSError:
+        return result
+
+    with fh:
+        for raw_line in fh:
+            raw_line = raw_line.strip()
+            if not raw_line:
+                continue
+            try:
+                record = json.loads(raw_line)
+            except Exception:
+                continue
+            if not isinstance(record, dict):
+                continue
+            # Coerce string-ish fields (mirrors mine(); mine() itself untouched).
+            for _f in ("event", "agent_type", "hook", "pattern"):
+                _v = record.get(_f)
+                if _v is not None and not isinstance(_v, str):
+                    record[_f] = str(_v)
+
+            ts = record.get("ts", "") or ""
+            if not isinstance(ts, str):
+                ts = str(ts)
+            if len(ts) < 10:
+                continue
+            try:
+                rec_date = date.fromisoformat(ts[:10])
+            except (ValueError, TypeError):
+                continue
+            if rec_date < window_start:
+                continue
+
+            event = record.get("event", "") or ""
+            hook_val = record.get("hook", "") or ""
+            session = record.get("session", "")
+            if not isinstance(session, str):
+                session = str(session)
+
+            # Collect deny/block events for the acceptance-proxy lookforward.
+            if event in ("deny", "block"):
+                dt = _warn_parse_dt(ts)
+                if dt is not None:
+                    deny_index.setdefault((session, hook_val), []).append(dt)
+                continue
+
+            if event != "warn":
+                continue
+            if not _real_session(record):
+                continue  # REV-7 reuse: synthetic sessions never enter
+
+            pattern = record.get("pattern", "") or ""
+            if not pattern.strip():
+                # Non-pattern warn family (advisory Stop-hook / dispatch
+                # semantics): measured only, never proposable in v1.
+                key = hook_val or "(no hook)"
+                result["family_counts"][key] = result["family_counts"].get(key, 0) + 1
+                continue
+
+            # Classification, exact-match first (approved plan 4.2 point 5).
+            if pattern in D:
+                drift_counts[pattern] = drift_counts.get(pattern, 0) + 1
+                continue  # hard exclusion: zero sigs, zero candidates, any count
+            if pattern not in W:
+                if any(pattern.startswith(d) and len(pattern) > len(d) for d in D):
+                    result["warn_variant_counts"][pattern] = (
+                        result["warn_variant_counts"].get(pattern, 0) + 1)
+                else:
+                    result["unrecognized_counts"][pattern] = (
+                        result["unrecognized_counts"].get(pattern, 0) + 1)
+                continue  # measured, not proposable
+
+            # Candidate-eligible (pattern in W).
+            agent_type = record.get("agent_type", "") or ""
+            key = _sig_key("warn", agent_type, hook_val, _normalize_reason(pattern))
+            sid = _sig_id(key)
+
+            if sid not in warn_meta:
+                warn_meta[sid] = {
+                    "sig_id": sid,
+                    "pattern": pattern,
+                    "hook": hook_val,
+                    "agent_type": agent_type,
+                    "count": 0,
+                    "dates": set(),
+                    "sessions": {},
+                    "first_seen": ts[:10],
+                    "last_seen": ts[:10],
+                    "command_prefix_samples": [],
+                    "events": [],  # (session, hook, datetime|None) for the proxy
+                }
+            m = warn_meta[sid]
+            m["count"] += 1
+            m["dates"].add(ts[:10])
+            m["sessions"][session] = m["sessions"].get(session, 0) + 1
+            if ts[:10] < m["first_seen"]:
+                m["first_seen"] = ts[:10]
+            if ts[:10] > m["last_seen"]:
+                m["last_seen"] = ts[:10]
+            cp = record.get("command_prefix", "")
+            if cp and len(m["command_prefix_samples"]) < 3:
+                m["command_prefix_samples"].append(cp)
+            m["events"].append((session, hook_val, _warn_parse_dt(ts)))
+
+            # Post-resolved tracking (same semantics as mine()).
+            resolved_date = resolved.get(sid, "")
+            if resolved_date and ts[:10] > resolved_date:
+                if "post_resolved_dates" not in m:
+                    m["post_resolved_dates"] = set()
+                    m["post_resolved_count"] = 0
+                m["post_resolved_dates"].add(ts[:10])
+                m["post_resolved_count"] = m.get("post_resolved_count", 0) + 1
+
+    # Drift notes: one loud line per deny-tier pattern sighted in warn data.
+    for pat in sorted(drift_counts):
+        result["drift_lines"].append(
+            "%s: '%s' seen %dx in warn-tier records; deny-tier reasons are never "
+            "promotion candidates. Investigate log spoofing, fixture pollution, "
+            "or an un-owner-gated demotion."
+            % (WARN_DENY_TIER_DRIFT_PREFIX, pat, drift_counts[pat]))
+
+    # Gates + suppression + candidate assembly.
+    window_seconds = WARN_ACCEPT_WINDOW_MIN * 60
+    for sid, m in warn_meta.items():
+        count = m["count"]
+        distinct_days = len(m["dates"])
+        distinct_sessions = len(m["sessions"])
+        if not (count >= DEFAULT_C and distinct_days >= DEFAULT_D
+                and distinct_sessions >= WARN_MIN_SESSIONS):
+            continue
+
+        resolved_date = resolved.get(sid, "")
+        suppressed = False
+        regression = False
+        if resolved_date:
+            post_count = m.get("post_resolved_count", 0)
+            post_days = len(m.get("post_resolved_dates", set()))
+            if post_count >= DEFAULT_C and post_days >= DEFAULT_D:
+                regression = True
+            else:
+                suppressed = True
+        if suppressed and not regression:
+            continue
+
+        # Acceptance proxy: a warn is accepted unless a same-session same-hook
+        # deny/block lands within the lookforward window after it. An
+        # unparseable warn timestamp counts as accepted (upper-bound behavior).
+        accepted = 0
+        for session, hook_val, wdt in m["events"]:
+            if wdt is None:
+                accepted += 1
+                continue
+            hits = deny_index.get((session, hook_val), [])
+            if any(0 <= (ddt - wdt).total_seconds() <= window_seconds
+                   for ddt in hits):
+                continue
+            accepted += 1
+
+        top_session_share = (max(m["sessions"].values()) / float(count)) if count else 0.0
+
+        result["candidates"].append({
+            "sig_id": sid,
+            "pattern": m["pattern"],
+            "hook": m["hook"],
+            "agent_type": m["agent_type"],
+            "severity": "normal",
+            "count": count,
+            "distinct_days": distinct_days,
+            "distinct_sessions": distinct_sessions,
+            "top_session_share": top_session_share,
+            "first_seen": m["first_seen"],
+            "last_seen": m["last_seen"],
+            "accepted_count": accepted,
+            "acceptance_note": (
+                "%d of %d warns accepted by the %d-minute same-hook proxy. %s"
+                % (accepted, count, WARN_ACCEPT_WINDOW_MIN,
+                   WARN_ACCEPTANCE_BLINDNESS_NOTE)),
+            "command_prefix_samples": m["command_prefix_samples"],
+            "suppressed": suppressed,
+            "regression": regression,
+        })
+
+    result["candidates"].sort(key=lambda c: (-c["count"], c["sig_id"]))
+    return result
+
+
+# ---------------------------------------------------------------------------
 # CLI ENTRY POINT
 # ---------------------------------------------------------------------------
 

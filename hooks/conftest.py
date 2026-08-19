@@ -51,3 +51,6 @@ def _redirect_live_logs():
                 os.environ.pop(name, None)
             else:
                 os.environ[name] = prior
+
+# Retired hooks keep their test files beside them for history; never collect them.
+collect_ignore = ["retired"]

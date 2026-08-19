@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -385,6 +386,121 @@ class WorkflowBoundaryResetTests(unittest.TestCase):
                 "deny",
                 "TASK TYPE assertion after a Workflow re-establishes routing: still denies wrong skill",
             )
+
+
+class DecompositionHandoffTests(unittest.TestCase):
+    """Documented gap fix (2026-08-07): a Compound classification legitimately
+    routes to process-analysis for decomposition (Decomposition mode,
+    process-analysis SKILL.md), which HANDS BACK numbered sub-tasks. The main
+    session then invokes each sub-task's own process skill (process-research,
+    process-build, etc.). This is a legitimate hand-off, not a misroute.
+
+    Once a Skill tool_use of process-analysis is observed in the transcript
+    while the active classification is Compound, subsequent process-* Skill
+    invocations in the same window must not be denied by stale 'compound'
+    residue. A Compound classification with NO process-analysis hand-off
+    first must keep the current deny behavior: this is not a blanket pass.
+    """
+
+    def _skill_tool_use(self, skill_name: str) -> dict:
+        """assistant entry containing a Skill tool_use block (prior invocation
+        of a process skill, as it would appear in the transcript)."""
+        return {
+            "type": "assistant",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "Skill",
+                        "input": {"skill": skill_name},
+                    }
+                ],
+            },
+        }
+
+    def test_compound_then_process_analysis_then_process_research_allows(self):
+        with tempfile.TemporaryDirectory() as td:
+            tp = _write_transcript(Path(td), [
+                _assistant_text("TASK TYPE: Compound\n\nDecomposing into sub-tasks..."),
+                self._skill_tool_use("process-analysis"),
+            ])
+            out = _run({
+                "tool_name": "Skill",
+                "tool_input": {"skill": "process-research"},
+                "transcript_path": tp,
+            })
+            self.assertEqual(out, "", (
+                "process-research must be ALLOWED after a Compound classification's "
+                "process-analysis decomposition hand-off"
+            ))
+
+    def test_compound_then_process_research_direct_still_denies(self):
+        with tempfile.TemporaryDirectory() as td:
+            tp = _write_transcript(Path(td), [
+                _assistant_text("TASK TYPE: Compound\n\nApproach: ..."),
+                # No process-analysis invocation: direct misroute, no hand-off
+            ])
+            out = _run({
+                "tool_name": "Skill",
+                "tool_input": {"skill": "process-research"},
+                "transcript_path": tp,
+            })
+            result = json.loads(out)
+            self.assertEqual(
+                result["hookSpecificOutput"]["permissionDecision"],
+                "deny",
+                "A Compound classification with no process-analysis hand-off must "
+                "still deny a direct sub-skill invocation",
+            )
+
+
+class LogFireSessionAndDetailTests(unittest.TestCase):
+    """Defect 2 + 4 (2026-08-07): log_fire() used to be called before skill_name and
+    session were read, so hook-activity.jsonl always recorded detail=None (no
+    instrument for WHICH skill ran) and session=None. This reproduces the broken
+    shape first (a synthetic Skill-tool payload) then asserts both fields populate."""
+
+    def _run_with_activity_log(self, payload):
+        with tempfile.TemporaryDirectory() as logdir:
+            log_path = str(Path(logdir) / "hook-activity.jsonl")
+            with mock.patch.dict(os.environ, {"HOOK_ACTIVITY_LOG_PATH": log_path}):
+                _run(payload)
+            if not os.path.exists(log_path):
+                return []
+            with open(log_path, encoding="utf-8") as f:
+                return [json.loads(l) for l in f if l.strip()]
+
+    def test_skill_name_populates_detail_field(self):
+        records = self._run_with_activity_log({
+            "tool_name": "Skill",
+            "tool_input": {"skill": "task-classifier"},
+            "session_id": "test-skillroute-1",
+        })
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["detail"], "task-classifier")
+
+    def test_payload_session_id_populates_session_field(self):
+        records = self._run_with_activity_log({
+            "tool_name": "Skill",
+            "tool_input": {"skill": "task-classifier"},
+            "session_id": "test-skillroute-2",
+        })
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["session"], "test-skillroute-2")
+
+    def test_process_skill_fire_also_carries_session_and_detail(self):
+        # A process-* skill (subject to routing validation) must ALSO log a
+        # populated session + detail on its self-log fire, not only the
+        # unconditionally-allowed non-process branch.
+        records = self._run_with_activity_log({
+            "tool_name": "Skill",
+            "tool_input": {"skill": "process-research"},
+            "session_id": "test-skillroute-3",
+        })
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["detail"], "process-research")
+        self.assertEqual(records[0]["session"], "test-skillroute-3")
 
 
 if __name__ == "__main__":

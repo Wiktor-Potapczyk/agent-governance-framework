@@ -47,14 +47,6 @@ def main():
     except json.JSONDecodeError:
         return
 
-    try:
-        import os as _gho, sys as _ghs
-        _ghs.path.insert(0, _gho.path.dirname(_gho.path.abspath(__file__)))
-        from _governance_logger import log_fire
-        log_fire("skill-routing-check")
-    except Exception:
-        pass
-
     # Get the skill being invoked
     tool_input = payload.get("tool_input", {})
     if isinstance(tool_input, str):
@@ -64,6 +56,23 @@ def main():
             tool_input = {}
 
     skill_name = (tool_input.get("skill") or "").lower()
+
+    # Self-log the fire (silent-zero instrument). Moved AFTER skill_name/payload
+    # parsing (2026-08-07 fix): the old call site fired before either was read,
+    # so it always logged detail=None (no instrument recorded WHICH skill was
+    # invoked) and session=None (payload was in scope but never wired in).
+    try:
+        import os as _gho, sys as _ghs
+        _ghs.path.insert(0, _gho.path.dirname(_gho.path.abspath(__file__)))
+        from _governance_logger import log_fire, session_from
+        log_fire(
+            "skill-routing-check",
+            detail=(skill_name or None),
+            session=session_from(payload),
+        )
+    except Exception:
+        pass
+
     if not skill_name:
         return
 
@@ -92,8 +101,22 @@ def main():
     # We track the LAST routing event: either a TASK TYPE assertion (text) or a
     # Workflow dispatch (tool_use name="Workflow"). If the most recent routing event
     # is a Workflow dispatch, we clear last_type before comparing.
+    #
+    # Decomposition-handoff reset (2026-08-07 fix): Compound routes to
+    # process-analysis for decomposition (process-analysis SKILL.md,
+    # Decomposition mode), which HANDS BACK numbered sub-tasks, and the main
+    # session then invokes each sub-task's own process skill directly via the
+    # Skill tool (prose-path hand-off, no Workflow tool_use involved when the
+    # decomposition itself ran in prose). Once a Skill tool_use of
+    # process-analysis is seen while the classification in effect at that
+    # point was Compound, the decomposition hand-off has occurred: subsequent
+    # process-* Skill invocations in the same window are legitimate and must
+    # not be blocked by the stale 'compound' classification. A Compound
+    # classification with NO process-analysis invocation first is still a
+    # genuine misroute and stays denied.
     last_type = None
     last_workflow_routing_reset = False  # True if the most-recent routing event was a Workflow
+    last_decomposition_handoff = False  # True once process-analysis ran under a Compound classification
     valid_types = re.compile(r'(?:TASK TYPE|CLASSIFICATION):\s*(Quick|Research|Analysis|Content|Build|Planning|Compound)', re.IGNORECASE)
 
     # Set of process-skill names a Workflow might be named after (matches ROUTING values)
@@ -132,6 +155,7 @@ def main():
                 if m:
                     last_type = m.group(1).lower()
                     last_workflow_routing_reset = False  # TASK TYPE assertion wins
+                    last_decomposition_handoff = False  # TASK TYPE assertion wins
             elif block.get("type") == "tool_use" and block.get("name") == "Workflow":
                 inp = block.get("input", {})
                 if isinstance(inp, str):
@@ -147,11 +171,28 @@ def main():
                 if _wf_name_is_process(wf_name):
                     # This Workflow consumed the last TASK TYPE: mark as reset
                     last_workflow_routing_reset = True
+            elif block.get("type") == "tool_use" and block.get("name") == "Skill":
+                inp = block.get("input", {})
+                if isinstance(inp, str):
+                    try:
+                        inp = json.loads(inp)
+                    except (json.JSONDecodeError, TypeError):
+                        inp = {}
+                invoked_skill = (inp.get("skill") or "").strip().lower()
+                # A Skill invocation of process-analysis while Compound is the
+                # active classification is the decomposition hand-off point;
+                # everything downstream of it in this window is legitimate.
+                if invoked_skill == ROUTING.get("compound") and last_type == "compound":
+                    last_decomposition_handoff = True
 
     # If the most-recent routing event was a Workflow dispatch, the classification
     # context has been consumed. Clear last_type so the next Skill invocation is
     # not blocked by stale residue from that Workflow's input classification.
-    if last_workflow_routing_reset:
+    #
+    # Same clearing for a decomposition hand-off: process-analysis already ran
+    # under the Compound classification and handed back sub-tasks, so the next
+    # Skill invocation(s) are the sanctioned sub-task dispatches, not a misroute.
+    if last_workflow_routing_reset or last_decomposition_handoff:
         last_type = None
 
     # If no classification found or Quick, allow

@@ -7,7 +7,7 @@ Polarity contract (plan Step-2 acceptance criterion):
   - write under _state/ (or archive/aggregates/__pycache__) -> ignored
 
 All pytest runs target a TEMP mini-suite via HOOK_REGRESSION_GATE_TARGET_DIR /
-HOOK_REGRESSION_GATE_LOG_PATH env overrides: never the live suite.
+HOOK_REGRESSION_GATE_LOG_PATH env overrides, never the live suite.
 """
 
 from __future__ import annotations
@@ -182,6 +182,51 @@ class GateBehaviorTests(unittest.TestCase):
             rc = gate.main()
         self.assertEqual(rc, 0)
         self.assertEqual(captured.getvalue(), "")
+
+
+class SessionWiringTests(unittest.TestCase):
+    """Defect 2 (2026-08-07): _log_fire's session=_SESSION always logged None
+    because _SESSION was declared at module level but never actually assigned
+    in main(): payload was in scope the whole time but never wired in. This
+    reproduces the gap (module global stays at its unset default) first, then
+    asserts main() populates it from payload["session_id"]."""
+
+    def _temp_suite(self, td: str) -> dict:
+        suite_dir = Path(td) / "minisuite"
+        suite_dir.mkdir()
+        (suite_dir / "test_mini.py").write_text(
+            "def test_green():\n    assert True\n", encoding="utf-8"
+        )
+        return {
+            "HOOK_REGRESSION_GATE_TARGET_DIR": str(suite_dir),
+            "HOOK_REGRESSION_GATE_LOG_PATH": str(Path(td) / "gate.log"),
+        }
+
+    def test_session_populates_from_payload(self):
+        gate._SESSION = None  # reset in case a prior test left it set
+        with tempfile.TemporaryDirectory() as td:
+            env = self._temp_suite(td)
+            payload = {**_payload(HOOK_PATH), "session_id": "test-hwrg-1"}
+            _run(payload, env)
+        self.assertEqual(gate._SESSION, "test-hwrg-1")
+
+    def test_log_fire_call_carries_session(self):
+        gate._SESSION = None
+        calls = []
+        with tempfile.TemporaryDirectory() as td:
+            env = self._temp_suite(td)
+            payload = {**_payload(HOOK_PATH), "session_id": "test-hwrg-2"}
+            with mock.patch.dict(os.environ, env, clear=False), \
+                 mock.patch.object(sys, "stdin", io.StringIO(json.dumps(payload))):
+                import importlib
+                gl = importlib.import_module("_governance_logger")
+                with mock.patch.object(
+                    gl, "log_fire",
+                    side_effect=lambda *a, **k: calls.append(k),
+                ):
+                    gate.main()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0].get("session"), "test-hwrg-2")
 
 
 if __name__ == "__main__":

@@ -211,5 +211,41 @@ class TestTwoGateFields(unittest.TestCase):
         self.assertEqual(det.group(1).strip(), "needs-detector")
 
 
+class SessionWiringTests(unittest.TestCase):
+    """Defect 2 (2026-08-07): the entry-point log_fire() call fired before
+    session was ever wired in, always logging session=None even though
+    `payload` (with session_id) was already in scope. Reproduces the broken
+    shape first (a synthetic Stop-hook invocation with a populated
+    session_id and no transcript, isolated via HOOK_ACTIVITY_LOG_PATH so it
+    cannot pollute the live log), then asserts session populates."""
+
+    def test_session_populates_from_payload(self):
+        import io
+        import json as _json
+        import sys as _sys
+        import tempfile as _tempfile
+        from contextlib import redirect_stdout
+        from pathlib import Path as _Path
+        from unittest import mock
+
+        with _tempfile.TemporaryDirectory() as td:
+            activity_log = str(_Path(td) / "hook-activity.jsonl")
+            payload = {
+                "session_id": "test-classfield-1",
+                "transcript_path": str(_Path(td) / "no-such-transcript.jsonl"),
+            }
+            captured = io.StringIO()
+            with mock.patch.dict(os.environ, {"HOOK_ACTIVITY_LOG_PATH": activity_log}), \
+                 mock.patch.object(_sys, "stdin", io.StringIO(_json.dumps(payload))), \
+                 redirect_stdout(captured):
+                cfc.main()
+            self.assertTrue(os.path.exists(activity_log))
+            with open(activity_log, encoding="utf-8") as f:
+                records = [_json.loads(l) for l in f if l.strip()]
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["hook"], "classifier-field-check")
+        self.assertEqual(records[0]["session"], "test-classfield-1")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

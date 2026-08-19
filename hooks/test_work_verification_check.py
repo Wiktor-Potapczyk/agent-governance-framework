@@ -390,12 +390,16 @@ class Check1bWorkflowQANotBlockedTests(unittest.TestCase):
 
     def test_b2_workflow_process_qa_with_qa_report_not_blocked_by_check1b(self):
         """Acceptance item (iii): Workflow process-qa (three-entry shape) with QA REPORT
-        relay text on a non-Quick task → CHECK 1b must NOT fire."""
+        relay text on a non-Quick task → CHECK 1b must NOT fire.
+
+        End-to-end: runs the hook as a real subprocess over the stdin→stdout
+        protocol (no monkeypatching; emit_event intentionally left live,
+        matching the CHECK-4 subprocess precedent)."""
         with tempfile.TemporaryDirectory() as td:
             tp = _write_transcript(Path(td), [
                 # Real user message (classification turn)
                 _user(),
-                # Workflow tool_use : entry 1
+                # Workflow tool_use: entry 1
                 _workflow_tool_use_entry("process-qa"),
                 # tool_result wrapper: entry 2 (not a real user turn)
                 _tool_result_wrapper_entry(),
@@ -408,11 +412,12 @@ class Check1bWorkflowQANotBlockedTests(unittest.TestCase):
                     ),
                 ]),
             ])
-            out = _run({"transcript_path": tp})
-            self.assertEqual(out, "", (
+            rc, stdout, stderr = _run_subprocess({"transcript_path": tp})
+            self.assertEqual(stdout, "", (
                 "B-2: Workflow process-qa + QA REPORT must NOT trigger CHECK 1b "
                 "'inline QA without skill invocation' block"
             ))
+            self.assertEqual(rc, 0, "hook must exit 0 (no block) for Workflow process-qa")
 
     def test_b2_workflow_scriptpath_process_qa_not_blocked(self):
         """scriptPath form: .claude/workflows/process-qa.js → same B-2 protection."""
@@ -593,13 +598,13 @@ class Check4FileExistenceTests(unittest.TestCase):
                 _user(),
                 _assistant([
                     _tool("Write", {
-                        "file_path": "Projects/Agent-Governance-Research/STATE.md",
+                        "file_path": "Projects/your-project/STATE.md",
                         "content": "x",
                     }),
                     _text(
                         "TASK TYPE: Build\n"
                         "I wrote the file to "
-                        "Projects/Agent-Governance-Research/STATE.md."
+                        "Projects/your-project/STATE.md."
                     ),
                 ]),
             ])
@@ -710,6 +715,27 @@ class Check4FileExistenceTests(unittest.TestCase):
             ])
             rc, stdout, stderr = _run_subprocess({"transcript_path": tp})
             self.assertNotIn("FABRICATION_DETECTED", stderr)
+
+
+class SessionWiringTests(unittest.TestCase):
+    """Defect 2 (2026-08-07): the entry-point log_fire() call fired before
+    session was ever wired in, always logging session=None even though
+    `payload` (with session_id) was already in scope. Reproduces the broken
+    shape first (a synthetic Stop-hook invocation with a populated
+    session_id), then asserts it populates."""
+
+    def test_session_populates_from_payload(self):
+        import os
+        with tempfile.TemporaryDirectory() as td:
+            activity_log = str(Path(td) / "hook-activity.jsonl")
+            with mock.patch.dict(os.environ, {"HOOK_ACTIVITY_LOG_PATH": activity_log}):
+                _run({"session_id": "test-workverify-1"})
+            self.assertTrue(os.path.exists(activity_log))
+            with open(activity_log, encoding="utf-8") as f:
+                records = [json.loads(l) for l in f if l.strip()]
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["hook"], "work-verification-check")
+        self.assertEqual(records[0]["session"], "test-workverify-1")
 
 
 if __name__ == "__main__":

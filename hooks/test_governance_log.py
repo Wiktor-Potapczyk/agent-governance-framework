@@ -9,9 +9,15 @@ Run: python .claude/hooks/test_governance_log.py
 """
 
 import importlib.util
+import io
+import json
 import os
 import sys
+import tempfile
 import unittest
+from contextlib import redirect_stdout
+from pathlib import Path
+from unittest import mock
 
 # Load the module under test
 HOOK_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "governance-log.py")
@@ -84,8 +90,8 @@ class TestExtractDispatchNames(unittest.TestCase):
 
     def test_trailing_reasoning_long(self):
         raw = (
-            "process-build, process-qa This is too many files to edit inline "
-            ": it would destroy context. Let me use parallel agents."
+            "process-build, process-qa This is too many files to edit inline, "
+            "it would destroy context. Let me use parallel agents."
         )
         self.assertEqual(extract_dispatch_names(raw), "process-build, process-qa")
 
@@ -149,7 +155,7 @@ class TestExtractDispatchNames(unittest.TestCase):
     def test_real_data_long_reasoning_1(self):
         raw = (
             "process-qa Let me build a structured research findings document "
-            "from the calculation files: tracing every claim to its source."
+            "from the calculation files, tracing every claim to its source."
         )
         self.assertEqual(extract_dispatch_names(raw), "process-qa")
 
@@ -180,6 +186,134 @@ class TestKnownNamesCompleteness(unittest.TestCase):
         ]
         for name in common:
             self.assertIn(name, KNOWN_DISPATCH_NAMES, f"{name} missing")
+
+
+class TestPluginDispatchNames(unittest.TestCase):
+    """Defect 5 (2026-08-07): KNOWN_DISPATCH_NAMES did not know any plugin
+    agent name, making plugin dispatches invisible to compliance parsing.
+    Reproduces the broken shape first (a plain plugin agent name that used to
+    have no membership), then asserts recognition, including the
+    plugin-namespaced form named in the acceptance instrument."""
+
+    def test_plain_plugin_agent_name_recognized(self):
+        self.assertIn("silent-failure-hunter", KNOWN_DISPATCH_NAMES)
+
+    def test_synthetic_dispatch_record_naming_plugin_agent_recognized(self):
+        # The literal acceptance-instrument example: a plugin-namespaced form.
+        self.assertEqual(
+            extract_dispatch_names("pr-review-toolkit:silent-failure-hunter"),
+            "silent-failure-hunter",
+        )
+
+    def test_plugin_agent_mixed_with_local_names(self):
+        self.assertEqual(
+            extract_dispatch_names(
+                "process-qa, pr-review-toolkit:silent-failure-hunter, pm"
+            ),
+            "process-qa, silent-failure-hunter, pm",
+        )
+
+    def test_unknown_namespace_still_rejected(self):
+        # A colon-bearing token whose suffix is NOT a known name must still
+        # be dropped, same as any other unrecognized garbage token.
+        self.assertIsNone(extract_dispatch_names("some-plugin:totally-made-up-agent"))
+
+
+def _assistant_text(text):
+    return {
+        "type": "assistant",
+        "message": {"role": "assistant", "content": [{"type": "text", "text": text}]},
+    }
+
+
+def _assistant_tool_use(name, tool_input):
+    return {
+        "type": "assistant",
+        "message": {
+            "role": "assistant",
+            "content": [{"type": "tool_use", "name": name, "input": tool_input}],
+        },
+    }
+
+
+def _write_transcript(td, events):
+    p = Path(td) / "session.jsonl"
+    with open(p, "w", encoding="utf-8") as f:
+        for ev in events:
+            f.write(json.dumps(ev) + "\n")
+    return str(p)
+
+
+def _run_main(payload, extra_env=None):
+    """Run governance-log.py's main() against a synthetic payload, capturing stdout
+    (governance-log writes to the file only, never stdout, so this just drives
+    the call). GOVERNANCE_LOG_PATH is always overridden to a temp file so the test
+    never appends to the live governance-log.jsonl."""
+    env = dict(extra_env or {})
+    captured = io.StringIO()
+    with mock.patch.dict(os.environ, env), \
+         mock.patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
+         redirect_stdout(captured):
+        mod.main()
+    return captured.getvalue()
+
+
+class AccumulatorReclassificationTests(unittest.TestCase):
+    """Defect 1 (2026-08-07): re-classification inside one Stop-hook window used to
+    wipe agents_dispatched/skills_invoked via 'Reset ALL state per new
+    classification'. This reproduces the broken behavior first (a synthetic
+    multi-reclassification sequence) and asserts the fixed accumulation."""
+
+    def test_agents_accumulate_across_reclassification_not_reset(self):
+        with tempfile.TemporaryDirectory() as td:
+            tp = _write_transcript(td, [
+                _assistant_text("TASK TYPE: Build\n\nMUST DISPATCH: blueprint-mode"),
+                _assistant_tool_use("Agent", {"subagent_type": "blueprint-mode"}),
+                # Mid-turn re-classification (e.g. a decomposed sub-task): under the
+                # old code this line wiped agents_dispatched back to [].
+                _assistant_text("TASK TYPE: Analysis\n\nMUST DISPATCH: architect-reviewer"),
+                _assistant_tool_use("Agent", {"subagent_type": "architect-reviewer"}),
+            ])
+            with tempfile.TemporaryDirectory() as logdir:
+                log_path = os.path.join(logdir, "governance-log.jsonl")
+                _run_main(
+                    {"transcript_path": tp, "session_id": "test-accum-1"},
+                    extra_env={"GOVERNANCE_LOG_PATH": log_path},
+                )
+                with open(log_path, encoding="utf-8") as f:
+                    lines = [json.loads(l) for l in f if l.strip()]
+            self.assertEqual(len(lines), 1)
+            record = lines[0]
+            # Both dispatches must be present: proves accumulation, not reset.
+            self.assertIn("blueprint-mode", record["agents"])
+            self.assertIn("architect-reviewer", record["agents"])
+            self.assertEqual(record["agent_count"], 2)
+            # The per-classification metadata field still reflects the LATEST
+            # classification only (this is correct, intended behavior; only the
+            # accumulator lists are exempted from the reset).
+            self.assertEqual(record["type"], "Analysis")
+
+    def test_skills_accumulate_across_reclassification_not_reset(self):
+        with tempfile.TemporaryDirectory() as td:
+            tp = _write_transcript(td, [
+                _assistant_text("TASK TYPE: Research\n\nMUST DISPATCH: process-research"),
+                _assistant_tool_use("Skill", {"skill": "process-research"}),
+                _assistant_text("TASK TYPE: Planning\n\nMUST DISPATCH: process-planning"),
+                _assistant_tool_use("Skill", {"skill": "process-planning"}),
+            ])
+            with tempfile.TemporaryDirectory() as logdir:
+                log_path = os.path.join(logdir, "governance-log.jsonl")
+                _run_main(
+                    {"transcript_path": tp, "session_id": "test-accum-2"},
+                    extra_env={"GOVERNANCE_LOG_PATH": log_path},
+                )
+                with open(log_path, encoding="utf-8") as f:
+                    lines = [json.loads(l) for l in f if l.strip()]
+            self.assertEqual(len(lines), 1)
+            record = lines[0]
+            self.assertIn("process-research", record["skills"])
+            self.assertIn("process-planning", record["skills"])
+            self.assertEqual(record["skill_count"], 2)
 
 
 if __name__ == "__main__":

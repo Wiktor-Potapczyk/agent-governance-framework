@@ -65,9 +65,11 @@ def _point_at_temp(td: Path, mcp_json: Path):
     probe.STATE_FILE = str(td / "_state" / "mcp-circuit-breaker.json")
 
 
-def _run_main() -> tuple[int, str]:
+def _run_main(payload: dict | None = None, extra_env: dict | None = None) -> tuple[int, str]:
     captured = io.StringIO()
-    with mock.patch.object(sys, "stdin", io.StringIO("{}")), \
+    env = dict(extra_env or {})
+    with mock.patch.dict(os.environ, env), \
+         mock.patch.object(sys, "stdin", io.StringIO(json.dumps(payload if payload is not None else {}))), \
          redirect_stdout(captured):
         rc = probe.main()
     return rc, captured.getvalue()
@@ -222,6 +224,175 @@ class ConsumerCompatibilityTests(unittest.TestCase):
                 dict(loaded["qmd"]), datetime.now(timezone.utc)
             )
             self.assertEqual(len(pruned["failures"]), 1)  # fresh entry survives
+
+
+class SessionWiringTests(unittest.TestCase):
+    """Defect 2 (2026-08-07): main() read+discarded stdin ('sys.stdin.read()'
+    with no assignment), so every _log_fire() call logged session=None. This
+    reproduces the broken shape first (a synthetic healthy-probe invocation
+    with a populated session_id), then asserts it populates."""
+
+    def test_session_populates_on_healthy_probe(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = Path(td)
+            mcp = _write_mcp_json(td, "import sys; sys.exit(0)\n")
+            _point_at_temp(td, mcp)
+            activity_log = str(td / "hook-activity.jsonl")
+            rc, out = _run_main(
+                {"session_id": "test-qmdprobe-1"},
+                extra_env={"HOOK_ACTIVITY_LOG_PATH": activity_log},
+            )
+            self.assertEqual(rc, 0)
+            with open(activity_log, encoding="utf-8") as f:
+                records = [json.loads(l) for l in f if l.strip()]
+        # R2 (2026-08-07): a passing status check now also runs the
+        # query-path check (TASK-015), which fires its OWN log_fire on
+        # success. The always-exit-0 stub here satisfies both the status
+        # AND the query-path CLI invocations, so a healthy run now logs 2
+        # records, not 1. Both must still carry the real session id
+        # (Defect 2 regression protection extends to the new call site too).
+        self.assertEqual(len(records), 2)
+        for rec in records:
+            self.assertEqual(rec["hook"], "mcp-qmd-health-probe")
+            self.assertEqual(rec["decision"], "quiet")
+            self.assertEqual(rec["session"], "test-qmdprobe-1")
+
+    def test_missing_session_id_logs_null_not_crash(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = Path(td)
+            mcp = _write_mcp_json(td, "import sys; sys.exit(0)\n")
+            _point_at_temp(td, mcp)
+            activity_log = str(td / "hook-activity.jsonl")
+            rc, out = _run_main({}, extra_env={"HOOK_ACTIVITY_LOG_PATH": activity_log})
+            self.assertEqual(rc, 0)
+            with open(activity_log, encoding="utf-8") as f:
+                records = [json.loads(l) for l in f if l.strip()]
+        # See test_session_populates_on_healthy_probe above: 2 records now,
+        # both must log a null session rather than crash or invent one.
+        self.assertEqual(len(records), 2)
+        for rec in records:
+            self.assertIsNone(rec["session"])
+
+
+class QueryPathTests(unittest.TestCase):
+    """R2 (CE-1 qmd substrate repair, TASK-017): the query-path check added
+    to main() in TASK-015/TASK-016. Every stub here branches on sys.argv[1]
+    (the subcommand the probe appends: "status" or "query") so status and
+    query-path behavior can be controlled independently within one stub."""
+
+    def _records(self, path):
+        if not os.path.exists(path):
+            return []
+        with open(path, encoding="utf-8") as fh:
+            return [json.loads(l) for l in fh if l.strip()]
+
+    def test_query_path_timeout_records_distinct_failure_and_warns(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = Path(td)
+            mcp = _write_mcp_json(
+                td,
+                "import sys, time\n"
+                "if sys.argv[1] == 'status':\n"
+                "    sys.exit(0)\n"
+                "else:\n"
+                "    time.sleep(30)\n",
+            )
+            _point_at_temp(td, mcp)
+            activity_log = str(td / "hook-activity.jsonl")
+            old_timeout = probe.QUERY_PROBE_TIMEOUT_SECONDS
+            probe.QUERY_PROBE_TIMEOUT_SECONDS = 1
+            try:
+                rc, out = _run_main(extra_env={"HOOK_ACTIVITY_LOG_PATH": activity_log})
+            finally:
+                probe.QUERY_PROBE_TIMEOUT_SECONDS = old_timeout
+            self.assertEqual(rc, 0)
+            self.assertIn("QUERY-PATH", out)
+            state = json.loads(Path(probe.STATE_FILE).read_text(encoding="utf-8"))
+            # Read records INSIDE the tempdir's lifetime -- TemporaryDirectory
+            # deletes the tree on __exit__, so this must happen before the
+            # `with` block above closes.
+            records = self._records(activity_log)
+        self.assertIn("last_query_probe_failure", state["qmd"])
+        self.assertIn("timed out", state["qmd"]["last_query_probe_failure"]["error"])
+        self.assertEqual(
+            state["qmd"]["last_query_probe_failure"]["source"], "sessionstart-query-probe"
+        )
+        # Status succeeded, so last_probe_failure (the STATUS sibling) must
+        # stay absent -- the two checks report through disjoint keys.
+        self.assertNotIn("last_probe_failure", state["qmd"])
+        self.assertEqual(len(records), 2)
+        self.assertEqual(records[0]["decision"], "quiet")  # status
+        self.assertEqual(records[1]["decision"], "warn")  # query-path
+        self.assertTrue(records[1]["detail"].startswith("query-probe"))
+
+    def test_query_path_nonzero_exit_records_distinct_failure_and_warns(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = Path(td)
+            mcp = _write_mcp_json(
+                td,
+                "import sys\n"
+                "if sys.argv[1] == 'status':\n"
+                "    sys.exit(0)\n"
+                "else:\n"
+                "    sys.stderr.write('query broke')\n"
+                "    sys.exit(4)\n",
+            )
+            _point_at_temp(td, mcp)
+            activity_log = str(td / "hook-activity.jsonl")
+            rc, out = _run_main(extra_env={"HOOK_ACTIVITY_LOG_PATH": activity_log})
+            self.assertEqual(rc, 0)
+            self.assertIn("QUERY-PATH", out)
+            state = json.loads(Path(probe.STATE_FILE).read_text(encoding="utf-8"))
+            records = self._records(activity_log)
+        self.assertIn("last_query_probe_failure", state["qmd"])
+        self.assertIn("query-probe exit 4", state["qmd"]["last_query_probe_failure"]["error"])
+        self.assertEqual(len(records), 2)
+        self.assertEqual(records[1]["decision"], "warn")
+        self.assertTrue(records[1]["detail"].startswith("query-probe"))
+
+    def test_query_path_success_records_distinct_ok_key_and_stays_quiet(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = Path(td)
+            mcp = _write_mcp_json(td, "import sys; sys.exit(0)\n")
+            _point_at_temp(td, mcp)
+            activity_log = str(td / "hook-activity.jsonl")
+            rc, out = _run_main(extra_env={"HOOK_ACTIVITY_LOG_PATH": activity_log})
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "", "a warning on a healthy query-path probe is a defect")
+            state = json.loads(Path(probe.STATE_FILE).read_text(encoding="utf-8"))
+            records = self._records(activity_log)
+        self.assertIn("last_query_probe_ok_at", state["qmd"])
+        self.assertIn("last_probe_ok_at", state["qmd"])
+        self.assertNotIn("last_query_probe_failure", state["qmd"])
+        self.assertEqual(len(records), 2)
+        self.assertEqual(records[0]["detail"], "qmd CLI probe ok")
+        self.assertEqual(records[1]["detail"], "qmd query-path probe ok")
+        self.assertEqual(records[1]["decision"], "quiet")
+
+    def test_query_path_check_does_not_run_when_status_already_failed(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = Path(td)
+            # Fails regardless of argv (status OR query) -- proves the skip is
+            # driven by main()'s own branch, not by the stub happening to pass
+            # the query leg too.
+            mcp = _write_mcp_json(
+                td, "import sys; sys.stderr.write('down'); sys.exit(3)\n"
+            )
+            _point_at_temp(td, mcp)
+            activity_log = str(td / "hook-activity.jsonl")
+            rc, out = _run_main(extra_env={"HOOK_ACTIVITY_LOG_PATH": activity_log})
+            self.assertEqual(rc, 0)
+            self.assertNotIn("QUERY-PATH", out)
+            state = json.loads(Path(probe.STATE_FILE).read_text(encoding="utf-8"))
+            records = self._records(activity_log)
+        # Only the status check's sibling keys exist; the query-path check
+        # never ran at all.
+        self.assertIn("last_probe_failure", state["qmd"])
+        self.assertNotIn("last_query_probe_failure", state["qmd"])
+        self.assertNotIn("last_query_probe_ok_at", state["qmd"])
+        self.assertEqual(len(records), 1, "status failure must skip the query-path check entirely")
+        self.assertEqual(records[0]["decision"], "warn")
+        self.assertTrue(records[0]["detail"].startswith("probe failure"))
 
 
 if __name__ == "__main__":

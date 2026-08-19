@@ -51,6 +51,7 @@ from _dispatch_compliance_logic import (  # noqa: E402
     format_empty_dispatch_reason,
     format_missing_reason,
     is_trackable_process_skill,
+    normalize_dispatched_name,
     scan_assistant_text_block,
     strip_fences,
 )
@@ -113,8 +114,8 @@ def main():
     try:
         import os as _gho, sys as _ghs
         _ghs.path.insert(0, _gho.path.dirname(_gho.path.abspath(__file__)))
-        from _governance_logger import log_fire
-        log_fire("dispatch-compliance-check")
+        from _governance_logger import log_fire, session_from
+        log_fire("dispatch-compliance-check", session=session_from(payload))
     except Exception:
         pass
 
@@ -192,6 +193,13 @@ def main():
                     # run). The workflow script itself IS the dispatch guarantee.
 
                 if dispatched_name:
+                    # Defect 5 follow-up (2026-08-07): normalize a plugin-namespaced
+                    # dispatch (e.g. "pr-review-toolkit:silent-failure-hunter") to the
+                    # same bare suffix extract_dispatch_names already reduces a
+                    # namespaced DECLARATION to, so the two sides compare on equal
+                    # footing. Without this, a namespaced dispatch never satisfied
+                    # either a bare or a namespaced declaration of the same agent.
+                    dispatched_name = normalize_dispatched_name(dispatched_name)
                     all_dispatched.add(dispatched_name)
                     if state["found_contract"]:
                         state["dispatched"].add(dispatched_name)

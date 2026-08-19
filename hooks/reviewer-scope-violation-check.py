@@ -14,7 +14,7 @@ Detection (§1 of design):
 2. FALLBACK: if agent_type absent/empty, walk sub-agent transcript (200KB tail)
    for first user entry that contains the agent frontmatter name: field. Sub-agents
    receive their dispatch prompt (including frontmatter) as the first user message
-   in their OWN transcript: not the parent session's transcript. The transcript_path
+   in their OWN transcript, not the parent session's transcript. The transcript_path
    in a sub-agent's PreToolUse payload points to the sub-agent's JSONL.
 
 False-positive rules applied in order (§3 of design):
@@ -38,7 +38,7 @@ import re
 READ_BYTES = 204800
 
 # The evaluative reviewer agents this hook is responsible for blocking.
-# code-reviewer is a plugin agent (superpowers/code-review): included because
+# code-reviewer is a plugin agent (superpowers/code-review), included because
 # detection is via agent_type field, which is runtime, not frontmatter.
 REVIEWER_AGENTS = {"adversarial-reviewer", "architect-reviewer", "code-reviewer"}
 
@@ -66,13 +66,15 @@ def _norm_path(p):
     """
     return p.replace(os.sep, "/")
 
-# Observability v2 shared helper: silent on import failure.
+# Observability v2 shared helper: silent on import failure. Only session_from
+# is used at module scope; _log_block does its own local `emit_event` import
+# (dead module-level `emit_event` fallback removed 2026-08-07: its only
+# reader, _emit_blocked, was retired as part of the defect-3 double-emission
+# fix and this was the orphan that edit left behind).
 try:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from _event_emit import emit_event  # type: ignore
     from _governance_logger import session_from  # type: ignore
 except Exception:
-    emit_event = None  # type: ignore
 
     def session_from(_payload):  # type: ignore
         """Fallback when the helper is unreachable: no identity, never a guess."""
@@ -84,7 +86,22 @@ _GOVERNANCE_LOG = os.path.join(_HOOK_DIR, "governance-log.jsonl")
 
 
 def _log_block(session_id, agent_type, tool_name, file_path, reason):
-    """Append a reviewer_scope_violation block entry to governance-log.jsonl."""
+    """Append a reviewer_scope_violation block entry to governance-log.jsonl.
+
+    Defect 3 fix (2026-08-07): this used to be followed by a second,
+    unconditional call to a now-removed _emit_blocked() helper that fired a
+    second event (reviewer_scope_violation_blocked) for the SAME block
+    decision, on the SAME sink (both routed through emit_event into
+    governance-log.jsonl); 13,813 real blocks produced 27,626 records. The
+    two-call split dates from when the "observability event" was designed
+    against a separate store that never materialized as separate; today both
+    calls write the identical file, so the second call was a pure duplicate
+    with strictly less information than this one (no block_reason). Keeping
+    exactly this one call, under exactly this event name, is also required by
+    _competence_signal.py, which keys its SCOPE completion signal
+    (Shape G) on the literal string "reviewer_scope_violation": renaming or
+    dropping THIS event, rather than the redundant twin, would have silently
+    starved that gate of its input instead of fixing the double-count."""
     try:
         from _event_emit import emit_event
         emit_event(
@@ -103,25 +120,6 @@ def _log_block(session_id, agent_type, tool_name, file_path, reason):
         pass
 
 
-def _emit_blocked(session_id, agent_type, tool_name, file_path):
-    """Fire observability event for the block (separate from governance log)."""
-    if emit_event is None:
-        return
-    try:
-        emit_event(
-            event="reviewer_scope_violation_blocked",
-            hook="reviewer-scope-violation-check",
-            session=session_id,
-            extra={
-                "agent_type": agent_type,
-                "tool_name": tool_name,
-                "file_path": file_path,
-            },
-        )
-    except Exception:
-        pass
-
-
 def _extract_agent_type_from_transcript(transcript_path):
     """
     Fallback: read the sub-agent's own transcript to find its agent name.
@@ -133,7 +131,7 @@ def _extract_agent_type_from_transcript(transcript_path):
     entry and extract the `name:` field.
 
     Returns the agent name string if found and in REVIEWER_AGENTS, else None.
-    This function does NOT check REVIEWER_AGENTS membership: caller does that.
+    This function does NOT check REVIEWER_AGENTS membership; caller does that.
     """
     if not transcript_path or not os.path.exists(transcript_path):
         return None
@@ -185,7 +183,7 @@ def _extract_agent_type_from_transcript(transcript_path):
             if m:
                 return m.group(1).strip()
 
-            # Only check the first user entry: subsequent user entries are not
+            # Only check the first user entry; subsequent user entries are not
             # the dispatch prompt and may introduce false matches.
             break
 
@@ -261,12 +259,12 @@ def main():
     # Rule A: Report-output path regex match → ALLOW.
     # Covers: existing report files being overwritten on a re-run (Rule C would block).
     if REVIEW_OUTPUT_RE.search(norm_path):
-        return  # exit 0: legitimate report output
+        return  # exit 0, legitimate report output
 
     # Rule C: File does not yet exist on disk → ALLOW (new file = report output).
     # The artifact under review already exists; the reviewer's output is always new.
     if not os.path.exists(file_path):
-        return  # exit 0: new file, safe to write
+        return  # exit 0, new file, safe to write
 
     # -------------------------------------------------------------------
     # Step 4: BLOCK: reviewer is attempting to edit an existing non-report file.
@@ -281,7 +279,7 @@ def main():
 
     # PreToolUse denial protocol: CC requires the hookSpecificOutput wrapper with
     # permissionDecision="deny". The older {"decision":"block"} form is the
-    # SubagentStop protocol and is SILENTLY IGNORED on PreToolUse: which is why
+    # SubagentStop protocol and is SILENTLY IGNORED on PreToolUse, which is why
     # this hook logged "blocked" for 14 days while blocking nothing (fixed 2026-06-07).
     print(json.dumps({
         "hookSpecificOutput": {
@@ -291,11 +289,9 @@ def main():
         }
     }))
 
-    # Governance log entry for audit trail.
+    # Governance log entry for audit trail: the ONLY emission for this block
+    # (defect 3 fix, 2026-08-07: a second call here used to double-emit).
     _log_block(session_id, agent_type, tool_name, file_path, block_reason)
-
-    # Observability v2 event.
-    _emit_blocked(session_id, agent_type, tool_name, file_path)
 
     # Exit 0: the structured JSON carries the block; exit 2 is for non-JSON blocks.
     return
@@ -319,7 +315,7 @@ if __name__ == "__main__":
     # Use sys.executable only if it points to a real Python binary.
     # When the smoke tests are run via `python hook.py` directly, sys.executable
     # is the Python interpreter. When the hook is invoked by the CC hook runner
-    # (node process), sys.executable may not be Python: fall back to the known path.
+    # (node process), sys.executable may not be Python; fall back to the known path.
     _candidate = sys.executable
     python_exe = (
         _candidate
@@ -329,14 +325,19 @@ if __name__ == "__main__":
     passed = 0
     failed = 0
 
-    def run_hook(payload_dict):
+    def run_hook(payload_dict, extra_env=None):
         """Run this hook with the given payload dict, return (returncode, stdout, stderr).
         HOOK_SMOKE_TEST=1 env var prevents the child process from re-entering __main__
         and running tests again (which would cause infinite recursion / timeout).
+        extra_env: optional dict merged into the child's environment (used by the
+        defect-3 regression test below to redirect GOVERNANCE_LOG_PATH to a temp
+        file instead of writing into the live log).
         """
         stdin_bytes = json.dumps(payload_dict).encode("utf-8")
         env = os.environ.copy()
         env["HOOK_SMOKE_TEST"] = "1"
+        if extra_env:
+            env.update(extra_env)
         result = subprocess.run(
             [python_exe, hook_path],
             input=stdin_bytes,
@@ -349,7 +350,7 @@ if __name__ == "__main__":
     def assert_test(name, condition, detail=""):
         global passed, failed
         status = "PASS" if condition else "FAIL"
-        suffix = f": {detail}" if detail else ""
+        suffix = f" ({detail})" if detail else ""
         print(f"  [{status}] {name}{suffix}")
         if condition:
             passed += 1
@@ -442,6 +443,36 @@ if __name__ == "__main__":
         tn2_rc == 0 and tn2_no_block,
         f"exit={tn2_rc} stdout={repr(tn2_out[:120])}",
     )
+
+    # ------------------------------------------------------------------
+    # TP2 (defect 3, 2026-08-07): a single block event must produce EXACTLY
+    # ONE governance-log record. Before the fix, this scenario produced TWO
+    # (reviewer_scope_violation + reviewer_scope_violation_blocked); 13,813
+    # real blocks had produced 27,626 records. GOVERNANCE_LOG_PATH redirects
+    # the write to an isolated temp file so this assertion is exact rather
+    # than a delta against the live, shared log.
+    # ------------------------------------------------------------------
+    tp2_log_fd, tp2_log_path = tempfile.mkstemp(suffix=".jsonl")
+    os.close(tp2_log_fd)
+    os.remove(tp2_log_path)  # emit_event creates it fresh on first append
+    try:
+        tp2_rc, tp2_out, tp2_err = run_hook(
+            tp1_payload,  # same architect-reviewer-edits-existing-file scenario as TP1
+            extra_env={"GOVERNANCE_LOG_PATH": tp2_log_path},
+        )
+        tp2_records = []
+        if os.path.exists(tp2_log_path):
+            with open(tp2_log_path, "r", encoding="utf-8") as f:
+                tp2_records = [json.loads(line) for line in f if line.strip()]
+        block_records = [r for r in tp2_records if r.get("event") == "reviewer_scope_violation"]
+        assert_test(
+            "TP2 - one block event -> exactly ONE governance-log record",
+            tp2_rc == 0 and len(tp2_records) == 1 and len(block_records) == 1,
+            f"exit={tp2_rc} total_records={len(tp2_records)} events={[r.get('event') for r in tp2_records]}",
+        )
+    finally:
+        if os.path.exists(tp2_log_path):
+            os.remove(tp2_log_path)
 
     # ------------------------------------------------------------------
     # Summary

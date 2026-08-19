@@ -138,51 +138,53 @@ def get_last_assistant_text(transcript_path: str) -> str:
         return ""
 
 
+def _discover_projects():
+    """Shared bounded depth-2 discovery. Returns [] if the helper is unavailable."""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from _project_discovery import discover_projects
+        return discover_projects(PROJECTS_DIR)
+    except Exception as e:
+        log(f"_project_discovery unavailable: {e}")
+        return []
+
+
 def detect_active_project() -> str:
-    """Same logic as H-1: override file → most-recently-modified STATE.md → no fallback."""
+    """Same three-tier logic as H-1, via the shared helper: override file ->
+    most-recently-modified STATE.md -> no fallback.
+
+    Returns the full relative identity (`Personal/Finance`), NOT a bare leaf.
+    The empty-string-not-None return contract is preserved because callers here
+    test it for truthiness and pass it straight to find_task_plans.
+    """
     try:
-        if OVERRIDE_FILE.is_file():
-            name = OVERRIDE_FILE.read_text(encoding="utf-8").strip()
-            if name and (PROJECTS_DIR / name / "STATE.md").is_file():
-                return name
-    except Exception:
-        pass
-    try:
-        if not PROJECTS_DIR.is_dir():
-            return ""
-        best = None
-        best_mt = 0
-        for proj in PROJECTS_DIR.iterdir():
-            if not proj.is_dir():
-                continue
-            sp = proj / "STATE.md"
-            if sp.is_file():
-                try:
-                    mt = sp.stat().st_mtime
-                    if mt > best_mt:
-                        best_mt = mt
-                        best = proj.name
-                except Exception:
-                    continue
-        return best or ""
-    except Exception:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from _project_discovery import detect_active_project as _detect
+        identity, state_path, _plan = _detect(PROJECTS_DIR, override_file=OVERRIDE_FILE)
+        return identity if (identity and state_path) else ""
+    except Exception as e:
+        log(f"detect_active_project failed: {e}")
         return ""
 
 
 def find_task_plans(active_project: str):
-    """Return ordered list of task_plan.md Paths: active first, then others."""
+    """Return ordered list of task_plan.md Paths: active first, then others.
+
+    Sourced from the same discovery pass as detect_active_project, so a nested
+    project's plan is reachable. `active_project` is a relative identity, so it
+    is matched against the identity, never against a directory leaf.
+    """
     plans = []
-    if active_project:
-        ap = PROJECTS_DIR / active_project / "task_plan.md"
-        if ap.is_file():
-            plans.append(ap)
-    if PROJECTS_DIR.is_dir():
-        for proj in PROJECTS_DIR.iterdir():
-            if not proj.is_dir() or proj.name == active_project:
-                continue
-            tp = proj / "task_plan.md"
-            if tp.is_file() and tp not in plans:
-                plans.append(tp)
+    rest = []
+    for identity, _state_path, plan_path in _discover_projects():
+        if not plan_path:
+            continue
+        p = Path(plan_path)
+        if identity == active_project:
+            plans.append(p)
+        elif p not in rest:
+            rest.append(p)
+    plans.extend(rest)
     return plans
 
 

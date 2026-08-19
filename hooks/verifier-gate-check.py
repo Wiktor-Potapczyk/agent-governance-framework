@@ -7,7 +7,7 @@ until a SEPARATE verifier agent was dispatched.
 SCOPING DECISION (deliberate, documented):
 This hook fires ONLY when the `verification-gated-research` skill was actually
 invoked. It does NOT attempt to force every Research/depth task through a
-verifier — that broader ambition is a false-positive minefield (normal
+verifier: that broader ambition is a false-positive minefield (normal
 process-research dispatches research-synthesizer/report-generator, which are
 not verifiers, and blocking those would be wrong). Instead this hook enforces
 the skill's OWN internal contract: you cannot invoke the verification-gated
@@ -15,17 +15,17 @@ harness and then skip its separate-verifier step. Narrow, reliable, near-zero
 false-positive. Forcing the harness onto all research is a doctrine/classifier
 concern, not this hook's job.
 
-Detection (3-part structural check — upgraded 2026-06-16, two-gate Gate-2):
+Detection (3-part structural check: upgraded 2026-06-16, two-gate Gate-2):
 - skill invoked  = a Skill tool_use with skill == "verification-gated-research"
 - A VALID verifier is an Agent tool_use that satisfies ALL THREE structural parts,
   all readable from the transcript tail:
     1. it carries "verifier" in its `description` AND appears AFTER all worker
-       dispatches (and after the skill invocation — ordering guard kept);
+       dispatches (and after the skill invocation: ordering guard kept);
     2. its task `prompt` is NOT byte-identical to any worker `prompt` (proves a
        different task, not just a relabel of a worker dispatch);
-    3. its `prompt` contains a RE-DERIVATION contract — one of the keywords
+    3. its `prompt` contains a RE-DERIVATION contract: one of the keywords
        (re-derive / independently verify / re-run / re-check / recompute) OR a
-       reference to a worker output-artifact path (a *.md/.py/.json/... token) —
+       reference to a worker output-artifact path (a *.md/.py/.json/... token) :
        not mere re-reading.
   (Workers = post-skill Agent dispatches whose description does NOT contain
   "verifier".)
@@ -36,7 +36,7 @@ dispatch described "verifier" but carrying a worker's prompt, or no re-derivatio
 task, no longer satisfies the gate).
 
 Audit (NOT a block condition): each post-skill dispatch's `subagent_type` is recorded
-to governance-log.jsonl. Type-difference is deliberately NOT enforced — a verifier
+to governance-log.jsonl. Type-difference is deliberately NOT enforced: a verifier
 legitimately CAN be the same subagent_type as a worker (e.g. technical-researcher
 used for both, in different dispatches with different tasks). Enforcing a type
 difference would wrongly reject the legitimate same-type case.
@@ -44,7 +44,7 @@ difference would wrongly reject the legitimate same-type case.
 Honest feasibility ceiling (refines the accepted limitation, per architect-review
 2026-05-21 and the 2026-06-15 two-gate spec axis c): a Stop hook reads name /
 description / subagent_type / prompt per dispatch but CANNOT prove model-instance
-independence (fresh context) — the transcript does not expose model-instance
+independence (fresh context): the transcript does not expose model-instance
 identity. So this remains a CONVENTION check, now a materially stronger one, not a
 proof of structural agent identity.
 """
@@ -72,7 +72,7 @@ def _has_rederivation_contract(prompt: str) -> bool:
     return bool(_REDERIVATION_KEYWORDS.search(prompt) or _ARTIFACT_PATH.search(prompt))
 
 _HOOK_DIR = os.path.dirname(os.path.abspath(__file__))
-READ_BYTES = 204800  # 200KB transcript tail — matches dispatch-compliance-check.py
+READ_BYTES = 204800  # 200KB transcript tail: matches dispatch-compliance-check.py
 
 SKILL_NAME = "verification-gated-research"
 
@@ -148,7 +148,7 @@ def main():
     worker_prompts = [d["prompt"] for d in dispatches if not d["is_verifier"]]
     worker_indices = [d["idx"] for d in dispatches if not d["is_verifier"]]
     last_worker_idx = max(worker_indices) if worker_indices else -1
-    # Audit only — recorded, never a block condition.
+    # Audit only: recorded, never a block condition.
     subagent_types = [d["subagent_type"] for d in dispatches]
 
     # A VALID verifier satisfies all 3 structural parts.
@@ -169,8 +169,10 @@ def main():
         valid_verifier = True
         break
 
+    session_id = _session_id(payload)
+
     if valid_verifier:
-        _log("pass", {"subagent_types": subagent_types})
+        _log("pass", session_id, {"subagent_types": subagent_types})
         return
 
     reason = (
@@ -181,14 +183,28 @@ def main():
         "prompt RE-DERIVES (keywords: re-derive / independently verify / re-run / "
         "re-check / recompute, OR a reference to the worker output-artifact path) "
         "rather than merely re-reading. Dispatch a re-deriving verifier and let it "
-        "gate the backlog ledger before completing — completion is the ledger state, "
+        "gate the backlog ledger before completing: completion is the ledger state, "
         "not your assertion."
     )
     print(json.dumps({"decision": "block", "reason": reason}))
-    _log("block", {"subagent_types": subagent_types})
+    _log("block", session_id, {"subagent_types": subagent_types})
 
 
-def _log(event, extra=None):
+def _session_id(payload):
+    """Best-effort session id from the Stop payload. Never raises.
+
+    Defect 2 fix (2026-08-07): _log() carried no session key at all, so every
+    record this hook ever wrote was structurally unclassifiable as real (a
+    missing session is read as synthetic by the gate-yield classifier)."""
+    try:
+        sys.path.insert(0, _HOOK_DIR)
+        from _governance_logger import session_from
+        return session_from(payload)
+    except Exception:
+        return None
+
+
+def _log(event, session=None, extra=None):
     try:
         from datetime import datetime
         log_path = os.path.join(_HOOK_DIR, "governance-log.jsonl")
@@ -198,6 +214,7 @@ def _log(event, extra=None):
             "hook": "verifier-gate",
             "skill": SKILL_NAME,
             "schema": 2,
+            "session": session,
         }
         if extra:
             record.update(extra)

@@ -5,11 +5,30 @@ description: "Save current session state to vault. Use when the user says /save,
 
 Checkpoint the current session. Save progress to vault files so future sessions can resume seamlessly.
 
+## Use-when
+
+- User says `/save` or "checkpoint" or "save state"
+- Before ending a session with unsaved progress
+- Before a milestone hand-off to another agent or workflow
+- Proactively when STATE.md is more than ~30 minutes out of date
+
+## Do-NOT-use-when
+
+- The session has produced no persistable changes: use the SAVE-CHECK skip-rules instead
+- The active project is ambiguous and saving to the wrong STATE.md would mislead future sessions: ask first
+- For volatile in-progress data: use `work/` artifacts; STATE.md is for durable status
+
+## Gotchas
+
+- **STATE.md location ambiguity**: `Projects/*/STATE.md` plus `Projects/*/*/STATE.md` resolves ~30 files; the right project must come from conversation context, not heuristics. If unclear, ask. Two projects can share a leaf name, so always disambiguate by the full relative identity (`Personal/Finance`).
+- **last_action overwrite vs append**: STATE.md is REWRITTEN on save, not appended. Preserve the existing structure (frontmatter fields, section headers) when rewriting; do not blank-rewrite from scratch.
+- **Frontmatter date drift**: `date:` is the original creation date and must be preserved across saves; `updated:` is the only date field that should change.
+
 ## Steps
 
 ### 1. Identify the active project
 
-Glob for `Projects/*/STATE.md`. Determine which project this session relates to from conversation context. If ambiguous, ask the user.
+Glob for `Projects/*/STATE.md` AND `Projects/*/*/STATE.md`: a directory IS a project if and only if it directly contains `STATE.md`, and projects nest one level. Refer to the project by its full relative identity (`Personal/Finance`), never the bare leaf. Determine which project this session relates to from conversation context. If ambiguous, ask the user.
 
 ### 2. Update STATE.md
 
@@ -131,7 +150,7 @@ Skip this step if nothing reusable was learned this session.
 
 ## Rules
 
-- **Use built-in Read/Write/Edit tools** for all file operations. They work on your vault path.
+- **Use built-in Read/Write/Edit tools** for all file operations. They work on the OneDrive path.
 - **One topic per memory file**: keep memories focused and independently useful.
 - **Never overwrite memory without reading first**: always read existing content and merge.
 - **Don't duplicate**: check existing memories before creating new ones.

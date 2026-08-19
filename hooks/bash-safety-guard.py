@@ -105,6 +105,16 @@ except Exception as _exc:
     def curl_external_write(_command):
         return (False, None)
 
+# owner ruling 2026-08-13: writes to hosts we own warn instead of denying. The
+# fallback returns False so a degraded import keeps the STRICTER behaviour (deny),
+# never the looser one.
+try:
+    from _irreversible_surface import curl_write_targets_warn_hosts_only
+except Exception:
+
+    def curl_write_targets_warn_hosts_only(_command):
+        return False
+
 
 # H2 fix (2026-04-18): pre-strip known-inert string contexts so blocked-pattern
 # matches don't hit content inside string literals. A full shlex tokenizer
@@ -233,18 +243,17 @@ BLOCKED_PATTERNS = [
     (r'\brm\s+(-[rfRF]+\s+|--force\s+|--recursive\s+)*/(?!(?:[a-z]/)?tmp/)', "rm -rf on non-tmp directory"),
     (r'\brm\s+(-[rfRF]+\s+)+\.(?![a-zA-Z])', "rm -rf on current directory"),
     # Destructive git operations
-    # The option-skipping prefix is shared verbatim with the normal-push WARN row.
-    # Both rows must tolerate git's global options (-C <dir>, -c k=v, --long, -x)
-    # sitting between `git` and `push`. Without it these rows required adjacency,
-    # so `git -C <path> push --force` matched neither and fell through to the WARN
-    # built for the additive, revertible push: the one unrecoverable git operation
-    # was being downgraded to the safe one's treatment. `-f` carries a lookbehind
-    # so a branch named `my-f` cannot match. These rows also now catch the
-    # trailing-flag spelling (`git push origin main --force`) the originals missed.
-    # Documented as insights/deny-patterns-fail-on-command-spelling in the
-    # companion research repository.
+    # The option-skipping prefix is shared verbatim with the normal-push WARN row in
+    # _IRREVERSIBLE_FALLBACK_SNAPSHOT (P2). Both rows must tolerate git's global options
+    # (-C <dir>, -c k=v, --long, -x) sitting between `git` and `push`. Without it these
+    # two rows required adjacency, so `git -C <path> push --force` matched neither and
+    # fell through to the P2 WARN built for the additive, revertible push: the one
+    # unrecoverable git operation was being downgraded to the safe one's treatment.
+    # Measured 2026-08-06 by executing this hook over a deny/warn matrix, after the
+    # evasion was used unknowingly during a history rewrite the same day.
     (r'\bgit\s+(?:(?:-C\s+\S+|-c\s+\S+|--[A-Za-z][\w-]*(?:=\S+)?|-[A-Za-z])\s+)*push\s+.*--force',
      "git force-push"),
+    # `-f` must be its own token: the lookbehind stops a branch named `my-f` matching.
     (r'\bgit\s+(?:(?:-C\s+\S+|-c\s+\S+|--[A-Za-z][\w-]*(?:=\S+)?|-[A-Za-z])\s+)*push\b[^;|&]*?(?<![\w-])-f\b',
      "git force-push (-f)"),
     (r'\bgit\s+reset\s+--hard', "git reset --hard"),
@@ -344,6 +353,39 @@ def _warn_and_allow(command, description, payload):
         pass
 
 
+def _warn_and_allow_curl(command, reason, payload):
+    """Permit a curl write aimed only at infrastructure we own, with a caution.
+
+    Separate from _warn_and_allow because that one's prose is about publishing a
+    git push; the risk here is different and the agent should read the right one."""
+    result = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow",
+            "permissionDecisionReason": (
+                f"BASH SAFETY (warning, not a block): '{reason}', but every target is a "
+                "host we administer, so this proceeds. "
+                f"Command: {command[:100]}. "
+                "It still changes live state: a workflow write publishes immediately, "
+                "and a webhook call runs for real against whatever that workflow does. "
+                "Snapshot before you edit, and check you are not pointed at production."
+            ),
+        }
+    }
+    print(json.dumps(result))
+    try:
+        from _event_emit import emit_event
+        from _governance_logger import session_from
+        emit_event(
+            event="warn",
+            hook="bash-safety-guard",
+            session=session_from(payload),
+            extra={"pattern": reason + " [self-hosted target]", "command_prefix": command[:50]},
+        )
+    except Exception:
+        pass
+
+
 def main():
     payload_text = sys.stdin.read()
     if not payload_text:
@@ -426,6 +468,16 @@ def main():
     except Exception:
         curl_deny, curl_reason = (False, None)
     if curl_deny:
+        # owner ruling 2026-08-13: a write aimed ONLY at infrastructure we own
+        # warns and proceeds. Prod, third-party APIs and message senders are
+        # untouched and still deny below. Fail toward the deny on any exception.
+        try:
+            _warn_host_only = curl_write_targets_warn_hosts_only(scannable)
+        except Exception:
+            _warn_host_only = False
+        if _warn_host_only:
+            _warn_and_allow_curl(command, curl_reason, payload)
+            return
         result = {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",

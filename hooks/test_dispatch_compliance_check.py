@@ -16,6 +16,7 @@ Run: python .claude/hooks/test_dispatch_compliance_check.py
 """
 import os
 import sys
+import tempfile
 import unittest
 
 _HOOK_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -268,6 +269,248 @@ class DualEmitSchemaFieldTests(unittest.TestCase):
             self.assertEqual(len(entries), 2)
             self.assertEqual(entries[0]["correlation_id"], entries[1]["correlation_id"])
             self.assertEqual(entries[0]["correlation_id"], cid)
+
+
+class WrapperSessionWiringTests(unittest.TestCase):
+    """Defect 2 (2026-08-07): the wrapper's entry-point log_fire() call fired
+    before session was ever wired in, always logging session=None even
+    though `payload` (with session_id) was already in scope. Reproduces the
+    broken shape first (a synthetic Stop-hook invocation with a populated
+    session_id and no transcript, isolated via HOOK_ACTIVITY_LOG_PATH so it
+    cannot pollute the live log), then asserts session populates."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "dispatch_compliance_check_wrapper_sessiontest",
+            os.path.join(_HOOK_DIR, "dispatch-compliance-check.py"),
+        )
+        cls.wrapper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.wrapper)
+
+    def test_session_populates_from_payload(self):
+        import io
+        import json as _json
+        import tempfile
+        from contextlib import redirect_stdout
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as td:
+            activity_log = os.path.join(td, "hook-activity.jsonl")
+            payload = {
+                "session_id": "test-dispatchcompliance-1",
+                "transcript_path": os.path.join(td, "no-such-transcript.jsonl"),
+            }
+            captured = io.StringIO()
+            with mock.patch.dict(os.environ, {"HOOK_ACTIVITY_LOG_PATH": activity_log}), \
+                 mock.patch.object(sys, "stdin", io.StringIO(_json.dumps(payload))), \
+                 redirect_stdout(captured):
+                self.wrapper.main()
+            self.assertTrue(os.path.exists(activity_log))
+            with open(activity_log, encoding="utf-8") as f:
+                records = [_json.loads(l) for l in f if l.strip()]
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["hook"], "dispatch-compliance-check")
+        self.assertEqual(records[0]["session"], "test-dispatchcompliance-1")
+
+
+class PluginDispatchNameTests(unittest.TestCase):
+    """Defect 5 (2026-08-07): KNOWN_DISPATCH_NAMES did not know any plugin
+    agent name, making plugin dispatches invisible to compliance parsing.
+    Reproduces the broken shape first (a plain plugin agent name that used to
+    have no membership), then asserts recognition, including the
+    plugin-namespaced form named in the acceptance instrument."""
+
+    def test_plain_plugin_agent_name_recognized(self):
+        from _dispatch_compliance_logic import KNOWN_DISPATCH_NAMES
+        self.assertIn("silent-failure-hunter", KNOWN_DISPATCH_NAMES)
+
+    def test_synthetic_dispatch_record_naming_plugin_agent_recognized(self):
+        self.assertEqual(
+            extract_dispatch_names("pr-review-toolkit:silent-failure-hunter"),
+            ["silent-failure-hunter"],
+        )
+
+    def test_unknown_namespace_still_rejected(self):
+        self.assertEqual(
+            extract_dispatch_names("some-plugin:totally-made-up-agent"),
+            [],
+        )
+
+
+class PrunedGenericWordTests(unittest.TestCase):
+    """Defect 5 post-review, silent-failure lens (2026-08-07): the 54-name
+    import included bare or near-bare common-English compounds that
+    extract_dispatch_names could match inside ordinary prose, letting a word
+    like "analyzer" become a phantom DECLARED item unrelated to any real
+    dispatch. Pruned: analyzer, comparator, compliance_agent, formatter_agent,
+    grader, intake_agent, monitoring_agent. These tests assert the prune
+    actually took (absent from the vocabulary, unmatched by extraction)."""
+
+    PRUNED = (
+        "analyzer", "comparator", "compliance_agent",
+        "formatter_agent", "grader", "intake_agent", "monitoring_agent",
+    )
+
+    def test_pruned_words_absent_from_vocabulary(self):
+        from _dispatch_compliance_logic import KNOWN_DISPATCH_NAMES
+        for word in self.PRUNED:
+            self.assertNotIn(word, KNOWN_DISPATCH_NAMES, f"{word!r} should have been pruned")
+
+    def test_pruned_word_in_ordinary_prose_not_extracted(self):
+        # "the analyzer showed clean results" is a plausible sentence a model
+        # might write; must not surface "analyzer" as a declared name.
+        names = extract_dispatch_names("the analyzer showed clean results")
+        self.assertEqual(names, [])
+        self.assertNotIn("analyzer", names)
+
+    def test_real_declaration_survives_pruned_word_in_trailing_prose(self):
+        # A real declared item followed by a comma-led sentence that happens
+        # to start with a pruned word must keep the real item and drop the
+        # pruned one, not silently inject it as a second declared name.
+        names = extract_dispatch_names(
+            "silent-failure-hunter, analyzer showed clean output on the prior pass"
+        )
+        self.assertEqual(names, ["silent-failure-hunter"])
+        self.assertNotIn("analyzer", names)
+
+
+class DispatchNormalizationTests(unittest.TestCase):
+    """Defect 5 follow-up (2026-08-07): normalize_dispatched_name reduces a
+    plugin-namespaced tool_use dispatch to the same bare suffix
+    extract_dispatch_names already reduces a namespaced DECLARATION to."""
+
+    def test_namespaced_name_reduced_to_suffix(self):
+        from _dispatch_compliance_logic import normalize_dispatched_name
+        self.assertEqual(
+            normalize_dispatched_name("pr-review-toolkit:silent-failure-hunter"),
+            "silent-failure-hunter",
+        )
+
+    def test_bare_name_unchanged(self):
+        from _dispatch_compliance_logic import normalize_dispatched_name
+        self.assertEqual(normalize_dispatched_name("silent-failure-hunter"), "silent-failure-hunter")
+
+    def test_empty_string_unchanged(self):
+        from _dispatch_compliance_logic import normalize_dispatched_name
+        self.assertEqual(normalize_dispatched_name(""), "")
+
+
+# --------------------------------------------------------------------------
+# End-to-end decision tests (defect 5 post-review, architect BLOCKING
+# finding 2026-08-07): the vocabulary change feeds dispatch-compliance-check's
+# Stop-hook BLOCK/PASS decision, not just telemetry. These run main() through
+# a synthetic transcript file and inspect the actual stdout decision, rather
+# than testing extract_dispatch_names / compute_missing in isolation.
+# --------------------------------------------------------------------------
+class PluginDispatchEndToEndTests(unittest.TestCase):
+    """Builds a temp transcript (one assistant turn per test) and runs the
+    wrapper's main() against it, asserting the stdout decision. governance-log
+    writes are isolated to a temp dir (wrapper._HOOK_DIR patched) and
+    hook-activity writes to a temp file (HOOK_ACTIVITY_LOG_PATH env override,
+    same mechanism WrapperSessionWiringTests uses) so no live log is touched."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "dispatch_compliance_check_e2e",
+            os.path.join(_HOOK_DIR, "dispatch-compliance-check.py"),
+        )
+        cls.wrapper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.wrapper)
+
+    @staticmethod
+    def _assistant_line(blocks):
+        import json as _json
+        return _json.dumps({"type": "assistant", "message": {"content": blocks}})
+
+    @staticmethod
+    def _text_block(text):
+        return {"type": "text", "text": text}
+
+    @staticmethod
+    def _agent_block(subagent_type):
+        return {"type": "tool_use", "name": "Agent", "input": {"subagent_type": subagent_type}}
+
+    def _run(self, td, blocks, session_id):
+        import io
+        import json as _json
+        import tempfile as _tempfile
+        from contextlib import redirect_stdout
+        from unittest import mock
+
+        transcript_path = os.path.join(td, "transcript.jsonl")
+        with open(transcript_path, "w", encoding="utf-8") as f:
+            f.write(self._assistant_line(blocks) + "\n")
+
+        activity_log = os.path.join(td, "hook-activity.jsonl")
+        payload = _json.dumps({"session_id": session_id, "transcript_path": transcript_path})
+        captured = io.StringIO()
+        with mock.patch.dict(os.environ, {"HOOK_ACTIVITY_LOG_PATH": activity_log}), \
+             mock.patch.object(self.wrapper, "_HOOK_DIR", td), \
+             mock.patch.object(sys, "stdin", io.StringIO(payload)), \
+             redirect_stdout(captured):
+            self.wrapper.main()
+        return captured.getvalue()
+
+    def test_namespaced_declared_and_dispatched_passes(self):
+        """(i) MUST DISPATCH declares a plugin agent by its namespaced form and
+        the transcript shows that exact namespaced Agent dispatch: PASS
+        (no block output)."""
+        with tempfile.TemporaryDirectory() as td:
+            text = "TASK TYPE: Build\nMUST DISPATCH: pr-review-toolkit:silent-failure-hunter"
+            out = self._run(
+                td,
+                [self._text_block(text), self._agent_block("pr-review-toolkit:silent-failure-hunter")],
+                "e2e-pass-namespaced",
+            )
+        self.assertEqual(out, "")
+
+    def test_declared_but_never_dispatched_blocks(self):
+        """(ii) MUST DISPATCH declares a plugin agent and no matching dispatch
+        occurs anywhere in the transcript: BLOCK."""
+        with tempfile.TemporaryDirectory() as td:
+            text = "TASK TYPE: Build\nMUST DISPATCH: pr-review-toolkit:silent-failure-hunter"
+            out = self._run(td, [self._text_block(text)], "e2e-block-missing")
+        self.assertIn('"decision": "block"', out)
+        self.assertIn("silent-failure-hunter", out)
+
+    def test_pruned_word_in_prose_does_not_satisfy_declared_obligation(self):
+        """(iii) A real declared item plus trailing prose containing a pruned
+        generic word ("analyzer") must still BLOCK on the real missing item.
+        The prose mention is neither recognized as a declared name nor as a
+        dispatch, so it cannot manufacture a false PASS."""
+        with tempfile.TemporaryDirectory() as td:
+            text = (
+                "TASK TYPE: Build\nMUST DISPATCH: silent-failure-hunter, "
+                "analyzer showed clean output on the prior pass"
+            )
+            out = self._run(td, [self._text_block(text)], "e2e-block-pruned-prose")
+        self.assertIn('"decision": "block"', out)
+        self.assertIn("silent-failure-hunter", out)
+        self.assertNotIn("analyzer", out)
+
+    def test_short_declared_matches_namespaced_dispatch(self):
+        """(iv) Live-probe finding: MUST DISPATCH declares the bare/short form
+        ("silent-failure-hunter") but the actual Agent dispatch uses the
+        plugin-namespaced runtime name ("pr-review-toolkit:silent-failure-hunter").
+        Before the normalize_dispatched_name fix this spuriously BLOCKED (the
+        declared side is reduced to the bare suffix by extract_dispatch_names,
+        but the dispatched side kept the full namespaced string, so the two
+        never compared equal). Chosen fix: make the dispatched side normalize
+        to the same bare suffix (smaller than requiring every declaration to
+        spell out a plugin namespace the classifier can't reliably know).
+        Verified behavior after the fix: PASS."""
+        with tempfile.TemporaryDirectory() as td:
+            text = "TASK TYPE: Build\nMUST DISPATCH: silent-failure-hunter"
+            out = self._run(
+                td,
+                [self._text_block(text), self._agent_block("pr-review-toolkit:silent-failure-hunter")],
+                "e2e-pass-short-declared-namespaced-dispatch",
+            )
+        self.assertEqual(out, "")
 
 
 if __name__ == "__main__":

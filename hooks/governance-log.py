@@ -2,7 +2,7 @@
 Governance Log - Stop Hook
 Captures classification, dispatch, and agent activity per response.
 Appends one JSON line to governance-log.jsonl per response.
-Does NOT block: logging only.
+Does NOT block; logging only.
 
 Regex hardening (2026-03-22):
 - 200KB window (up from 80KB) to capture large agent outputs
@@ -51,6 +51,44 @@ KNOWN_DISPATCH_NAMES = {
     "process-qa", "process-analysis", "process-build", "process-planning",
     "process-research", "process-pentest", "pm", "task-classifier", "verify",
     "ensemble", "architect-loop", "save", "maintain", "index",
+    # Plugin agents (defect 5, 2026-08-07): enumerated from registry.json's
+    # `agents` dict, every entry whose `source` starts with "plugin:" (54
+    # names: academic-research-skills 36 + claude-plugins-official 18).
+    # Without these, MUST DISPATCH text naming a plugin agent (e.g.
+    # "pr-review-toolkit:silent-failure-hunter") was invisible to this
+    # parser's compliance extraction: the vocabulary only knew vault-local
+    # agents/skills. registry.json is READ-ONLY input here, never edited.
+    # Prune follow-up (post-review, 2026-08-07): 7 of the 54 were bare or
+    # near-bare common-English compounds ("analyzer", "compliance_agent")
+    # that extract_dispatch_names could match inside ordinary prose,
+    # producing a phantom DECLARED item unrelated to any real dispatch
+    # intent. Dropped rather than kept namespace-qualified: the suffix
+    # check below reuses this SAME set for both the bare-candidate test and
+    # the post-colon suffix test, so a namespace-only bucket needs a second
+    # set (out of scope for this fix) or a hardcoded "plugin:name" literal
+    # whose namespace slug can't be verified from registry.json's
+    # marketplace-level "source" field (compare "claude-plugins-official"
+    # above with the real dispatch namespace "pr-review-toolkit" in the
+    # silent-failure-hunter example). Dropped: analyzer, comparator,
+    # compliance_agent, formatter_agent, grader, intake_agent,
+    # monitoring_agent.
+    "abstract_bilingual_agent", "agent-creator", "agent-sdk-verifier-py",
+    "agent-sdk-verifier-ts", "argument_builder_agent",
+    "atomic-explorer", "atomic-reviewer", "bibliography_agent",
+    "citation_compliance_agent", "code-architect", "code-explorer",
+    "code-reviewer", "collaboration_depth_agent", "comment-analyzer",
+    "conversation-analyzer",
+    "devils_advocate_agent", "devils_advocate_reviewer_agent", "domain_reviewer_agent",
+    "draft_writer_agent", "editor_in_chief_agent", "editorial_synthesizer_agent",
+    "eic_agent", "ethics_review_agent", "field_analyst_agent",
+    "integrity_verification_agent", "literature_strategist_agent", "meta_analysis_agent",
+    "methodology_reviewer_agent", "peer_reviewer_agent",
+    "perspective_reviewer_agent", "pipeline_orchestrator_agent", "plugin-validator",
+    "pr-test-analyzer", "report_compiler_agent", "research_architect_agent",
+    "research_question_agent", "revision_coach_agent", "risk_of_bias_agent",
+    "silent-failure-hunter", "skill-reviewer", "socratic_mentor_agent",
+    "source_verification_agent", "state_tracker_agent", "structure_architect_agent",
+    "synthesis_agent", "type-design-analyzer", "visualization_agent",
 }
 
 
@@ -72,7 +110,7 @@ def extract_dispatch_names(raw_text):
     found = []
     for segment in raw_text.split(","):
         segment = segment.strip()
-        # The name might be followed by reasoning text: try matching the first word(s)
+        # The name might be followed by reasoning text; try matching the first word(s)
         # that form a known name (handles multi-word like "architect-review")
         words = segment.split()
         for i in range(min(3, len(words)), 0, -1):
@@ -80,6 +118,18 @@ def extract_dispatch_names(raw_text):
             if candidate in KNOWN_DISPATCH_NAMES:
                 found.append(candidate)
                 break
+            # Defect 5 (2026-08-07): a plugin-namespaced dispatch name (e.g.
+            # "pr-review-toolkit:silent-failure-hunter") is a single
+            # whitespace-free token, so the word-count loop above never sees
+            # it split apart. registry.json's own agent names are plain
+            # (unqualified), so recognize the token by its post-colon suffix
+            # instead of requiring every specific plugin's namespace prefix
+            # to be hardcoded here.
+            if ":" in candidate:
+                suffix = candidate.rsplit(":", 1)[-1].strip()
+                if suffix in KNOWN_DISPATCH_NAMES:
+                    found.append(suffix)
+                    break
 
     return ", ".join(found) if found else None
 
@@ -160,12 +210,24 @@ def main():
                 m = VALID_TYPES.search(clean)
                 if m:
                     last_type = m.group(1)
-                    # Reset ALL state per new classification
+                    # Reset the per-classification metadata fields only (domain,
+                    # must_dispatch, implies describe THIS classification and are
+                    # correctly replaced by a newer one). agents_dispatched /
+                    # skills_invoked are NOT reset here (fixed 2026-08-07,
+                    # measurement-integrity addendum): this hook runs once per
+                    # Stop event over one transcript-tail window, and a
+                    # re-classification inside that same window (a compound task,
+                    # a decomposed sub-task) does not mean the dispatches counted
+                    # under the PRIOR classification stopped happening this turn.
+                    # The old reset wiped them on every re-classification,
+                    # undercounting independent of window size: a dispatch made
+                    # before a mid-turn re-classification vanished from the final
+                    # record. The true window boundary is one hook invocation
+                    # (the top of main(), where these lists are first initialized
+                    # to []), not each classification match inside it.
                     last_domain = None
                     last_must_dispatch = None
                     last_implies = None
-                    agents_dispatched = []
-                    skills_invoked = []
 
                     # IMPLIES (case-insensitive)
                     im = re.search(r'IMPLIES:\s*(.+)', clean, re.IGNORECASE)
@@ -243,7 +305,7 @@ def main():
         "skill_count": len(skills_invoked),
         "wiki_queried": wiki_queried,  # W-V1 Phase 1 (2026-05-26): qmd MCP consultation this turn
         "memory_searched_raw": memory_searched_raw,  # 2026-06-01: raw Grep of memory/KB corpus this turn
-        "memory_forgot_qmd": memory_searched_raw and not wiki_queried,  # 2026-06-01: forget signal: searched corpus by hand, never consulted qmd
+        "memory_forgot_qmd": memory_searched_raw and not wiki_queried,  # 2026-06-01: forget signal, searched corpus by hand, never consulted qmd
     }
 
     # C7 convergence (2026-08-01). This was the last direct writer with its own

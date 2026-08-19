@@ -1,4 +1,4 @@
-"""Tests for _event_emit: the shared governance-log writer.
+"""Tests for _event_emit, the shared governance-log writer.
 
 Written 2026-08-01 as the first step of contract C7 (writer convergence). The
 module had no tests at all, which is a poor state for a helper that other
@@ -16,6 +16,7 @@ import importlib.util
 import json
 import os
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -143,6 +144,76 @@ class LogPathOverrideTests(_Base):
         with mock.patch.dict(os.environ, {"GOVERNANCE_LOG_PATH": "   "}):
             self.m.emit_event(event="e", hook="h", session="s")
         self.assertEqual(len(self.records()), 1)
+
+
+class BeltAndSuspendersGuardTests(unittest.TestCase):
+    """Phase 1 (CE-1 qmd substrate repair, 2026-08-07): the stack-based
+    fallback that closes the one bypass class conftest.py's env-var redirect
+    cannot reach (a bare `python -m unittest` run on a hook test file whose
+    test code never touches this module, so the real hook under test writes
+    straight to the live file). See finding_unittest_bypasses_conftest_log_redirect.md.
+
+    LOG_PATH and _LIVE_LOG_PATH are both monkeypatched to the SAME decoy path
+    in every case (never the real governance-log.jsonl), so a guard defect
+    cannot pollute the live log even if this test itself fails.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.decoy_live = os.path.join(self.tmp, "decoy-governance-log.jsonl")
+        self.m = _load()
+        self.m.LOG_PATH = self.decoy_live
+        self.m._LIVE_LOG_PATH = self.decoy_live
+        self._env_patch = mock.patch.dict(os.environ, {}, clear=False)
+        self._env_patch.start()
+        os.environ.pop("GOVERNANCE_LOG_PATH", None)
+        self.addCleanup(self._env_patch.stop)
+
+    def _records(self, path):
+        if not os.path.exists(path):
+            return []
+        with open(path, encoding="utf-8") as fh:
+            return [json.loads(line) for line in fh if line.strip()]
+
+    def test_a_test_context_with_no_override_redirects_away_from_the_decoy_live_path(self):
+        # This test method's own frame is a unittest.TestCase bound in a
+        # test_*.py file: exactly the shape _in_test_context() looks for.
+        self.m.emit_event(event="e", hook="some-hook", session="s")
+        self.assertEqual(
+            self._records(self.decoy_live), [],
+            "guard must not write to the live-shaped path from a test frame",
+        )
+        fallback = self.m._test_fallback_path()
+        recs = self._records(fallback)
+        self.assertEqual(len(recs), 1)
+        self.assertEqual(recs[0]["hook"], "some-hook")
+
+    def test_b_explicit_env_override_still_wins_over_the_stack_guard(self):
+        other = os.path.join(self.tmp, "explicit-override.jsonl")
+        with mock.patch.dict(os.environ, {"GOVERNANCE_LOG_PATH": other}):
+            self.m.emit_event(event="e", hook="h", session="s")
+        self.assertEqual(len(self._records(other)), 1)
+        self.assertEqual(self._records(self.decoy_live), [])
+        fallback = self.m._test_fallback_path()
+        self.assertEqual(
+            self._records(fallback), [],
+            "the explicit env override must win over the stack-based guard",
+        )
+
+    def test_c_a_non_test_frame_is_unaffected_and_writes_to_the_live_shaped_path(self):
+        # Run emit_event on a worker thread: inspect.stack() only sees the
+        # CURRENT thread's frames, so this thread's stack contains no
+        # test_*.py/TestCase frame at all, genuinely simulating a production
+        # hook firing (not just "called during a test run").
+        t = threading.Thread(
+            target=self.m.emit_event, kwargs={"event": "e", "hook": "prod-hook", "session": "s"}
+        )
+        t.start()
+        t.join(timeout=5)
+        self.assertFalse(t.is_alive())
+        recs = self._records(self.decoy_live)
+        self.assertEqual(len(recs), 1)
+        self.assertEqual(recs[0]["hook"], "prod-hook")
 
 
 if __name__ == "__main__":

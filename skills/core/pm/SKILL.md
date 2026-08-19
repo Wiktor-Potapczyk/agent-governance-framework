@@ -17,7 +17,7 @@ Run a project management checkpoint by dispatching the PM orchestrator agent.
 
 ### 1. Identify the active project
 
-Glob for `Projects/*/STATE.md`. Determine which project this checkpoint is for from conversation context.
+Glob for `Projects/*/STATE.md` AND `Projects/*/*/STATE.md`: a directory IS a project if and only if it directly contains `STATE.md`, and projects nest one level (`Personal/Finance`, `Consultations/TKT123-Vendor-Scorecard-v3`). Name the project by its full relative identity, not the bare leaf. Determine which project this checkpoint is for from conversation context.
 
 - If multiple projects found and context is ambiguous, ask the user.
 - If no `STATE.md` files found, inform the user no projects exist and ask if they want to start one.
@@ -52,8 +52,10 @@ PM CHECKPOINT REPORT
 Project: [name]
 Phase: [0-4]
 Viability: PASS | HOLD | KILL
-Blockers: [count]: [list or "none"]
+Blockers: [count], then [list or "none"]
 Next: [recommended next action]
+Parallel-runnable: [parallel-group letters or ticket list that can fan out together, or "none, must serialize"]
+Parallel-blocked-by: [data-flow dependencies that force serialization, or "none"]
 ```
 
-Populate from the pm-orchestrator's output. If the orchestrator didn't produce a viability verdict, default to PASS (checkpoint ran, no kill signal).
+Populate from the pm-orchestrator's output. If the orchestrator didn't produce a viability verdict, default to PASS (checkpoint ran, no kill signal). If the orchestrator didn't produce parallel-runnability fields (older pm-orchestrator versions), default to `Parallel-runnable: unknown` and `Parallel-blocked-by: unknown`: do not fabricate.

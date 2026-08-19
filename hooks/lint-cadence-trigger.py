@@ -5,13 +5,14 @@ Reads three sibling state files and surfaces a "consider running" suggestion
 for each when last run is older than its cadence (or the state file does not exist).
 
 State files:
-  .claude/hooks/_state/lint-cadence.json: /process-lint (7d)
-  .claude/hooks/_state/governance-mine-cadence.json: /process-governance-mine (7d)
-  .claude/hooks/_state/setup-audit-cadence.json: rolling CMDB / full-setup-analysis refresh (30d)
+  .claude/hooks/_state/lint-cadence.json            : /process-lint (7d)
+  .claude/hooks/_state/governance-mine-cadence.json : /process-governance-mine (7d)
+  .claude/hooks/_state/setup-audit-cadence.json     : rolling CMDB / full-setup-analysis refresh (30d)
+  .claude/hooks/_state/telemetry-check-cadence.json : process-lint Pass T telemetry check (7d, Hermes P3 2026-08-18)
 
 The setup-audit cadence makes the situational-awareness audit (CMDB-v3 + asset-awareness
-Phases 0:C) a ROLLING effort rather than incidental, per
-[[feedback_rolling_setup_analysis_single_source_of_truth]]: so registry.json stays the
+Phases 0-C) a ROLLING effort rather than incidental, per
+[[feedback_rolling_setup_analysis_single_source_of_truth]], so registry.json stays the
 single source of truth and redundancy/dead-dependency drift surfaces on a schedule.
 
 Output contract: stdout JSON per SessionStart hook spec. Never blocks.
@@ -31,6 +32,9 @@ SETUP_AUDIT_STATE_FILE = os.path.join(
 )
 WORK_TRIAGE_STATE_FILE = os.path.join(
     VAULT, ".claude", "hooks", "_state", "work-triage-cadence.json"
+)
+TELEMETRY_CHECK_STATE_FILE = os.path.join(
+    VAULT, ".claude", "hooks", "_state", "telemetry-check-cadence.json"
 )
 
 MINER_RESOLVED_LEDGER = os.path.join(
@@ -113,7 +117,7 @@ def build_ingest_backlog_suggestion():
             if age_h < INGEST_BACKLOG_HOURS:
                 continue
             stem = os.path.splitext(name)[0]
-            # log entries may truncate long titles: probe on the first token
+            # log entries may truncate long titles; probe on the first token
             # (repo/article slug), min 8 chars to avoid false matches, else full stem
             first_token = stem.split()[0] if stem.split() else stem
             probe = first_token if len(first_token) >= 8 else stem[:60]
@@ -125,7 +129,7 @@ def build_ingest_backlog_suggestion():
     shown = ", ".join(overdue[:5]) + (f" (+{len(overdue)-5} more)" if len(overdue) > 5 else "")
     return (
         f"[INGEST CADENCE] {len(overdue)} item(s) past the {INGEST_BACKLOG_HOURS}h ingest rule with no "
-        f"log.md decision: {shown}. Run process-ingest or record a CLIP-SKIPPED decision: "
+        f"log.md decision: {shown}. Run process-ingest or record a CLIP-SKIPPED decision; "
         "silence is worse than a recorded skip (audit 2026-06-10, lesson 5)."
     )
 
@@ -137,7 +141,7 @@ def build_lint_suggestion():
         bootstrap_state_file(STATE_FILE, "/process-lint")
         return (
             "[LINT CADENCE] No prior /process-lint run on record (state file bootstrapped). "
-            "Lint is read-only: RUN /process-lint this session to establish baseline "
+            "Lint is read-only; RUN /process-lint this session to establish baseline "
             "(standing authorization, Increment 2 2026-06-12)."
         )
     try:
@@ -160,7 +164,7 @@ def build_lint_suggestion():
         msg = (
             f"[LINT CADENCE: OVERDUE] Last /process-lint ran {age_days} days ago "
             f"(cadence 7d; {errors} errors, {warnings} warnings unresolved). "
-            "Lint is read-only: RUN /process-lint this session, do not defer "
+            "Lint is read-only; RUN /process-lint this session, do not defer "
             "(standing authorization, Increment 2 2026-06-12)."
         )
     else:
@@ -181,7 +185,7 @@ def build_governance_mine_suggestion():
         bootstrap_state_file(GOVERNANCE_MINE_STATE_FILE, "/process-governance-mine")
         return (
             "[GOVERNANCE-MINE CADENCE] No prior /process-governance-mine run (state file "
-            "bootstrapped). Mining is proposal-only: RUN /process-governance-mine this "
+            "bootstrapped). Mining is proposal-only; RUN /process-governance-mine this "
             "session to establish baseline (standing authorization, Increment 2 2026-06-12)."
         )
     try:
@@ -203,7 +207,7 @@ def build_governance_mine_suggestion():
         msg = (
             f"[GOVERNANCE-MINE CADENCE: OVERDUE] Last /process-governance-mine ran {age_days} "
             f"days ago (cadence 7d; {proposal_count} proposals last run). Mining is "
-            "proposal-only: RUN /process-governance-mine this session, do not defer "
+            "proposal-only; RUN /process-governance-mine this session, do not defer "
             "(standing authorization, Increment 2 2026-06-12)."
         )
     else:
@@ -221,12 +225,12 @@ def build_governance_mine_proposal_closure_suggestion():
     """GAP-3b (TA-3 Phase 2, 2026-07-10): loop-closure reminder for UNRESOLVED
     governance-mine proposals.
 
-    The cadence reminder above only asks "is a new mine run due?": proposals
+    The cadence reminder above only asks "is a new mine run due?"; proposals
     from the LAST run can sit unruled forever without tripping anything. This
     builder fires when: the last report still exists on disk AND unresolved
     proposals remain (proposal_count minus distinct sig_ids in the resolved
     ledger; a MISSING ledger counts as 0 resolved, never as an error and never
-    as fully-resolved: plan discovery D3) AND the run is older than 7 days.
+    as fully-resolved; plan discovery D3) AND the run is older than 7 days.
     Advisory only; the ruling on each proposal is the owner's (flag F6).
     """
     now = datetime.now(timezone.utc)
@@ -276,7 +280,7 @@ def build_governance_mine_proposal_closure_suggestion():
     return (
         f"[GOVERNANCE-MINE LOOP-CLOSURE] {unresolved} of {proposal_count} proposals "
         f"from the last mine run remain unruled (report: {report_path}). "
-        f"Triage sheet: {GOVERNANCE_MINE_TRIAGE_SHEET}: one owner ruling per row "
+        f"Triage sheet: {GOVERNANCE_MINE_TRIAGE_SHEET}, one owner ruling per row "
         "(accept / tune / reject); append accepted rulings to "
         ".claude/hooks/aggregates/miner-resolved.jsonl to close the loop."
     )
@@ -294,7 +298,7 @@ def build_work_triage_suggestion():
         bootstrap_state_file(WORK_TRIAGE_STATE_FILE, "/maintain work-triage")
         return (
             "[WORK-TRIAGE CADENCE] No prior work-layer triage on record (state file "
-            "bootstrapped). The sweep is proposal-only: run /maintain work-triage "
+            "bootstrapped). The sweep is proposal-only; run /maintain work-triage "
             "(python .claude/scripts/work_triage_sweep.py) to establish baseline."
         )
     try:
@@ -314,13 +318,68 @@ def build_work_triage_suggestion():
     if age >= timedelta(days=CADENCE_DAYS * ESCALATION_FACTOR):
         msg = (
             f"[WORK-TRIAGE CADENCE: OVERDUE] Last work-layer triage was {age_days} days ago "
-            "(cadence 7d). The sweep is proposal-only: run /maintain work-triage this "
+            "(cadence 7d). The sweep is proposal-only; run /maintain work-triage this "
             "session, do not defer."
         )
     else:
         msg = (
             f"[WORK-TRIAGE CADENCE] Last work-layer triage was {age_days} days ago. "
             "Run /maintain work-triage."
+        )
+    if last_report:
+        msg += f" Last report: {last_report}"
+    return msg
+
+
+def build_telemetry_check_suggestion():
+    """Return additionalContext string for the process-lint Pass T telemetry
+    check, or empty if not due.
+
+    Hermes P3 step 7 (plan 2026-08-17, build 2026-08-18): own state file, own
+    emit block per the E4 one-reminder-per-concern sibling pattern (the
+    work-triage builder is the model). The stamp file is separate from
+    lint-cadence.json by design: a partial lint run that skips Pass T must
+    not be able to stamp the telemetry check as done.
+    """
+    now = datetime.now(timezone.utc)
+    if not os.path.isfile(TELEMETRY_CHECK_STATE_FILE):
+        bootstrap_state_file(TELEMETRY_CHECK_STATE_FILE, "process-lint Pass T telemetry check")
+        return (
+            "[TELEMETRY-CHECK CADENCE] No prior Pass T telemetry check on record "
+            "(state file bootstrapped). The check is read-only and advisory; run "
+            '"C:\\Program Files\\Python314\\python.exe" '
+            ".claude\\scripts\\hook_activity_report.py --findings (and --matrix) "
+            "via /process-lint Pass T to establish baseline."
+        )
+    try:
+        with open(TELEMETRY_CHECK_STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return ""
+    last_iso = data.get("last_iso")
+    last_dt = parse_iso(last_iso) if last_iso else None
+    if last_dt is None:
+        return ""
+    age = now - last_dt
+    if age < timedelta(days=CADENCE_DAYS):
+        return ""
+    age_days = age.days
+    last_report = data.get("report_path", "")
+    if age >= timedelta(days=CADENCE_DAYS * ESCALATION_FACTOR):
+        msg = (
+            f"[TELEMETRY-CHECK CADENCE: OVERDUE] Last Pass T telemetry check ran "
+            f"{age_days} days ago (cadence 7d). The check is read-only and advisory; "
+            'RUN "C:\\Program Files\\Python314\\python.exe" '
+            ".claude\\scripts\\hook_activity_report.py --findings via /process-lint "
+            "Pass T this session, do not defer."
+        )
+    else:
+        msg = (
+            f"[TELEMETRY-CHECK CADENCE] Last Pass T telemetry check ran {age_days} "
+            f"days ago (cadence 7d). Run "
+            '"C:\\Program Files\\Python314\\python.exe" '
+            ".claude\\scripts\\hook_activity_report.py --findings (and --matrix) "
+            "via /process-lint Pass T."
         )
     if last_report:
         msg += f" Last report: {last_report}"
@@ -365,8 +424,15 @@ def build_setup_audit_suggestion():
 
 
 def main():
+    # Defect 2 fix (2026-08-07): stdin was read and immediately discarded, so
+    # the log_fire() call below always logged session=None; the payload was
+    # never parsed at all, not merely dropped after parsing.
+    session_id = None
     try:
-        sys.stdin.read()
+        payload = json.loads(sys.stdin.read() or "{}")
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from _governance_logger import session_from
+        session_id = session_from(payload)
     except Exception:
         pass
 
@@ -376,8 +442,13 @@ def main():
     setup_suggestion = ""
     ingest_suggestion = ""
     work_triage_suggestion = ""
+    telemetry_suggestion = ""
     try:
         lint_suggestion = build_lint_suggestion()
+    except Exception:
+        pass
+    try:
+        telemetry_suggestion = build_telemetry_check_suggestion()
     except Exception:
         pass
     try:
@@ -403,7 +474,8 @@ def main():
 
     # Concatenate all non-empty suggestions (newline-separated)
     parts = [s for s in (lint_suggestion, gov_suggestion, gov_closure_suggestion,
-                         setup_suggestion, ingest_suggestion, work_triage_suggestion) if s]
+                         setup_suggestion, ingest_suggestion, work_triage_suggestion,
+                         telemetry_suggestion) if s]
     combined = "\n".join(parts)
 
     try:
@@ -418,8 +490,10 @@ def main():
                 f"gov-mine-closure={'yes' if gov_closure_suggestion else 'no'} "
                 f"setup-audit={'yes' if setup_suggestion else 'no'} "
                 f"ingest-backlog={'yes' if ingest_suggestion else 'no'} "
-                f"work-triage={'yes' if work_triage_suggestion else 'no'}"
+                f"work-triage={'yes' if work_triage_suggestion else 'no'} "
+                f"telemetry-check={'yes' if telemetry_suggestion else 'no'}"
             ),
+            session=session_id,
         )
     except Exception:
         pass

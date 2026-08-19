@@ -1,4 +1,4 @@
-"""Tests for prose-slop-check.py: DORMANT PostToolUse:Write quality hook.
+"""Tests for prose-slop-check.py, the LIVE warn-only PostToolUse Write|Edit quality hook.
 
 Covers the pure detector (find_slop / should_warn) + the scope gate, and carries
 named FP-guards (C4 boundary coverage). The hook NEVER blocks (WARN-only), so the

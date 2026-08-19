@@ -16,12 +16,16 @@ touches live _state/ or aggregates/.
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
+import os
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -177,7 +181,7 @@ class WorkTriageSuggestionTests(unittest.TestCase):
 
     # (a) fresh state -> silent
     def test_silent_when_last_run_within_cadence(self):
-        """Case (a): last_iso 2 days ago: below 7d threshold: no suggestion."""
+        """Case (a): last_iso 2 days ago, below 7d threshold, no suggestion."""
         with tempfile.TemporaryDirectory() as td:
             state = Path(td) / "work-triage-cadence.json"
             self._write_state(state, self._fresh_iso(days_ago=2))
@@ -187,7 +191,7 @@ class WorkTriageSuggestionTests(unittest.TestCase):
 
     # (b) stale state -> suggestion with WORK-TRIAGE
     def test_fires_when_last_run_older_than_cadence(self):
-        """Case (b): last_iso 10 days ago: past 7d threshold: suggestion emitted."""
+        """Case (b): last_iso 10 days ago, past 7d threshold, suggestion emitted."""
         with tempfile.TemporaryDirectory() as td:
             state = Path(td) / "work-triage-cadence.json"
             self._write_state(state, self._fresh_iso(days_ago=10))
@@ -253,7 +257,7 @@ class WorkTriageSuggestionTests(unittest.TestCase):
     def test_exactly_at_threshold_boundary_is_silent(self):
         """last_iso exactly at 7d (< timedelta(days=7) is False when age == 7d).
 
-        The function uses `age < timedelta(days=CADENCE_DAYS)`: so age == 7d triggers.
+        The function uses `age < timedelta(days=CADENCE_DAYS)`, so age == 7d triggers.
         This test asserts the boundary is inclusive (fires at 7d, not just >7d).
         """
         with tempfile.TemporaryDirectory() as td:
@@ -266,6 +270,60 @@ class WorkTriageSuggestionTests(unittest.TestCase):
             lct.WORK_TRIAGE_STATE_FILE = str(state)
             msg = lct.build_work_triage_suggestion()
             self.assertEqual(msg, "")
+
+
+class SessionWiringTests(unittest.TestCase):
+    """Defect 2 (2026-08-07): main() read stdin then immediately discarded it
+    ('sys.stdin.read()' with no assignment), so the log_fire() call always
+    logged session=None; stdin was never actually parsed, not merely dropped
+    after parsing. Reproduces the broken shape first (a synthetic main()
+    invocation with a populated session_id), then asserts it populates."""
+
+    def _run_main_quiet(self, payload, activity_log):
+        """Run main() with all seven builders forced empty, so the outcome is a
+        deterministic 'quiet' fire regardless of live vault state."""
+        captured = io.StringIO()
+        builder_names = [
+            "build_lint_suggestion",
+            "build_governance_mine_suggestion",
+            "build_governance_mine_proposal_closure_suggestion",
+            "build_setup_audit_suggestion",
+            "build_ingest_backlog_suggestion",
+            "build_work_triage_suggestion",
+            "build_telemetry_check_suggestion",
+        ]
+        patches = [mock.patch.object(lct, name, return_value="") for name in builder_names]
+        with mock.patch.dict(os.environ, {"HOOK_ACTIVITY_LOG_PATH": activity_log}), \
+             mock.patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
+             redirect_stdout(captured):
+            for p in patches:
+                p.start()
+            try:
+                lct.main()
+            finally:
+                for p in patches:
+                    p.stop()
+        return captured.getvalue()
+
+    def test_session_populates_from_payload(self):
+        with tempfile.TemporaryDirectory() as td:
+            activity_log = str(Path(td) / "hook-activity.jsonl")
+            self._run_main_quiet({"session_id": "test-lintcadence-1"}, activity_log)
+            with open(activity_log, encoding="utf-8") as f:
+                records = [json.loads(l) for l in f if l.strip()]
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["hook"], "lint-cadence-trigger")
+        self.assertEqual(records[0]["decision"], "quiet")
+        self.assertEqual(records[0]["session"], "test-lintcadence-1")
+
+    def test_missing_session_id_logs_null_not_crash(self):
+        with tempfile.TemporaryDirectory() as td:
+            activity_log = str(Path(td) / "hook-activity.jsonl")
+            self._run_main_quiet({}, activity_log)
+            with open(activity_log, encoding="utf-8") as f:
+                records = [json.loads(l) for l in f if l.strip()]
+        self.assertEqual(len(records), 1)
+        self.assertIsNone(records[0]["session"])
 
 
 if __name__ == "__main__":

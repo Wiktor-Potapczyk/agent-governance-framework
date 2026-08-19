@@ -88,8 +88,8 @@ def main():
     try:
         import os as _gho, sys as _ghs
         _ghs.path.insert(0, _gho.path.dirname(_gho.path.abspath(__file__)))
-        from _governance_logger import log_fire
-        log_fire("work-verification-check")
+        from _governance_logger import log_fire, session_from
+        log_fire("work-verification-check", session=session_from(payload))
     except Exception:
         pass
 

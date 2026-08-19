@@ -581,6 +581,362 @@ class AdversarialRobustnessTests(unittest.TestCase):
         self.assertIsInstance(res, list)
 
 
+# ---------------------------------------------------------------------------
+# HERMES P4: warn-event miner (mine_warns) tests (2026-08-18)
+# Plan: Projects/your-project/work/2026-08-17-hermes-p4-warn-event-miner-plan.md
+# Build plan: .../2026-08-18-hermes-p4-build-implementation-plan.md
+# Fixture: _test_fixtures/warn-miner-log-fixture.jsonl (reference date 2026-08-18)
+# The pattern literals below are PERMITTED in this test file (fixtures need
+# them); the literal ban applies to mine_governance.py source only.
+# ---------------------------------------------------------------------------
+
+_WARN_FIXTURE = os.path.join(_FIXTURES_DIR, "warn-miner-log-fixture.jsonl")
+_WARN_NOW = date(2026, 8, 18)
+
+_P4_PUSH = "git push (publication is effectively irreversible)"
+_P4_RM = "rm on unflagged relative file (irreversible delete)"
+_P4_CURL = "external curl write (remote state mutation)"
+_P4_CURLV = _P4_CURL + " [self-hosted target]"
+
+
+class _WarnMinerBase(unittest.TestCase):
+    """Guarded per-test import (implementation-plan flag 3, done in setUp rather
+    than setUpClass so EVERY new test individually reports red before mine_warns
+    exists, without breaking collection of the pre-existing classes)."""
+
+    def setUp(self):
+        import mine_governance as mg
+        self.mg = mg
+        if not hasattr(mg, "mine_warns"):
+            self.fail("mine_warns does not exist yet (B2 red state)")
+        self.mine_warns = mg.mine_warns
+
+    def _run(self, ledger=None, log=None):
+        return self.mine_warns(log or _WARN_FIXTURE, _WARN_NOW, window_days=30,
+                               resolved_ledger_path=ledger)
+
+    def _push_candidate(self, result):
+        for c in result["candidates"]:
+            if c["pattern"] == _P4_PUSH and c.get("agent_type", "") == "":
+                return c
+        return None
+
+    def _push_sig_id(self):
+        key = _sig_key("warn", "", "bash-safety-guard", _normalize_reason(_P4_PUSH))
+        return _sig_id(key)
+
+
+class WarnMinerTests(_WarnMinerBase):
+    """B2 red tests 1-11 of the implementation plan."""
+
+    # -- threshold gating -------------------------------------------------
+    def test_push_cluster_promotes(self):
+        res = self._run()
+        c = self._push_candidate(res)
+        self.assertIsNotNone(c, "push-warn cluster (17/4d/3s) must promote")
+        self.assertEqual(c["count"], 17)
+        self.assertEqual(c["distinct_days"], 4)
+        self.assertEqual(c["distinct_sessions"], 3)
+        self.assertEqual(c["hook"], "bash-safety-guard")
+        self.assertEqual(c["severity"], "normal")
+        self.assertEqual(c["first_seen"], "2026-08-05")
+        self.assertEqual(c["last_seen"], "2026-08-08")
+        self.assertAlmostEqual(c["top_session_share"], 11.0 / 17.0, places=6)
+        self.assertTrue(1 <= len(c["command_prefix_samples"]) <= 3)
+        self.assertEqual(c["sig_id"], self._push_sig_id())
+
+    def test_below_count_cluster_not_promoted(self):
+        res = self._run()
+        bad = [c for c in res["candidates"] if c.get("agent_type") == "builder-agent"]
+        self.assertEqual(bad, [], "count-5 cluster must fail the C=10 gate")
+
+    def test_session_floor_boundary_both_sides(self):
+        self.assertEqual(self.mg.WARN_MIN_SESSIONS, 3)
+        res = self._run()
+        floor = [c for c in res["candidates"] if c.get("agent_type") == "floor-agent"]
+        self.assertEqual(floor, [], "12/4d but only 2 sessions must fail the session floor")
+        # boundary from the passing side: push cluster has EXACTLY 3 sessions
+        c = self._push_candidate(res)
+        self.assertIsNotNone(c)
+        self.assertEqual(c["distinct_sessions"], self.mg.WARN_MIN_SESSIONS)
+
+    # -- load-bearing negative -------------------------------------------
+    def test_negative_deny_tier_cluster_yields_nothing_at_any_count(self):
+        res = self._run()
+        self.assertIsNone(
+            next((c for c in res["candidates"] if c["pattern"] == _P4_RM), None),
+            "deny-tier pattern must NEVER be a candidate")
+        self.assertTrue(any(_P4_RM in ln for ln in res["drift_lines"]),
+                        "drift note must name the deny-tier pattern")
+        self.assertNotIn(_P4_RM, res["warn_variant_counts"])
+        self.assertNotIn(_P4_RM, res["unrecognized_counts"])
+        # parameterized 50 / 500 variants, preserving 10 distinct days + 6 sessions
+        sessions = ["0c0c000%d-000%d-4001-8001-00000000000%d" % (i, i, i)
+                    for i in range(1, 7)]
+        for total in (50, 500):
+            per_day = total // 10
+            lines = []
+            n = 0
+            for i in range(10):
+                for j in range(per_day):
+                    n += 1
+                    lines.append(json.dumps({
+                        "ts": "2026-07-%02d %02d:%02d:00" % (20 + i, 8 + (j % 12), j % 60),
+                        "schema": 2, "event": "warn", "hook": "bash-safety-guard",
+                        "session": sessions[n % 6], "environment": "prod",
+                        "pattern": _P4_RM, "command_prefix": "rm notes.md"}))
+            fd, path = tempfile.mkstemp(suffix=".jsonl")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    fh.write("\n".join(lines) + "\n")
+                res_n = self._run(log=path)
+                self.assertEqual(
+                    res_n["candidates"], [],
+                    "deny-tier warn cluster at count %d produced candidates" % total)
+                self.assertTrue(any(_P4_RM in ln for ln in res_n["drift_lines"]))
+            finally:
+                os.unlink(path)
+
+    # -- curl pair (fixture g) -------------------------------------------
+    def test_curl_pair_classification(self):
+        res = self._run()
+        # bare deny reason: drift-alarms, never proposes
+        self.assertTrue(
+            any(("'" + _P4_CURL + "'") in ln for ln in res["drift_lines"]),
+            "bare curl deny reason must drift-alarm")
+        self.assertIsNone(
+            next((c for c in res["candidates"] if c["pattern"].startswith(_P4_CURL)), None))
+        self.assertNotIn(_P4_CURL, res["warn_variant_counts"])
+        # suffixed variant: measured warn-variant, no drift line, no candidacy
+        self.assertEqual(res["warn_variant_counts"].get(_P4_CURLV), 1)
+        self.assertFalse(any(_P4_CURLV in ln for ln in res["drift_lines"]),
+                         "suffixed warn variant must NOT drift-alarm")
+        self.assertNotIn(_P4_CURLV, res["unrecognized_counts"])
+        # drift lines carry the loud prefix
+        for ln in res["drift_lines"]:
+            self.assertTrue(ln.startswith(self.mg.WARN_DENY_TIER_DRIFT_PREFIX))
+
+    # -- exclusions (fixtures d + e) --------------------------------------
+    def test_patternless_family_counted_not_proposed(self):
+        res = self._run()
+        self.assertEqual(res["family_counts"].get("work-verification-check"), 3)
+        self.assertIsNone(
+            next((c for c in res["candidates"] if c["hook"] == "work-verification-check"),
+                 None))
+
+    def test_synthetic_sessions_excluded_from_candidacy(self):
+        # 3 synthetic-session records (unknown/probe/qa) carry the push pattern;
+        # admitted they would make the push count 20. The 17 proves exclusion via
+        # the reused _real_session filter, with no new filter in the way.
+        res = self._run()
+        c = self._push_candidate(res)
+        self.assertIsNotNone(c)
+        self.assertEqual(c["count"], 17)
+        for rec in ({"session": "unknown"}, {"session": "probe"}, {"session": "qa"}):
+            self.assertFalse(self.mg._real_session(rec))
+
+    # -- ledger suppression + regression ----------------------------------
+    def test_ledger_suppression(self):
+        sid = self._push_sig_id()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False,
+                                         encoding="utf-8") as tf:
+            tf.write(json.dumps({"sig_id": sid, "resolved_ts": "2026-08-10",
+                                 "resolution": "test", "note": "warn suppression"}) + "\n")
+            ledger = tf.name
+        try:
+            res = self._run(ledger=ledger)
+            self.assertIsNone(self._push_candidate(res),
+                              "push sig must be SUPPRESSED (resolved after last occurrence)")
+        finally:
+            os.unlink(ledger)
+
+    def test_ledger_regression_resurfaces(self):
+        sid = self._push_sig_id()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False,
+                                         encoding="utf-8") as tf:
+            tf.write(json.dumps({"sig_id": sid, "resolved_ts": "2026-08-01",
+                                 "resolution": "test", "note": "warn regression"}) + "\n")
+            ledger = tf.name
+        try:
+            res = self._run(ledger=ledger)
+            c = self._push_candidate(res)
+            self.assertIsNotNone(c, "push sig must RE-SURFACE (17 occurrences after resolved_ts)")
+            self.assertTrue(c["regression"])
+            self.assertFalse(c["suppressed"])
+        finally:
+            os.unlink(ledger)
+
+    # -- acceptance proxy (fixture h) -------------------------------------
+    def test_acceptance_proxy_accepted_count(self):
+        self.assertEqual(self.mg.WARN_ACCEPT_WINDOW_MIN, 10)
+        res = self._run()
+        c = self._push_candidate(res)
+        self.assertIsNotNone(c)
+        self.assertEqual(c["accepted_count"], 14,
+                         "3 same-hook denies inside 10 min must subtract from 17")
+        self.assertTrue(c["acceptance_note"])
+        self.assertIn("upper bound", c["acceptance_note"])
+        self.assertIn(self.mg.WARN_ACCEPTANCE_BLINDNESS_NOTE, c["acceptance_note"])
+
+    # -- literal ban + call-derivation ------------------------------------
+    def test_literal_ban_in_miner_source(self):
+        src_path = os.path.join(_HOOKS_DIR, "mine_governance.py")
+        with open(src_path, encoding="utf-8") as fh:
+            src = fh.read()
+        for banned in ("irreversible delete", "remote state mutation",
+                       "self-hosted target"):
+            self.assertNotIn(banned, src,
+                             "banned literal %r found in mine_governance.py" % banned)
+
+    def test_monkeypatch_call_derivation(self):
+        import types
+        real = self.mg._load_surface_module()
+        stub = types.SimpleNamespace(
+            IRREVERSIBLE_BASH_PATTERNS=real.IRREVERSIBLE_BASH_PATTERNS,
+            IRREVERSIBLE_MCP_TOOLS=real.IRREVERSIBLE_MCP_TOOLS,
+            curl_external_write=lambda cmd: (True, "HERMES-MARKER"),
+        )
+        W, D = self.mg._derive_exclusion_sets(surface_module=stub)
+        self.assertIn("HERMES-MARKER", D,
+                      "curl reason must flow from the predicate CALL into D")
+
+    # -- mine() regression (REV-6 invariant) ------------------------------
+    def test_mine_failure_pass_regression_unchanged(self):
+        # Baseline captured at B0 (2026-08-18) over governance-log-sample.jsonl
+        # with now=2026-06-10: byte-stable sig_ids, counts, severities, labels.
+        expected = sorted([
+            "1258d8ebe419:3:high:fabrication_detected",
+            "1ebc570c6b46:12:normal:no_classification",
+            "554f64f6aa37:12:normal:dark-zone",
+            "59c75cff3762:12:normal:reviewer_scope_violation",
+            "61fc20849104:12:normal:reviewer_scope_violation",
+            "980a5789bfeb:12:normal:block",
+            "9b65d39b3fe1:3:high:dark-zone",
+            "fdc692f7b60f:12:normal:no_classification",
+        ])
+        res = mine(_FIXTURE_LOG, _NOW, window_days=WINDOW_DAYS)
+        got = sorted("%s:%d:%s:%s" % (r["sig_id"], r["count"], r["severity"],
+                                      r["event_label"]) for r in res)
+        self.assertEqual(got, expected,
+                         "mine() output over the existing fixture shifted (REV-6 violation)")
+
+    # -- guard-load side effect -------------------------------------------
+    def test_guard_load_no_live_log_side_effect(self):
+        if not os.path.isfile(_REAL_LOG):
+            self.skipTest("live governance log absent")
+
+        def _count():
+            with open(_REAL_LOG, "rb") as fh:
+                return sum(1 for _ in fh)
+
+        before = _count()
+        mod = self.mg._load_guard_module()
+        self.assertTrue(hasattr(mod, "WARN_PATTERNS"))
+        after = _count()
+        self.assertEqual(before, after,
+                         "successful guard load must not write the live governance log")
+
+    # -- return contract ---------------------------------------------------
+    def test_return_contract_keys(self):
+        res = self._run()
+        self.assertEqual(
+            set(res.keys()),
+            {"candidates", "exclusion_unavailable", "drift_lines",
+             "warn_variant_counts", "unrecognized_counts", "family_counts"})
+        self.assertIs(res["exclusion_unavailable"], False)
+        self.assertIsInstance(res["candidates"], list)
+        self.assertIsInstance(res["drift_lines"], list)
+
+    def test_candidate_field_schema(self):
+        res = self._run()
+        c = self._push_candidate(res)
+        self.assertIsNotNone(c)
+        required = {
+            "sig_id", "pattern", "hook", "agent_type", "severity", "count",
+            "distinct_days", "distinct_sessions", "top_session_share",
+            "first_seen", "last_seen", "accepted_count", "acceptance_note",
+            "command_prefix_samples", "suppressed", "regression",
+        }
+        missing = required - set(c.keys())
+        self.assertEqual(missing, set(), "candidate missing fields: %s" % missing)
+
+
+class WarnMinerFailClosedTests(_WarnMinerBase):
+    """B4 breakage matrix: every broken derivation input fails CLOSED (zero
+    candidates + sentinel), asserted positively; paired intact-derivation test."""
+
+    def _assert_sentinel(self, res):
+        self.assertIs(res["exclusion_unavailable"], True)
+        self.assertEqual(res["candidates"], [])
+
+    def test_guard_path_nonexistent_fails_closed(self):
+        bad = os.path.join(_FIXTURES_DIR, "no-such-guard.py")
+        res = self.mine_warns(
+            _WARN_FIXTURE, _WARN_NOW, window_days=30,
+            _derive=lambda: self.mg._derive_exclusion_sets(guard_path=bad))
+        self._assert_sentinel(res)
+
+    def test_surface_path_nonexistent_fails_closed(self):
+        bad = os.path.join(_FIXTURES_DIR, "no-such-surface.py")
+        res = self.mine_warns(
+            _WARN_FIXTURE, _WARN_NOW, window_days=30,
+            _derive=lambda: self.mg._derive_exclusion_sets(surface_path=bad))
+        self._assert_sentinel(res)
+
+    def test_curl_predicate_false_none_fails_closed(self):
+        import types
+        real = self.mg._load_surface_module()
+        stub = types.SimpleNamespace(
+            IRREVERSIBLE_BASH_PATTERNS=real.IRREVERSIBLE_BASH_PATTERNS,
+            IRREVERSIBLE_MCP_TOOLS=real.IRREVERSIBLE_MCP_TOOLS,
+            curl_external_write=lambda cmd: (False, None),
+        )
+        res = self.mine_warns(
+            _WARN_FIXTURE, _WARN_NOW, window_days=30,
+            _derive=lambda: self.mg._derive_exclusion_sets(surface_module=stub))
+        self._assert_sentinel(res)
+
+    def test_curl_predicate_raises_fails_closed(self):
+        import types
+
+        def _boom(cmd):
+            raise RuntimeError("synthetic predicate failure")
+
+        real = self.mg._load_surface_module()
+        stub = types.SimpleNamespace(
+            IRREVERSIBLE_BASH_PATTERNS=real.IRREVERSIBLE_BASH_PATTERNS,
+            IRREVERSIBLE_MCP_TOOLS=real.IRREVERSIBLE_MCP_TOOLS,
+            curl_external_write=_boom,
+        )
+        res = self.mine_warns(
+            _WARN_FIXTURE, _WARN_NOW, window_days=30,
+            _derive=lambda: self.mg._derive_exclusion_sets(surface_module=stub))
+        self._assert_sentinel(res)
+
+    def test_derive_callable_raises_fails_closed(self):
+        def _boom():
+            raise RuntimeError("synthetic derivation failure")
+
+        res = self.mine_warns(_WARN_FIXTURE, _WARN_NOW, window_days=30, _derive=_boom)
+        self._assert_sentinel(res)
+
+    def test_intact_derivation_exactly_one_candidate(self):
+        res = self._run()
+        self.assertIs(res["exclusion_unavailable"], False)
+        self.assertEqual(len(res["candidates"]), 1,
+                         "intact derivation over the fixture yields exactly the push candidate")
+        self.assertEqual(res["candidates"][0]["pattern"], _P4_PUSH)
+
+    def test_loud_note_constants_exist(self):
+        self.assertEqual(
+            self.mg.WARN_DERIVATION_UNAVAILABLE_NOTE,
+            "WARN MINING SKIPPED THIS RUN: canonical-surface derivation failed, "
+            "zero proposals emitted.")
+        self.assertEqual(self.mg.WARN_DENY_TIER_DRIFT_PREFIX,
+                         "DENY-TIER PATTERN SEEN IN WARN LOG")
+        self.assertTrue(self.mg.WARN_ACCEPTANCE_BLINDNESS_NOTE)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 

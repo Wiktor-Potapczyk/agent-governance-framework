@@ -128,11 +128,15 @@ def _emit(context: str) -> None:
     }))
 
 
+_SESSION: str | None = None  # set from the payload in main(); None when absent
+
+
 def _log_fire(decision: str, detail: str) -> None:
     try:
         sys.path.insert(0, HOOKS_DIR)
         from _governance_logger import log_fire
-        log_fire("hook-write-regression-gate", decision=decision, detail=detail)
+        log_fire("hook-write-regression-gate", decision=decision, detail=detail,
+                  session=_SESSION)
     except Exception:
         pass
 
@@ -164,10 +168,18 @@ def _matrix_findings_text() -> str:
 
 
 def main() -> int:
+    global _SESSION
     try:
         payload = json.loads(sys.stdin.read() or "{}")
     except Exception:
         return 0  # fail-open: gate never crashes the turn
+
+    try:
+        sys.path.insert(0, HOOKS_DIR)
+        from _governance_logger import session_from
+        _SESSION = session_from(payload)
+    except Exception:
+        _SESSION = None
 
     tool_name = payload.get("tool_name", "")
     if tool_name not in ("Write", "Edit"):

@@ -1,4 +1,4 @@
-"""Smoke tests for verifier-gate-check.py — Stop hook.
+"""Smoke tests for verifier-gate-check.py: Stop hook.
 
 Fires only when `verification-gated-research` skill was invoked in the session.
 Blocks completion if no separate verifier Agent was dispatched after the skill.
@@ -119,7 +119,7 @@ class VerifierDispatchTests(unittest.TestCase):
                 _tool_use("Skill", {"skill": "verification-gated-research"}),
                 _tool_use("Agent", {"description": "worker harness", "subagent_type": "general-purpose",
                                     "prompt": "Investigate the backlog items from source materials."}),
-                _tool_use("Agent", {"description": "verifier — gate the ledger", "subagent_type": "general-purpose",
+                _tool_use("Agent", {"description": "verifier: gate the ledger", "subagent_type": "general-purpose",
                                     "prompt": "Independently verify and re-derive each ledger claim from work/ledger.md."}),
             ])
             rc, out = _run({"transcript_path": tp})
@@ -129,7 +129,7 @@ class VerifierDispatchTests(unittest.TestCase):
         # Ordering guard: verifier dispatched BEFORE skill doesn't satisfy the gate.
         with tempfile.TemporaryDirectory() as td:
             tp = _write_transcript(Path(td), [
-                _tool_use("Agent", {"description": "verifier — earlier task", "subagent_type": "general-purpose"}),
+                _tool_use("Agent", {"description": "verifier: earlier task", "subagent_type": "general-purpose"}),
                 _tool_use("Skill", {"skill": "verification-gated-research"}),
             ])
             rc, out = _run({"transcript_path": tp})
@@ -157,7 +157,7 @@ class MalformedLinesTests(unittest.TestCase):
                 f.write("not json at all\n")
                 f.write(json.dumps(_tool_use("Skill", {"skill": "verification-gated-research"})) + "\n")
                 f.write("{broken\n")
-                f.write(json.dumps(_tool_use("Agent", {"description": "verifier — round",
+                f.write(json.dumps(_tool_use("Agent", {"description": "verifier: round",
                                                        "prompt": "Re-derive the findings from work/out.md."})) + "\n")
             rc, out = _run({"transcript_path": str(tp)})
             self.assertEqual(out, "")  # malformed lines skipped, valid skill+verifier => pass
@@ -173,7 +173,7 @@ class MalformedLinesTests(unittest.TestCase):
 class VerifierGateBoundaryTests(unittest.TestCase):
     """Named FP-guards (boundary-test harness sprint 9). Each docstring names its
     boundary_axis. The hook is deliberately narrow (fires ONLY when the
-    verification-gated-research skill was invoked) — these lock that scoping so it
+    verification-gated-research skill was invoked); these lock that scoping so it
     never expands into the 'force every research through a verifier' false-positive
     minefield the source warns against."""
 
@@ -210,7 +210,7 @@ class VerifierGateBoundaryTests(unittest.TestCase):
                 _tool_use("Skill", {"skill": "verification-gated-research"}),
                 _tool_use("Agent", {"description": "worker harness", "subagent_type": "general-purpose",
                                     "prompt": "Investigate the backlog from sources."}),
-                _tool_use("Agent", {"description": "verifier — gate the ledger", "subagent_type": "general-purpose",
+                _tool_use("Agent", {"description": "verifier: gate the ledger", "subagent_type": "general-purpose",
                                     "prompt": "Independently verify and re-derive each claim from work/ledger.md."}),
             ])
             _, out = _run({"transcript_path": tp})
@@ -233,14 +233,14 @@ class ThreePartStructuralCheckTests(unittest.TestCase):
 
     def test_tp_relabel_byte_identical_prompt_blocks(self):
         """A 'verifier'-described dispatch whose prompt is byte-identical to a worker
-        prompt is a relabel, not a verifier — must BLOCK (part 2 fails)."""
+        prompt is a relabel, not a verifier: must BLOCK (part 2 fails)."""
         identical = "Investigate the backlog items from source materials."
         with tempfile.TemporaryDirectory() as td:
             tp = _write_transcript(Path(td), [
                 _tool_use("Skill", {"skill": "verification-gated-research"}),
                 _tool_use("Agent", {"description": "worker", "subagent_type": "general-purpose",
                                     "prompt": identical}),
-                _tool_use("Agent", {"description": "verifier — gate", "subagent_type": "general-purpose",
+                _tool_use("Agent", {"description": "verifier: gate", "subagent_type": "general-purpose",
                                     "prompt": identical}),
             ])
             _, out = _run({"transcript_path": tp})
@@ -254,7 +254,7 @@ class ThreePartStructuralCheckTests(unittest.TestCase):
                 _tool_use("Skill", {"skill": "verification-gated-research"}),
                 _tool_use("Agent", {"description": "worker", "subagent_type": "general-purpose",
                                     "prompt": "Investigate X from sources."}),
-                _tool_use("Agent", {"description": "verifier — look again", "subagent_type": "general-purpose",
+                _tool_use("Agent", {"description": "verifier: look again", "subagent_type": "general-purpose",
                                     "prompt": "Please read the work again and confirm it looks fine."}),
             ])
             _, out = _run({"transcript_path": tp})
@@ -262,7 +262,7 @@ class ThreePartStructuralCheckTests(unittest.TestCase):
 
     def test_fp_same_subagent_type_rederiving_verifier_passes(self):
         """A legitimate verifier of the SAME subagent_type as the worker, with a
-        distinct re-derivation prompt, must PASS — type-difference is NOT required."""
+        distinct re-derivation prompt, must PASS: type-difference is NOT required."""
         with tempfile.TemporaryDirectory() as td:
             tp = _write_transcript(Path(td), [
                 _tool_use("Skill", {"skill": "verification-gated-research"}),
@@ -273,6 +273,86 @@ class ThreePartStructuralCheckTests(unittest.TestCase):
             ])
             _, out = _run({"transcript_path": tp})
             self.assertEqual(out, "")
+
+
+class SessionWiringTests(unittest.TestCase):
+    """Defect 2 (2026-08-07, coordinator addendum): _log()'s record dict carried
+    no 'session' key at all, so every record this hook wrote was structurally
+    unclassifiable as real (a missing session is read as synthetic by the
+    gate-yield classifier). Reproduces the broken shape first (a real _log()
+    write, not the mocked-out one the tests above use), then asserts the
+    session id populates and the emitted 'hook' field name is untouched."""
+
+    def _run_real_log(self, payload: dict, events: list[dict], log_path: str) -> str:
+        captured = io.StringIO()
+        with tempfile.TemporaryDirectory() as td:
+            tp = _write_transcript(Path(td), events)
+            full_payload = {**payload, "transcript_path": tp}
+            with mock.patch.object(sys, "stdin", io.StringIO(json.dumps(full_payload))), \
+                 mock.patch.object(vgc, "_HOOK_DIR", os.path.dirname(log_path)), \
+                 redirect_stdout(captured):
+                vgc.main()
+        return captured.getvalue()
+
+    def test_block_record_carries_session_and_untouched_hook_name(self):
+        with tempfile.TemporaryDirectory() as logdir:
+            log_path = os.path.join(logdir, "governance-log.jsonl")
+            self._run_real_log(
+                {"session_id": "test-vgate-1"},
+                [
+                    _tool_use("Skill", {"skill": "verification-gated-research"}),
+                    _tool_use("Agent", {"description": "worker bee", "subagent_type": "general-purpose"}),
+                ],
+                log_path,
+            )
+            with open(log_path, encoding="utf-8") as f:
+                records = [json.loads(l) for l in f if l.strip()]
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["event"], "block")
+        self.assertEqual(records[0]["hook"], "verifier-gate")  # emitted name unchanged
+        self.assertEqual(records[0]["session"], "test-vgate-1")
+
+    def test_pass_record_carries_session(self):
+        with tempfile.TemporaryDirectory() as logdir:
+            log_path = os.path.join(logdir, "governance-log.jsonl")
+            self._run_real_log(
+                {"session_id": "test-vgate-2"},
+                [
+                    _tool_use("Skill", {"skill": "verification-gated-research"}),
+                    _tool_use("Agent", {"description": "worker harness", "subagent_type": "general-purpose",
+                                        "prompt": "Investigate the backlog items from source materials."}),
+                    _tool_use("Agent", {"description": "verifier: gate the ledger", "subagent_type": "general-purpose",
+                                        "prompt": "Independently verify and re-derive each ledger claim from work/ledger.md."}),
+                ],
+                log_path,
+            )
+            with open(log_path, encoding="utf-8") as f:
+                records = [json.loads(l) for l in f if l.strip()]
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["event"], "pass")
+        self.assertEqual(records[0]["session"], "test-vgate-2")
+
+    def test_missing_session_id_falls_back_to_transcript_stem_not_crash(self):
+        # This hook requires a real, existing transcript_path just to reach
+        # main()'s body (early-return guard), so with session_id absent,
+        # session_from's documented fallback (transcript filename stem) is
+        # what should land here: never a crash, never the bare string
+        # "unknown" written directly by this hook.
+        with tempfile.TemporaryDirectory() as logdir, tempfile.TemporaryDirectory() as td:
+            log_path = os.path.join(logdir, "governance-log.jsonl")
+            tp = _write_transcript(Path(td), [
+                _tool_use("Skill", {"skill": "verification-gated-research"}),
+                _tool_use("Agent", {"description": "worker bee", "subagent_type": "general-purpose"}),
+            ])
+            captured = io.StringIO()
+            with mock.patch.object(sys, "stdin", io.StringIO(json.dumps({"transcript_path": tp}))), \
+                 mock.patch.object(vgc, "_HOOK_DIR", logdir), \
+                 redirect_stdout(captured):
+                vgc.main()
+            with open(log_path, encoding="utf-8") as f:
+                records = [json.loads(l) for l in f if l.strip()]
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["session"], Path(tp).stem)
 
 
 if __name__ == "__main__":

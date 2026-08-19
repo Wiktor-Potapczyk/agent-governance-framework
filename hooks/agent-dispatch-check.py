@@ -215,6 +215,44 @@ KNOWN_DISPATCH_NAMES = {
     "process-qa", "process-analysis", "process-build", "process-planning",
     "process-research", "process-pentest", "pm", "task-classifier", "verify",
     "ensemble", "architect-loop", "save", "maintain", "index",
+    # Plugin agents (defect 5, 2026-08-07): enumerated from registry.json's
+    # `agents` dict, every entry whose `source` starts with "plugin:" (54
+    # names: academic-research-skills 36 + claude-plugins-official 18).
+    # Without these, MUST DISPATCH text naming a plugin agent (e.g.
+    # "pr-review-toolkit:silent-failure-hunter") was invisible to this
+    # parser's compliance extraction: the vocabulary only knew vault-local
+    # agents/skills. registry.json is READ-ONLY input here, never edited.
+    # Prune follow-up (post-review, 2026-08-07): 7 of the 54 were bare or
+    # near-bare common-English compounds ("analyzer", "compliance_agent")
+    # that extract_dispatch_names could match inside ordinary prose,
+    # producing a phantom DECLARED item unrelated to any real dispatch
+    # intent. Dropped rather than kept namespace-qualified: the suffix
+    # check below reuses this SAME set for both the bare-candidate test and
+    # the post-colon suffix test, so a namespace-only bucket needs a second
+    # set (out of scope for this fix) or a hardcoded "plugin:name" literal
+    # whose namespace slug can't be verified from registry.json's
+    # marketplace-level "source" field (compare "claude-plugins-official"
+    # above with the real dispatch namespace "pr-review-toolkit" in the
+    # silent-failure-hunter example). Dropped: analyzer, comparator,
+    # compliance_agent, formatter_agent, grader, intake_agent,
+    # monitoring_agent.
+    "abstract_bilingual_agent", "agent-creator", "agent-sdk-verifier-py",
+    "agent-sdk-verifier-ts", "argument_builder_agent",
+    "atomic-explorer", "atomic-reviewer", "bibliography_agent",
+    "citation_compliance_agent", "code-architect", "code-explorer",
+    "code-reviewer", "collaboration_depth_agent", "comment-analyzer",
+    "conversation-analyzer",
+    "devils_advocate_agent", "devils_advocate_reviewer_agent", "domain_reviewer_agent",
+    "draft_writer_agent", "editor_in_chief_agent", "editorial_synthesizer_agent",
+    "eic_agent", "ethics_review_agent", "field_analyst_agent",
+    "integrity_verification_agent", "literature_strategist_agent", "meta_analysis_agent",
+    "methodology_reviewer_agent", "peer_reviewer_agent",
+    "perspective_reviewer_agent", "pipeline_orchestrator_agent", "plugin-validator",
+    "pr-test-analyzer", "report_compiler_agent", "research_architect_agent",
+    "research_question_agent", "revision_coach_agent", "risk_of_bias_agent",
+    "silent-failure-hunter", "skill-reviewer", "socratic_mentor_agent",
+    "source_verification_agent", "state_tracker_agent", "structure_architect_agent",
+    "synthesis_agent", "type-design-analyzer", "visualization_agent",
 }
 
 
@@ -237,6 +275,18 @@ def extract_dispatch_names(raw_text):
             if candidate in KNOWN_DISPATCH_NAMES:
                 found.append(candidate)
                 break
+            # Defect 5 (2026-08-07): a plugin-namespaced dispatch name (e.g.
+            # "pr-review-toolkit:silent-failure-hunter") is a single
+            # whitespace-free token, so the word-count loop above never sees
+            # it split apart. registry.json's own agent names are plain
+            # (unqualified), so recognize the token by its post-colon suffix
+            # instead of requiring every specific plugin's namespace prefix
+            # to be hardcoded here.
+            if ":" in candidate:
+                suffix = candidate.rsplit(":", 1)[-1].strip()
+                if suffix in KNOWN_DISPATCH_NAMES:
+                    found.append(suffix)
+                    break
     return found
 
 

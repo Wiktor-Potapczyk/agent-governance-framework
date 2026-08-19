@@ -1,5 +1,5 @@
 """
-Prose Slop Check - PostToolUse:Write hook  [DORMANT: NOT REGISTERED]
+Prose Slop Check - PostToolUse Write|Edit hook  [LIVE, registered]
 
 Sibling to prose-codes-check.py. That hook catches invented shorthand CODES
 (T-C1, AR-F5, B-1). This one catches LLM-register VOCABULARY SLOP: the
@@ -27,9 +27,21 @@ nudge, not a correctness gate: a false positive must never interrupt a real
 write. (Contrast: prose-codes-check hard-blocks because the owner literally cannot
 parse the codes.)
 
-STATUS: DORMANT. This file is intentionally NOT registered in any settings*.json.
-It is a ready-to-enable pilot artifact. Activation is the owner's call (one
-PostToolUse:Write registration line). Until then it has zero runtime effect.
+STATUS: LIVE (header reconciled 2026-08-11 by the plain-language Stage 1
+discovery gate). Registered in .claude/settings.local.json as the third command
+entry of a PostToolUse "Write|Edit" matcher block. hook-activity.jsonl held
+4,256 firing records for this hook (100 warn) at reconciliation time. Earlier
+revisions of this header claimed DORMANT / NOT REGISTERED; registration plus
+the firing log falsify that claim.
+
+OVERLAP VERDICT (2026-08-11 discovery gate): DISJOINT from
+plain-language-guard.py. Scripted set intersection of SLOP_WORDS against the
+PL-4/PL-5/PL-7 lists returned zero shared entries and zero substring
+near-misses; both hooks are warn-only; this hook warns only past its
+2-distinct/3-total thresholds (measured warn rate 100/4,256 firings), so a
+double advisory on one write is rare and never about the same word. The
+plain-language layer lives in .claude/plain-language-rules.md and
+plain-language-guard.py.
 Boundary tests: test_prose_slop_check.py (C4 FP-guard coverage).
 
 EXIT CODES

@@ -9,11 +9,24 @@ Architect a Ralph Loop prompt: structure open questions into a research plan tha
 
 The user (or you) has identified a complex task with multiple unknowns. Instead of guessing or building prematurely, we need to exhaust all information sources first. This skill turns that fuzzy need into a structured, executable research prompt.
 
+## Do-NOT-use-when
+
+- Task can be answered with a single fact lookup: use Quick inline instead
+- Investigation needs the current conversation's context: Ralph Loop runs in fresh isolation
+- The "open questions" are pure opinion or aesthetic judgment: Ralph Loop needs source materials to consult
+- All required research has already been completed in this session: review existing artifacts instead
+
+## Gotchas
+
+- **Anchored hypotheses leak in**: if your loop prompt contains a proposed cause or conclusion, the autonomous Claude will validate-not-investigate. Strip hypotheses from the prompt before ship.
+- **Source materials must be enumerated explicitly**: vague references to "the codebase" or "our docs" produce vague returns. Cite files, URLs, or directories the loop should consult.
+- **Loop output is a research artifact, not a decision**: the loop returns findings; main session synthesizes and decides. Do not let the loop body propose direct fixes: that's anchored.
+
 ## Process
 
 ### Step 1: Identify the Active Project
 
-Read `Projects/*/STATE.md` to find the relevant project. The STATE.md contains current status, locked decisions, and verified facts: these become the "What You Know" section of the loop prompt.
+Find the relevant project by its `STATE.md`. A directory IS a project if and only if it directly contains `STATE.md`, and projects nest one level: search `Projects/*/STATE.md` AND `Projects/*/*/STATE.md`. Refer to a project by its full relative identity (`Personal/Finance`, `Umbrella/Module-8B`), never by the bare leaf, because leaf names are not unique. The STATE.md contains current status, locked decisions, and verified facts: these become the "What You Know" section of the loop prompt.
 
 ### Step 2: Gather Open Questions
 
@@ -71,6 +84,8 @@ purpose: Ralph Loop prompt: [one-line description]
 
 **Use agents aggressively.** You have access to the Agent tool. Spawn Explore agents to read large files in parallel. Use multiple agents simultaneously when questions are independent. Do NOT read large files inline: delegate to agents.
 
+**Re-ground periodically.** Every few iterations: and after any compaction: re-read this prompt file plus the **What You Know** and **Source Materials** sections fresh before continuing. The loop accumulates context across iterations and the compaction summary is lossy; re-inject the spec rather than trusting the compressed version.
+
 ## What You Know (verified facts: do not re-research)
 [Bullet list of confirmed facts from STATE.md and conversation. This prevents the loop from wasting time re-verifying things we already know.]
 
@@ -126,6 +141,8 @@ Choose `--max-iterations` based on problem count and source material volume:
 - 4-6 problems, many large files: 20
 - 6+ problems or very large corpus: 25
 
+**Hard ceiling: NEVER exceed 30** (two-gate Gate-1-adjacent, [[2026-06-15-two-gate-enforcement-spec]] Area E). The 15-25 guidance above stands for normal use; 30 is the absolute upper cap regardless of corpus size. An unbounded loop multiplies irreversible-action exposure, so the cap is a safety floor, not a tuning knob. If a corpus seems to need more than 30 iterations, decompose it into separate loops instead of raising the cap.
+
 ### Step 7: Present for Review
 
 Tell the user:
@@ -142,3 +159,4 @@ Tell the user:
 - **Large files (>50KB) must be delegated to Explore agents**: the prompt should say this explicitly
 - **The output file should be a requirements doc, not a spec**: specs come after the loop, built by specialist agents
 - **Include the completion promise instruction in the prompt**: "When all problems are answered... output RESEARCH COMPLETE"
+- **`--max-iterations` has a hard ceiling of 30**: never generate a command above it; 15-25 is the normal band. Decompose oversized corpora into multiple loops rather than raising the cap (two-gate Gate-1-adjacent, [[2026-06-15-two-gate-enforcement-spec]] Area E).
