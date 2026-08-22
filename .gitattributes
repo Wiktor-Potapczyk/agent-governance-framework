@@ -1,0 +1,18 @@
+# Byte-exact test fixtures.
+#
+# hooks/_test_fixtures/unicode-hygiene/ holds files whose entire purpose is to
+# carry one specific codepoint at one specific offset. test_unicode_hygiene.py
+# asserts those offsets literally, and one test asserts that the file's SHA-256
+# is unchanged by the scan-and-sanitize flow.
+#
+# Git's default text handling breaks both. With core.autocrlf=true, which is
+# the Windows default and is set on the machine these were authored on, a fresh
+# clone rewrites every LF to CRLF: measured on class-zero-width.md, 54 bytes
+# become 60 and every asserted offset after the first newline shifts by up to
+# six. The fixtures would still look correct in an editor while the suite went
+# red on any Windows checkout, and a SHA committed in a wiki page's source
+# field would no longer match the file it names.
+#
+# eol=lf rather than -text, because none of these files contains a CR byte, so
+# pinning the line ending is sufficient and they stay readable as text diffs.
+hooks/_test_fixtures/unicode-hygiene/* text eol=lf
