@@ -58,16 +58,16 @@ Core skills include: `task-classifier`, `process-research`, `process-analysis`, 
 
 **Two settings templates ship with this repo: choose the right one:**
 
-- `settings/settings.json.example` and `settings/settings.local.json.example` register **6 hooks** (a minimal starter subset). Good for a quick first install.
-- `settings/settings.json.template` registers **all 35 hooks** (the full framework). This is the recommended production starting point. See `settings/settings.json.template.README.md` for the automated substitution one-liner that replaces `{{VAULT_ROOT}}` and `{{HOME_OR_VAULT}}` placeholders across the template.
+- `settings/settings.json.example` and `settings/settings.local.json.example` register **12 hooks** (a minimal starter subset). Good for a quick first install.
+- `settings/settings.json.template` registers **all 42 hooks** (the full framework). This is the recommended production starting point. See `settings/settings.json.template.README.md` for the automated substitution one-liner that replaces `{{VAULT_ROOT}}` and `{{HOME_OR_VAULT}}` placeholders across the template.
 
-Copy the example settings file (minimal 6-hook subset):
+Copy the example settings file (minimal 12-hook subset):
 
 ```bash
 cp settings/settings.json.example /your/project/.claude/settings.local.json
 ```
 
-Or copy the full 35-hook template and run the substitution documented in `settings/settings.json.template.README.md`:
+Or copy the full 42-hook template and run the substitution documented in `settings/settings.json.template.README.md`:
 
 ```bash
 cp settings/settings.json.template /your/project/.claude/settings.json

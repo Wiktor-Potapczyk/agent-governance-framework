@@ -20,17 +20,16 @@ Every hook file in `hooks/` is listed below, whether or not it is registered by 
 | `agent-dispatch-check.py` | PreToolUse (Agent) | Warn when dispatched agent not in MUST DISPATCH list | Yes: `settings.json.template` |
 | `memory-dedup-check.py` | PreToolUse (Write) | Soft-warn on duplicate memory file (Jaccard ≥ 0.65) | Yes: `settings.json.template` |
 | `reviewer-scope-violation-check.py` | PreToolUse (Write\|Edit\|MultiEdit) | Block reviewer agents from editing non-report files | Yes: `settings.json.template` |
-| `config-protection.py` | PreToolUse (Write\|Edit\|MultiEdit) | Hard-block writes to protected config files | Yes: `settings.json.template` |
 | `mcp-circuit-breaker.py` | PreToolUse (mcp__.*) | Trip breaker after ≥3 MCP failures in 600s window | Yes: `settings.json.template` |
 | `skill-step-reminder.py` | PostToolUse (Skill) | Inject mandatory process-step reminder for process-* skills | Yes: `settings.json.template` |
 | `memory-schema-check.py` | PostToolUse (Write\|Edit) | Soft-warn on missing/invalid memory frontmatter fields | Yes: `settings.json.template` |
 | `tag-variant-check.py` | PostToolUse (Write) | Advisory on non-canonical tags in .md frontmatter | Yes: `settings.json.template` |
 | `mcp-circuit-breaker-record.py` | PostToolUse (mcp__.*) | Record MCP tool result as success/failure to breaker state | Yes: `settings.json.template` |
 | `wiki-citation-check.py` | PostToolUse (Write\|Edit) | Validate source: field + SHA integrity on wiki-layer files | Yes: `settings.json.template` |
+| `unicode-hygiene-check.py` | PostToolUse (Write\|Edit) | Warn on invisible/bidirectional Unicode in raw-layer arrivals | No: opt-in |
 | `inbox-auto-ingest.py` | PostToolUse (Write\|Edit) | Trigger process-ingest when file written under Inbox/ | Yes: `settings.json.template` |
 | `checkpoint.py` | PostToolUse (no matcher) | Inject knowledge reminder at ≥60s; CHECKPOINT notice at ≥300s | Yes: `settings.json.template` |
 | `subagent-governance.py` | SubagentStart | Inject governance additionalContext; log agent_type | Yes: `settings.json.template` |
-| `agent-registry-check.py` | SubagentStart | Suggest specialist agents for generic dispatches | Yes: `settings.json.template` |
 | `subagent-scope-check.py` | SubagentStart + SubagentStop | Capture/diff git status baseline per subagent | Yes: `settings.json.template` |
 | `bias-guard.py` | SubagentStart | Inject Blind Analysis Rule for evaluator agents | Yes: `settings.json.template` |
 | `subagent-quality-check.py` | SubagentStop | Block on structural quality violations in agent output | Yes: `settings.json.template` |
@@ -42,7 +41,6 @@ Every hook file in `hooks/` is listed below, whether or not it is registered by 
 | `work-verification-check.py` | Stop | Block lazy QA, premature escalation, fabrication claims | Yes: `settings.json.template` |
 | `token-breakdown.py` | Stop | Log per-turn token breakdown telemetry | Yes: `settings.json.template` |
 | `read-before-edit-check.py` | Stop | Log edit-without-read instrumentation | Yes: `settings.json.template` |
-| `epistemic-check.py` | Stop | Spawn Haiku to evaluate overconfidence; block if flagged | Yes: `settings.json.template` |
 | `verifier-gate-check.py` | Stop | Block if verification-gated-research ran without verifier agent | Yes: `settings.json.template` |
 | `task-plan-auto-sync.py` | Stop | Mark task_plan.md item done on QA PASS | Yes: `settings.json.template` |
 | `pre-compact.py` | PreCompact | Write recovery snapshot before context compaction | Yes: `settings.json.template` |
@@ -314,22 +312,6 @@ Every hook file in `hooks/` is listed below, whether or not it is registered by 
 
 ---
 
-### `config-protection.py`
-
-| Attribute | Value |
-|---|---|
-| **Event** | PreToolUse |
-| **Matcher** | `Write\|Edit\|MultiEdit` |
-| **Registered in** | `settings/settings.json.template` |
-| **Action** | Hard-blocks writes to three protected files: `settings.local.json` (under `.claude/`), `registry.json` (under `.claude/`), and `MEMORY.md` (anywhere). |
-| **Inputs** | stdin JSON payload: `tool_input.file_path`. Reads `CONFIG_PROTECTION_ALLOW` environment variable. |
-| **Outputs / Side-effects** | stdout: `{"decision": "block", "reason": "..."}` on violation; nothing on allow. |
-| **Logical paths** | `CONFIG_PROTECTION_ALLOW=1` env var set → allow all (session-scoped override). Target file is `settings.local.json` with parent directory `.claude` → block. Target file is `registry.json` with parent directory `.claude` → block. Target file is `MEMORY.md` (any path) → block. No match → allow. Parse error → allow (fail-open). |
-| **Failure mode** | Fail-open: any unhandled exception exits 0 without blocking. |
-| **Rationale** | Prevents accidental or hook-triggered overwrites of the three highest-consequence config files: the local settings that control hook registration, the asset registry, and the persistent memory index. |
-
----
-
 ### `mcp-circuit-breaker.py`
 
 | Attribute | Value |
@@ -588,6 +570,22 @@ Every hook file in `hooks/` is listed below, whether or not it is registered by 
 
 ---
 
+### `unicode-hygiene-check.py`
+
+| Attribute | Value |
+|---|---|
+| **Event** | PostToolUse |
+| **Matcher** | `Write\|Edit` |
+| **Registered in** | Not registered by default: opt-in |
+| **Action** | Scans tool-written content headed for `Inbox/` or `Clippings/` for invisible and bidirectional Unicode characters (the prompt-injection carrier classes: bidi overrides, bidi isolates, zero-width characters, a mid-file byte-order mark, a soft hyphen, and any other category-Cf character). Warns; never blocks. |
+| **Inputs** | stdin JSON payload: `tool_name`, `tool_input.file_path`, `tool_input.content` (Write) or `tool_input.new_string` (Edit). Pure logic lives in `_unicode_hygiene.py`. |
+| **Outputs / Side-effects** | On findings: stdout `hookSpecificOutput.additionalContext` warning; one stderr line; one JSONL record appended to `hooks/aggregates/unicode-hygiene.jsonl`. Clean or out-of-scope writes produce no output and no record. The written file itself is never modified: detection only. |
+| **Logical paths** | Tool is not Write/Edit → skip. File path does not match `/inbox/` or `/clippings/` (case-insensitive, `_test_fixtures` excluded) → skip. Content scanned via `_unicode_hygiene.scan_text` → no findings → log allow, no output. Findings present → build per-class counts, emit advisory + JSONL record + log warn. |
+| **Failure mode** | Fail-open: the entire hook body is wrapped in a top-level `try/except`; any internal exception → exit 0, no advisory. |
+| **Rationale** | Closes the arrival-time gap for a specific, narrow attack class (Trojan-Source-style hidden characters) on the two directories a Karpathy LLM-Wiki-style raw layer treats as untrusted input. Ships opt-in rather than registered by default because its scope (two hardcoded directory names) needs adapting to your own raw-layer paths, and its paired test suite depends on committed glyph-level fixtures this repo has not yet adopted a shipping strategy for — see the 2026-08-22 `CHANGELOG.md` entry. |
+
+---
+
 ### `plain-language-guard.py`
 
 | Attribute | Value |
@@ -667,22 +665,6 @@ Every hook file in `hooks/` is listed below, whether or not it is registered by 
 | **Logical paths** | Parse payload → log to file → build governance context block → emit. Log write failure → continue to emit context (fail-open). |
 | **Failure mode** | Fail-open: log write errors caught and ignored; context block always emitted on best-effort. |
 | **Rationale** | Ensures every subagent receives baseline governance instructions (blind analysis, uncertainty flagging, evidence citation) regardless of what its dispatch prompt says. |
-
----
-
-### `agent-registry-check.py`
-
-| Attribute | Value |
-|---|---|
-| **Event** | SubagentStart |
-| **Matcher** | none |
-| **Registered in** | `settings/settings.json.template` |
-| **Action** | When a generic/untyped agent is dispatched, scores prompt words against registry keyword lists and suggests specialist agents with overlap score ≥ 3. Advisory only: never blocks. |
-| **Inputs** | stdin JSON payload: `subagent_type` / `agent_type`, `agent_id`, `prompt` / `description`. Reads `{{VAULT_ROOT}}/.claude/registry.json`. |
-| **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `additionalContext` with specialist suggestions (only when match found). Appends one line to `hooks/agent-registry-check.log`. |
-| **Logical paths** | Agent type not in `GENERIC_TYPES` (general-purpose, explore, plan, "", unknown) → skip silently. No prompt text → skip. Registry unreadable → skip. Extract prompt word set → find specialist agents with keyword overlap ≥ `MIN_MATCH_SCORE` (3) → top 3 matches → emit suggestion text. No matches → log `no_match` silently. |
-| **Failure mode** | Fail-open: any exception → exit without blocking. |
-| **Rationale** | Nudges toward specialist agents when a generic dispatch is used, without enforcing it: addresses the advisory routing gap for domain-specific agents. |
 
 ---
 
@@ -868,22 +850,6 @@ Note: `subagent-scope-check.py` also fires at SubagentStop: documented in the Su
 
 ---
 
-### `epistemic-check.py`
-
-| Attribute | Value |
-|---|---|
-| **Event** | Stop |
-| **Matcher** | none |
-| **Registered in** | `settings/settings.json.template` |
-| **Action** | Spawns a `claude -p --model haiku` subprocess to evaluate the last response for overconfidence. Blocks if Haiku returns `{"decision": "block"}`. |
-| **Inputs** | stdin JSON payload: `transcript_path`, `stop_hook_active`. Reads last assistant message from transcript. |
-| **Outputs / Side-effects** | On Haiku block verdict: stdout `{"decision": "block", "reason": "..."}`. On pass or timeout: nothing.; appends the block verdict as an event to `governance-log.jsonl` |
-| **Logical paths** | `stop_hook_active=True` → return. Extract last assistant message from transcript. Build evaluation prompt → spawn `claude -p --model haiku` subprocess with 15s timeout. Parse stdout → `{"decision": "block"}` → emit block. Any other response → pass. Timeout → fail-open (pass). Subprocess error → fail-open (pass). Parse error → fail-open (pass). |
-| **Failure mode** | Fail-open: all subprocess errors, timeouts, and parse failures → exit 0 without blocking. |
-| **Rationale** | Provides an external evaluator gate for epistemic honesty using a fresh model context. Note: the disabled/ version of this hook was found to never block in practice (see `hooks/disabled/README.md`); the registered version preserves the circuit but its real-world block rate is low. |
-
----
-
 ### `verifier-gate-check.py`
 
 | Attribute | Value |
@@ -958,12 +924,17 @@ These files ship in `hooks/disabled/` or are present in `hooks/` but explicitly 
 
 | Hook file | Where | Reason unregistered | One-line description |
 |---|---|---|---|
-| `disabled/epistemic-check.py` | `hooks/disabled/` | Disabled after failure: never blocked in practice; cannot distinguish correct from incorrect confidence without semantic domain understanding | Earlier version of the Stop-event Haiku evaluator; disabled per `disabled/README.md` lessons |
+| `disabled/epistemic-check.py` | `hooks/disabled/` | Disabled after failure: never blocked in practice; cannot distinguish correct from incorrect confidence without semantic domain understanding | Sole surviving copy of the Stop-event Haiku evaluator; a duplicate that shipped registered in `settings/settings.json.template` (contradicting this entry) was removed 2026-08-22, see `disabled/README.md` |
 | `disabled/agent-dispatch-check.py` | `hooks/disabled/` | Disabled after failure: allowlist model blocked legitimate ad-hoc dispatches; ceilings punish adaptation | PreToolUse (Agent) version that blocked (not warned) dispatches not in a pre-approved allowlist |
 | `disabled/delegation-check.ps1` | `hooks/disabled/` | Disabled after failure: same rationale as agent-dispatch-check.py; PowerShell form | PowerShell PreToolUse hook that blocked undeclared agent dispatches |
 | `disabled/routing-table-validation.py` | `hooks/disabled/` | Opt-in by design: correct and tested (26 tests); ships unregistered because arming a blocking hook on CLAUDE.md + SKILL.md is a deliberate decision requiring a complete registry | PreToolUse (Edit\|Write\|MultiEdit) hook that denies edits introducing broken agent-name references in CLAUDE.md or any SKILL.md |
-| `weekly-usage.py` | `hooks/` AND `hooks/disabled/` (duplicate copies) | Standalone CLI utility, not a hook -- never registered; requires `claude_monitor` package; duplicate-file state flagged for consolidation | CLI utility printing weekly token usage grouped by model and day since last Friday 8PM |
+| `disabled/config-protection.py` | `hooks/disabled/` | Retired from the maintainer's own deployment (2026-08-07): a hard PreToolUse deny on reversible, git-tracked config files cost a retry round-trip without moving any decision to a human; see `disabled/README.md` | PreToolUse (Write\|Edit\|MultiEdit) hook that hard-blocked writes to a local settings file, a registry file, and a persistent memory index |
+| `disabled/agent-registry-check.py` | `hooks/disabled/` | Retired from the maintainer's own deployment alongside config-protection.py; no independent failure narrative recorded, kept as a correct reference implementation | SubagentStart hook that suggested specialist agents for generic/untyped dispatches via keyword overlap |
+| `disabled/em-dash-guard.py` | `hooks/disabled/` | Opt-in by design: enforces a personal prose-style preference (no "fancy" dash glyphs), not a process-compliance check | Stop hook that blocks a response containing en/em dash, minus sign, or similar Unicode dash look-alikes in prose |
+| `disabled/prose-codes-check.py` | `hooks/disabled/` | Opt-in by design: same reasoning as em-dash-guard.py; also ships with a placeholder ticket-key allow-list that needs editing before arming | Stop hook that blocks a response using invented internal shorthand codes instead of plain language |
+| `_archived/hooks/weekly-usage.py` | `_archived/hooks/` | Archived: retired from the maintainer's active toolset; kept as a worked example of a non-hook maintenance script | Standalone CLI utility printing weekly token usage grouped by model and day since last Friday 8PM; requires the third-party `claude_monitor` package |
 | `prose-slop-check.py` | `hooks/` (dormant) | Opt-in: built and calibrated (0 false positives on a 19-page prose corpus); ships unregistered until the maintainer arms it | PostToolUse (Write) hook that warns on LLM-register slop vocabulary in `Resources/KB/` and `Projects/*/work/` prose |
+| `unicode-hygiene-check.py` | `hooks/` (dormant) | Opt-in: narrowly scoped by design (two hardcoded raw-layer directories) and its paired test suite needs a fixture-shipping decision this repo has not made yet | PostToolUse (Write\|Edit) hook that warns on invisible/bidirectional Unicode characters in content written under `Inbox/` or `Clippings/` |
 | `disabled/pretooluse-payload-probe.py` | `hooks/disabled/` | Diagnostic, temporary by design: a metadata-only probe (payload key names, `agent_type` value, tool name: never content) used to verify which fields reach PreToolUse payloads; deregistered after its probe window and retained as a worked example of safe payload introspection | PreToolUse (Write\|Edit\|MultiEdit) probe appending one JSONL metadata record per matched call |
 | `plain_language_check.py` | `hooks/` | Not a hook: the checker module `plain-language-guard.py` wraps; also runnable standalone against a file | Plain-language rule engine (rules of record in `plain-language-rules.md`) |
 | `mine_governance.py` | `hooks/` | Not a hook: the miner module behind the weekly `process-governance-mine` skill; proposal-only, never edits config | Mines `governance-log.jsonl` for recurring failure/warn patterns (allowlist + per-agent sig_key + severity gate + resolved-ledger suppression) |

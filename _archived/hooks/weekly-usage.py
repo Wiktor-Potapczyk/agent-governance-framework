@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
-"""Weekly usage summary: resets Friday 8PM local time."""
+"""Weekly usage summary: resets Friday 8PM local time.
+
+STATUS: ARCHIVED (2026-08-22 repo-sync). Not a hook: never registered in
+settings, never invoked by the framework's event pipeline. It is a standalone
+CLI utility a maintainer runs by hand.
+
+Why archived: retired from the maintainer's own active toolset. Kept here,
+rather than deleted, as a worked example of a non-hook maintenance script that
+reads Claude Code's local usage data. Two duplicate copies of this file
+previously shipped at once (`hooks/weekly-usage.py` and
+`hooks/disabled/weekly-usage.py`), which `docs/reference/hooks.md` flagged as
+"duplicate-file state flagged for consolidation." This single copy resolves
+that: it is the only one that ships.
+
+Requires the third-party `claude_monitor` package (not a stdlib or
+repo-vendored dependency) to run.
+"""
 
 from datetime import datetime, timedelta
 from claude_monitor.data.reader import load_usage_entries

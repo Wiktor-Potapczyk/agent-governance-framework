@@ -48,17 +48,17 @@ Hook commands invoke `python3`. On Windows, install Python 3.10+ and ensure `pyt
 
 A minimal allow-list of structural permissions. Extend with project-specific WebFetch domains and Bash patterns as needed.
 
-### Hooks: 45 active enforcement hooks across 8 events
+### Hooks: 42 active enforcement hooks across 8 events
 
 | Event | Count | Hooks |
 |---|---|---|
 | `SessionStart` | 4 | `session-start-log.py`, `session-start-orientation.py`, `session-work-orientation.py`, `memory-nudge.py` |
 | `UserPromptSubmit` | 2 | `user-prompt-submit.py`, `user-prompt-state-inject.py` |
-| `PreToolUse` | 11 | `skill-routing-check.py` (Skill matcher), `bash-safety-guard.py` (Bash matcher), `agent-dispatch-check.py` (Agent matcher), `memory-dedup-check.py` (Write matcher), `reviewer-scope-violation-check.py` (Write\|Edit\|MultiEdit matcher), `config-protection.py` (Write\|Edit\|MultiEdit matcher), `mcp-irreversible-guard.py` (mcp__.* matcher), `mcp-circuit-breaker.py` (mcp__.* matcher), `qmd-rerank-default-guard.py` (mcp__qmd__query matcher), `aggregate-write-guard.py` (Write\|Edit\|MultiEdit matcher), `memory-context-guard.py` (Write\|Edit\|MultiEdit matcher) |
+| `PreToolUse` | 10 | `skill-routing-check.py` (Skill matcher), `bash-safety-guard.py` (Bash matcher), `agent-dispatch-check.py` (Agent matcher), `memory-dedup-check.py` (Write matcher), `reviewer-scope-violation-check.py` (Write\|Edit\|MultiEdit matcher), `mcp-irreversible-guard.py` (mcp__.* matcher), `mcp-circuit-breaker.py` (mcp__.* matcher), `qmd-rerank-default-guard.py` (mcp__qmd__query matcher), `aggregate-write-guard.py` (Write\|Edit\|MultiEdit matcher), `memory-context-guard.py` (Write\|Edit\|MultiEdit matcher) |
 | `PostToolUse` | 11 | `skill-step-reminder.py` (Skill matcher), `memory-schema-check.py` (Write\|Edit matcher), `tag-variant-check.py` (Write matcher), `mcp-circuit-breaker-record.py` (mcp__.* matcher), `wiki-citation-check.py` (Write\|Edit matcher), `inbox-auto-ingest.py` (Write\|Edit matcher), `checkpoint.py`, `plain-language-guard.py` (Write\|Edit matcher), `claude-md-provenance-check.py` (Write\|Edit matcher), `deferral-resurface.py` (Write\|Edit matcher), `state-reconcile-check.py` (Write\|Edit matcher) |
-| `SubagentStart` | 4 | `subagent-governance.py`, `agent-registry-check.py`, `subagent-scope-check.py`, `bias-guard.py` |
+| `SubagentStart` | 3 | `subagent-governance.py`, `subagent-scope-check.py`, `bias-guard.py` |
 | `SubagentStop` | 2 | `subagent-quality-check.py`, `subagent-scope-check.py` |
-| `Stop` | 12 | `classifier-field-check.py`, `dispatch-compliance-check.py`, `governance-log.py`, `process-step-check.py`, `dark-zone-check.py`, `work-verification-check.py`, `token-breakdown.py`, `read-before-edit-check.py`, `epistemic-check.py`, `verifier-gate-check.py`, `task-plan-auto-sync.py`, `memory-nudge.py` |
+| `Stop` | 11 | `classifier-field-check.py`, `dispatch-compliance-check.py`, `governance-log.py`, `process-step-check.py`, `dark-zone-check.py`, `work-verification-check.py`, `token-breakdown.py`, `read-before-edit-check.py`, `verifier-gate-check.py`, `task-plan-auto-sync.py`, `memory-nudge.py` |
 | `PreCompact` | 1 | `pre-compact.py` |
 
 ## After substitution

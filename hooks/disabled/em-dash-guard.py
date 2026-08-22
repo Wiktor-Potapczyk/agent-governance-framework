@@ -62,15 +62,15 @@ READ_BYTES = 204800
 # Dash-like glyphs that are NOT the plain hyphen. Stored as escapes so this
 # source file does not itself contain the characters it blocks.
 BLOCKED_DASHES = [
-    (":", "figure dash (U+2012)"),
-    (":", "en dash (U+2013)"),
-    (":", "em dash (U+2014)"),
-    (":", "horizontal bar (U+2015)"),
-    (":", "minus sign (U+2212)"),
+    ("‒", "figure dash (U+2012)"),
+    ("–", "en dash (U+2013)"),
+    ("—", "em dash (U+2014)"),
+    ("―", "horizontal bar (U+2015)"),
+    ("−", "minus sign (U+2212)"),
     ("⸺", "two-em dash (U+2E3A)"),
     ("⸻", "three-em dash (U+2E3B)"),
-    (":", "small em dash (U+FE58)"),
-    (":", "fullwidth hyphen-minus (U+FF0D)"),
+    ("﹘", "small em dash (U+FE58)"),
+    ("－", "fullwidth hyphen-minus (U+FF0D)"),
 ]
 
 # A real markdown table row: optional leading whitespace, a pipe, content, a

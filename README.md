@@ -18,9 +18,9 @@ The framework operationalizes three research-backed principles: classify before 
 
 ## Architecture
 
-The framework operates across four layers. The repository ships **55 hooks**, **10 shared libraries** they import, and **53 test files** covering them.
+The framework operates across four layers. The repository ships **53 hooks**, **11 shared libraries** they import, and **52 test files** covering them.
 
-**Two numbers describe the hooks and they are worth keeping apart.** `settings/settings.json.template` is the full recommended configuration and registers 45 of them. `settings/settings.json.example` and `settings.local.json.example` register 12: a minimal starter set, the smallest group that makes all four layers below actually enforce something. Start from the 12, add from the 45 as you want them, and treat the remainder as worked examples. `docs/reference/hooks.md` says what each one does and which event it binds to.
+**Two numbers describe the hooks and they are worth keeping apart.** `settings/settings.json.template` is the full recommended configuration and registers 42 of them. `settings/settings.json.example` and `settings.local.json.example` register 12: a minimal starter set, the smallest group that makes all four layers below actually enforce something. Start from the 12, add from the 42 as you want them, and treat the remainder as worked examples. `docs/reference/hooks.md` says what each one does and which event it binds to.
 
 A further set lives in `hooks/disabled/`, excluded from the default test run by `pytest.ini` so a clean clone runs green. Some are there after an instructive failure, documented in `hooks/disabled/README.md`; others simply ship unregistered.
 
@@ -60,7 +60,6 @@ framework-repo/
 │   ├── process-step-check.py        # Stop: L1 exit gate -- blocks missing SCOPE or QA REPORT
 │   ├── dark-zone-check.py           # Stop: monitors unsupported citations and reasoning gaps
 │   ├── work-verification-check.py   # Stop: blocks lazy QA and premature user escalation
-│   ├── epistemic-check.py           # Stop: Haiku-evaluated overconfidence/rationalization gate
 │   ├── session-start-log.py         # SessionStart: governance-log session-boundary marker
 │   ├── registry-staleness-check.py  # SessionStart: warns when the registry is stale (opt-in)
 │   ├── prose-slop-check.py          # PostToolUse: flags LLM-slop vocabulary in generated prose (opt-in)

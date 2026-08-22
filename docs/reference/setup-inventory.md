@@ -15,10 +15,10 @@ A reference catalogue of every artifact class in this framework: what is install
 | Vault-management skills | 9 | `skills/vault/` |
 | Domain-example skills | 21 | `skills/domain-examples/` (apify, n8n) |
 | Workflow scripts | 6 | `workflows/` |
-| Production hook files | 55 | `hooks/` |
-|: of which active enforcement (registered) | 45 | `settings/` |
-| Shared hook libraries | 10 | `hooks/` |
-| Opt-in (disabled) hook files | 9 | `hooks/disabled/` |
+| Production hook files | 53 | `hooks/` |
+|: of which active enforcement (registered) | 42 | `settings/` |
+| Shared hook libraries | 11 | `hooks/` |
+| Opt-in (disabled) hook files | 11 | `hooks/disabled/` |
 | Analysis and maintenance scripts | 13 | `scripts/` |
 
 ## Workflows (`workflows/`)
@@ -60,7 +60,7 @@ Each skill is a `SKILL.md` with `name` + `description` frontmatter and a body of
 
 ## Hooks (`hooks/`)
 
-The repository ships 55 production hook files; **45** of them are *active enforcement* hooks registered in `settings/` (the figure pinned in the manifest), and the remainder are logging/lifecycle handlers and shared libraries. Hooks bind to Claude Code lifecycle events (PreToolUse, PostToolUse, Stop, SubagentStart/Stop, SessionStart/End, UserPromptSubmit, Pre/PostCompact). They divide into:
+The repository ships 53 production hook files; **42** of them are *active enforcement* hooks registered in `settings/` (the figure pinned in the manifest), and the remainder are logging/lifecycle handlers and shared libraries. Hooks bind to Claude Code lifecycle events (PreToolUse, PostToolUse, Stop, SubagentStart/Stop, SessionStart/End, UserPromptSubmit, Pre/PostCompact). They divide into:
 
 - **Classification & routing gates**: verify the task-classifier ran and that dispatch references resolve.
 - **Dispatch-compliance gates**: verify that mandated agents/skills were actually invoked.
@@ -69,7 +69,7 @@ The repository ships 55 production hook files; **45** of them are *active enforc
 - **Documentation-quality gates**: plain-language-guard, claude-md-provenance-check, state-reconcile-check, deferral-resurface.
 - **Logging & lifecycle**: governance-log, checkpoint, session-start orientation, compaction handlers.
 
-`hooks/disabled/` holds 9 opt-in or diagnostic files that ship unregistered (copy to the active dir + register in settings to arm). Most production hooks have a paired `test_<hook>.py`: that test file is the authoritative enumeration of the hook's branches (per [Documentation Standard §3a](../documentation-standard.md)).
+`hooks/disabled/` holds 11 opt-in or diagnostic files that ship unregistered (copy to the active dir + register in settings to arm). Most production hooks have a paired `test_<hook>.py`: that test file is the authoritative enumeration of the hook's branches (per [Documentation Standard §3a](../documentation-standard.md)).
 
 ## How this inventory stays current
 

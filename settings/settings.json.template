@@ -138,10 +138,6 @@
           {
             "type": "command",
             "command": "python \"{{VAULT_ROOT}}/.claude/hooks/reviewer-scope-violation-check.py\""
-          },
-          {
-            "type": "command",
-            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/config-protection.py\""
           }
         ]
       },
@@ -290,10 +286,6 @@
           },
           {
             "type": "command",
-            "command": "python3 \"{{VAULT_ROOT}}/.claude/hooks/agent-registry-check.py\""
-          },
-          {
-            "type": "command",
             "command": "python \"{{VAULT_ROOT}}/.claude/hooks/subagent-scope-check.py\""
           },
           {
@@ -351,10 +343,6 @@
           {
             "type": "command",
             "command": "python \"{{VAULT_ROOT}}/.claude/hooks/read-before-edit-check.py\""
-          },
-          {
-            "type": "command",
-            "command": "python \"{{VAULT_ROOT}}/.claude/hooks/epistemic-check.py\""
           },
           {
             "type": "command",

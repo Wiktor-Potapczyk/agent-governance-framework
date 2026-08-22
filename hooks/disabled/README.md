@@ -1,6 +1,46 @@
 # Disabled Hooks
 
-This directory holds hooks that ship with the framework but are NOT registered in the default config. Two kinds live here: (1) hooks disabled after an instructive failure: documented below because the failure modes reveal where the line is between useful enforcement and counterproductive restriction; (2) hooks that ship **opt-in / unregistered** by design: built and tested, but armed deliberately by the adopter rather than on by default (because the action they gate is high-stakes or context-dependent).
+This directory holds hooks that ship with the framework but are NOT registered in the default config. Three kinds live here: (1) hooks disabled after an instructive failure: documented below because the failure modes reveal where the line is between useful enforcement and counterproductive restriction; (2) hooks that ship **opt-in / unregistered** by design: built and tested, but armed deliberately by the adopter rather than on by default (because the action they gate is high-stakes or context-dependent); (3) hooks **retired from the maintainer's own deployment**: still correct, working code, kept here as a reference implementation rather than deleted, because a working pattern has value even after its author stopped running it.
+
+## config-protection.py
+
+**What it did:** Fired on PreToolUse for `Write|Edit|MultiEdit`. Hard-blocked writes to three protected files (a local settings file, a registry file, and a persistent memory index), on the theory that a config file controlling hook registration should not be silently editable by the agent it governs.
+
+**Why it was retired:** the guard blocked an already-approved batch of edits twice in one working day, and the only compliant paths were a session relaunch or a manual re-paste of a command the maintainer had already typed once. The maintainer's ruling: *"let's just remove that guard, it's nonsense anyways."* This is the same shape as the reversible-surface calibration documented for `bash-safety-guard.py`'s normal-push handling: a gate whose only real effect is making a human re-run an agent-composed action verbatim moves no decision to a human, it only costs a round trip.
+
+**The lesson:** a hard PreToolUse deny on a *reversible* file (one with git history, diffable and revertable) is the wrong enforcement shape once the adopter has already delegated that decision. Warn-and-record (advisory logging, a changelog discipline, a full-suite regression gate on hook edits) recovers most of the safety value without the retry tax. See also `hooks/hook-write-regression-gate.py` and `claude-md-provenance-check.py`, which cover related ground without a hard block.
+
+---
+
+## agent-registry-check.py
+
+**What it did:** Fired on SubagentStart. When a generic/untyped agent (general-purpose, explore, plan) was dispatched, scored the dispatch prompt's words against registry keyword lists and suggested specialist agents in `additionalContext`. Advisory only: it never blocked.
+
+**Why it was retired:** retired from the maintainer's own deployment in the same pass as `config-protection.py`. Unlike that hook, no specific failure narrative is recorded for this one in the source project's own memory: the two were cut together as a batch, and this file's individual rationale was not separately documented. Recorded here as an honest gap rather than an invented one.
+
+**Kept as a reference implementation:** the code is correct and does what its docstring says. If your adopter workflow leans on generic-agent dispatches and would benefit from a keyword-nudge toward specialists, this is a working starting point; just be aware it lacks an independently-recorded justification for staying off by default beyond "the maintainer stopped using it."
+
+---
+
+## em-dash-guard.py
+
+**What it did / does:** Fires on Stop. Scans the assistant's last response for "fancy" dash characters (en dash, em dash, minus sign, and similar Unicode look-alikes) in prose, and hard-blocks the turn if any are found outside of code spans, tables, or frontmatter.
+
+**Why it ships opt-in:** this is a personal writing-style preference, not a process-compliance check. It enforces "the maintainer never uses these characters" rather than anything about whether the agent did its job correctly, so it does not fit the framework's own stated design principle that hooks should verify process compliance, not judge output quality. It is a genuinely useful pattern for an adopter who wants a specific prose convention mechanically enforced (soft instructions alone land roughly 25% compliance in this framework's own measurements), but the convention itself is not universal, so it ships armed only by choice.
+
+**To arm:** copy/symlink into your active hooks dir and register on `Stop` with no matcher.
+
+---
+
+## prose-codes-check.py
+
+**What it did / does:** Fires on Stop. Sibling of `em-dash-guard.py` (same transcript-parse and strip-noise idiom): blocks a response that uses invented internal shorthand codes in prose (e.g. a made-up `T-C1` or `D-3` style reference) instead of a plain-language description, while allowing real ticket-key prefixes and workflow shorthand through an allow-list.
+
+**Why it ships opt-in:** same reasoning as `em-dash-guard.py` -- this enforces a specific human's readability preference for prose, not a process gate. The allow-list (`ALLOW_PREFIXES`) is a placeholder pattern (`PROJ|TEAM|OPS|PLAT`) in this shipped copy; substitute your own project's real ticket-key prefixes before arming it, or every one of your own tickets will read as an invented code and trip the block.
+
+**To arm:** copy/symlink into your active hooks dir and register on `Stop` with no matcher. Edit `ALLOW_PREFIXES` first.
+
+---
 
 ## epistemic-check.py
 
@@ -38,7 +78,7 @@ This directory holds hooks that ship with the framework but are NOT registered i
 
 **What it does:** Fires on PreToolUse for `Edit|Write|MultiEdit`. Denies a write that would introduce a **broken dispatch-name reference**: an agent name in a clear dispatch position (`MUST DISPATCH:` line, `subagent_type:` field, or a routing-table row) inside `CLAUDE.md` or any `SKILL.md` that resolves to nothing in `registry.json`. Low-false-positive by design: it only denies the unambiguous case and ALLOWs on any ambiguity (fail-open), so it never blocks a legitimate edit.
 
-**Why it ships disabled (opt-in):** unlike the two hooks above, this is not a disabled-after-failure case: it is built, tested (26 tests), and correct. It ships unregistered because arming a **blocking** hook on `CLAUDE.md` + every `SKILL.md` is a deliberate decision: it will gate the adopter's own edits to those files, and the registry it validates against must be complete (run `scripts/generate_registry.py` for the target project first). Arm it knowingly, not by default.
+**Why it ships disabled (opt-in):** unlike `epistemic-check.py` and `delegation-check.ps1` above, this is not a disabled-after-failure case: it is built, tested (26 tests), and correct. It ships unregistered because arming a **blocking** hook on `CLAUDE.md` + every `SKILL.md` is a deliberate decision: it will gate the adopter's own edits to those files, and the registry it validates against must be complete (run `scripts/generate_registry.py` for the target project first). Arm it knowingly, not by default.
 
 **To arm:** copy/symlink it into your active hooks dir and register it on `PreToolUse` with matcher `Edit|Write|MultiEdit` in `settings`. Populate `DEPRECATED_ALLOWLIST` with any retired-but-still-mentioned agent names so renames don't trip a false positive.
 

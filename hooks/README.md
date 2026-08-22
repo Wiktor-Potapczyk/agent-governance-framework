@@ -1,10 +1,10 @@
 # Hook Registry
 
-This directory holds 55 hook scripts across 8 event types, plus 10 shared libraries they import (`_competence_signal.py`, `_daily_aggregate.py`, `_dispatch_compliance_logic.py`, `_event_emit.py`, `_governance_logger.py`, `_haiku_summarize.py`, `_irreversible_surface.py`, `_project_discovery.py`, `_subagent_quality_logic.py`, `_wiki_citation_logic.py`) and 53 test files.
+This directory holds 53 hook scripts across 8 event types, plus 11 shared libraries they import (`_competence_signal.py`, `_daily_aggregate.py`, `_dispatch_compliance_logic.py`, `_event_emit.py`, `_governance_logger.py`, `_haiku_summarize.py`, `_irreversible_surface.py`, `_project_discovery.py`, `_subagent_quality_logic.py`, `_unicode_hygiene.py`, `_wiki_citation_logic.py`) and 52 test files.
 
-**Two different numbers describe this directory and they are easy to confuse.** `settings/settings.json.template` uses 45 active enforcement hooks: that is the full recommended configuration. `settings/settings.json.example` and `settings.local.json.example` register only 12: a minimal starter set, the smallest group that makes all four enforcement layers do something. Being present in this directory means a hook is available, not that it runs.
+**Two different numbers describe this directory and they are easy to confuse.** `settings/settings.json.template` uses 42 active enforcement hooks: that is the full recommended configuration. `settings/settings.json.example` and `settings.local.json.example` register only 12: a minimal starter set, the smallest group that makes all four enforcement layers do something. Being present in this directory means a hook is available, not that it runs.
 
-Start from the 12, add from the 36 as you find you want them, and treat the rest as worked examples. The table below says what each does and which event it binds to.
+Start from the 12, add from the 30 as you find you want them, and treat the rest as worked examples. The table below says what each does and which event it binds to.
 
 A further set lives in `hooks/disabled/`, excluded from the default test run by `pytest.ini` so a clean clone runs green. Some are there after an instructive failure and some simply ship unregistered; `disabled/README.md` gives the reason for each.
 
@@ -28,7 +28,6 @@ The counts above are checked against this directory on every CI run rather than 
 | agent-dispatch-check.py | PreToolUse | Agent | Advisory governance: logs agent dispatches, registry-exempts process-* skill dispatches, and warns on off-contract dispatches without blocking | No (warns only) |
 | memory-dedup-check.py | PreToolUse | Write | Detects near-duplicate memory entries and surfaces an advisory warning when a candidate write overlaps significantly with an existing memory file | No (additionalContext advisory) |
 | memory-schema-check.py | PostToolUse | Write\|Edit | Validates memory frontmatter after writes (required fields: name, description, type, confidence, last_verified, expires); logs schema violations | No (logs only) |
-| epistemic-check.py | Stop | (all) | Sends Claude's response to Haiku for external evaluation of overconfidence. Adapted from the Trail of Bits anti-rationalization pattern. Blocks when the Haiku evaluator returns a block verdict | Yes |
 | session-start-log.py | SessionStart | (all) | Writes a `session_start` event to `governance-log.jsonl` so analytics scripts can detect session boundaries cleanly instead of inferring from first classification entry | No (logging only) |
 | work-verification-check.py | Stop | (all) | L1 exit gate: blocks QA/pentest reports filed with zero execution tool uses; also catches inline QA/PENTEST REPORT blocks filed without invoking the corresponding process skill | Yes |
 | verifier-gate-check.py | Stop | (all) | Enforces the contract of the `verification-gated-research` skill: if that skill was invoked, blocks completion until a separate verifier agent was dispatched | Yes |
@@ -42,8 +41,6 @@ The counts above are checked against this directory on every CI run rather than 
 | pre-compact.py | PreCompact | (all) | Comprehensive state save before compaction: writes a recovery file containing STATE.md content, open task plans, and recent transcript context | No (state save) |
 | prose-slop-check.py | PostToolUse | Write\|Edit | **Opt-in (not default-registered)**: flags LLM-slop vocabulary (delve, tapestry, multifaceted, furthermore, foster…) in generated prose; corpus-calibrated to 0 false-positives; scoped to prose, not code | No (warns only) |
 | registry-staleness-check.py | SessionStart | (all) | **Opt-in (not default-registered)**: warns when `registry.json` is older than a threshold, naming the regen command; silent when fresh | No (additionalContext) |
-| agent-registry-check.py | SubagentStart | (all) | When a general-purpose agent is dispatched, suggests specialist agents whose keywords match the prompt | No (advisory) |
-| config-protection.py | PreToolUse | Write\|Edit\|MultiEdit | Denies agent edits to the governance config itself, so the system cannot quietly widen its own permissions | Yes |
 | git-credential-scope-check.py | SessionStart | (all) | Warns when the git credential scope could let a push authenticate as an unintended account | No (advisory) |
 | hook-write-regression-gate.py | PostToolUse | Write\|Edit | After any edit to a hook, requires evidence that the hook suite was run, so a hook change cannot land unverified | No (advisory) |
 | lint-cadence-trigger.py | SessionStart | (all) | Surfaces a 'consider running' reminder when a periodic sweep (lint, governance-mine, setup-audit) is past its cadence | No (additionalContext) |
@@ -58,14 +55,16 @@ The counts above are checked against this directory on every CI run rather than 
 | reviewer-scope-violation-check.py | PreToolUse | Write\|Edit\|MultiEdit | Denies a reviewer agent editing the artifact it was dispatched to review, which would collapse generator and verifier into one | Yes |
 | subagent-scope-check.py | SubagentStart | (all) | Detects a subagent whose prompt has drifted beyond the scope it was dispatched with | No (advisory) |
 | tag-variant-check.py | PostToolUse | Write | Advisory: flags tag spellings outside the canonical taxonomy before they proliferate | No (advisory) |
+| unicode-hygiene-check.py | PostToolUse | Write\|Edit | **Opt-in (not default-registered)**: warns on invisible/bidirectional Unicode characters (Trojan-Source bidi, zero-width hiding) in content written under `Inbox/` or `Clippings/`; scope and paired test fixtures need adapting to your own raw-layer paths before arming | No (warns only) |
 | token-breakdown.py | Stop | (all) | Per-turn token and cost accounting written to the governance log | No (logging only) |
 | transition-gate-check.py | PreToolUse | Write\|Edit | Denies an SDLC phase advance whose evidence does not satisfy the phase's declared gate | Yes |
 ## Helper Scripts (not hooks)
 
 | Script | Purpose |
 |--------|---------|
-| `weekly-usage.py` | Standalone weekly usage summary, resets Friday evening. Reads no stdin and binds no event, so it is not a hook and is excluded from the hook count. |
 | `mine_governance.py` | Pure-stdlib governance-log failure miner: imported by the `process-governance-mine` skill. Scans `governance-log.jsonl` for recurring failure patterns keyed by (event_label, agent_type, hook, normalized_reason); returns flagged sig records sorted severity-high-first. Also runnable standalone via `python mine_governance.py`. Not a hook: never registered in settings. |
+
+`weekly-usage.py` (standalone weekly usage summary; not a hook) previously shipped as two duplicate copies here and in `disabled/`. Both were consolidated into a single archived copy at `_archived/hooks/weekly-usage.py` (2026-08-22): see that file's header and `docs/reference/hooks.md`'s Disabled/opt-in table.
 
 ## Opt-in / Unregistered Hooks
 
