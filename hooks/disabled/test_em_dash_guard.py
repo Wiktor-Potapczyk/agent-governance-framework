@@ -17,11 +17,11 @@ import tempfile
 HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "em-dash-guard.py")
 
 # Literal glyphs (consistent with the hook's detection list).
-EM = ":"        # U+2014 em dash
-EN = ":"        # U+2013 en dash
-HBAR = ":"      # U+2015 horizontal bar
-MINUS = ":"     # U+2212 minus sign
-FIGURE = ":"    # U+2012 figure dash
+EM = "—"        # U+2014 em dash
+EN = "–"        # U+2013 en dash
+HBAR = "―"      # U+2015 horizontal bar
+MINUS = "−"     # U+2212 minus sign
+FIGURE = "‒"    # U+2012 figure dash
 
 
 def run(assistant_text=None, stop_hook_active=False, transcript_exists=True,
@@ -76,9 +76,9 @@ case("dash only in the second text block", True, content_blocks=[
 case("clean prose, hyphens only", False,
      assistant_text="day-to-day self-hosted well-known. No fancy dashes here.")
 case("em dash only inside fenced code", False,
-     assistant_text="Here is code:\n```\nx = 1  # note: a dash\n```\nDone.")
+     assistant_text="Here is code:\n```\nx = 1  # note — a dash\n```\nDone.")
 case("em dash only inside inline code", False,
-     assistant_text="The char `:` is U+2014. I describe it without typing it.")
+     assistant_text="The char `—` is U+2014. I describe it without typing it.")
 case("the literal word em-dash with hyphen", False,
      assistant_text="I will not use the em-dash or en-dash in prose.")
 case("em dash inside a real markdown table row", False,
@@ -90,6 +90,29 @@ case("empty stdin fails open", False, raw_payload="")
 case("bad json stdin fails open", False, raw_payload="{not json")
 case("no assistant text fails open", False, assistant_text=None,
      extra_lines=[{"type": "user", "message": {"content": "hi"}}])
+
+
+def test_em_dash_guard_cases():
+    """pytest entry point for the cases above.
+
+    Added 2026-08-22. `pytest hooks/` collects only test_-prefixed functions
+    and classes; every case in this file was reachable solely through main(),
+    so pytest collected ZERO tests here while collecting 2,809 across the other
+    124 test files. That is how the damage went unnoticed: a scrub pass blanked
+    the guard's dash table AND this file's dash fixtures in the same edit, so
+    the guard stopped seeing dashes and the only thing that would have said so
+    was never being run.
+
+    One function, so the standalone runner keeps working unchanged and CI sees
+    the same 17 cases. Per-case granularity is deliberately traded for zero new
+    dependencies: the assertion message names every failing case.
+    """
+    failures = []
+    for name, want_block, kw in CASES:
+        rc, _err = run(**kw)
+        if (rc == 2) != want_block:
+            failures.append(f"{name}: want_block={want_block} got_rc={rc}")
+    assert not failures, "em-dash-guard cases failed:\n  " + "\n  ".join(failures)
 
 
 def main():
