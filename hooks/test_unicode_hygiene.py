@@ -232,7 +232,22 @@ LONG_SEGMENT = "unicode-hygiene-longpath-segment-0123456789abcdef"
 
 
 def _extended(path):
-    r"""\\?\-prefixed fully qualified backslash form for test setup I/O."""
+    r"""Windows extended-length form for test setup I/O, a no-op elsewhere.
+
+    The \\?\ prefix is a Windows API concept for escaping the 260-character
+    MAX_PATH limit. On POSIX a backslash is an ordinary filename character, so
+    prepending it does not escape anything: it creates a directory literally
+    named "\\?\/tmp/..." while the test then hands scan_file the RAW path,
+    which now points at nothing, and the scanner correctly reports it
+    unreadable. That is how this test passed on Windows and failed on the
+    Ubuntu CI runner (run 32646027963).
+
+    The test stays meaningful on both: POSIX allows paths past 260 characters
+    natively, so the assertion that a long path is still read holds there
+    without any prefix.
+    """
+    if os.name != "nt":
+        return path
     return "\\\\?\\" + os.path.abspath(path)
 
 
