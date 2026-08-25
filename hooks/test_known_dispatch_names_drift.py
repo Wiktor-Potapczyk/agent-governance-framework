@@ -1,19 +1,28 @@
-"""
-Drift Guard Test: KNOWN_DISPATCH_NAMES consistency across hooks + shared module (2026-04-12)
+"""Drift Guard Test - KNOWN_DISPATCH_NAMES consistency across hooks and the
+generated data file (2026-04-12; architecture updated 2026-08-19).
 
-The same KNOWN_DISPATCH_NAMES set is duplicated in 3 hook files (hooks must be self-contained):
-- governance-log.py
-- dispatch-compliance-check.py
-- agent-dispatch-check.py
+Architecture change (2026-08-19, plugin-wiring-investigation fix): the three
+hook files (governance-log.py, dispatch-compliance-check.py [via
+_dispatch_compliance_logic.py], agent-dispatch-check.py) no longer each carry
+an independent hand-typed KNOWN_DISPATCH_NAMES literal. All three now read
+the same generated file (.claude/hooks/_known_dispatch_names.json, produced
+by .claude/scripts/generate_known_dispatch_names.py from registry.json plus
+a local disk scan) via the shared .claude/hooks/_known_dispatch_names_loader.py.
 
-The canonical source is: scripts/shared/known_names.py
+Projects/your-project/scripts/shared/known_names.py (the old
+hand-maintained "canonical copy", outside .claude/ and out of scope for the
+generator) is now a frozen historical snapshot, not the live source of
+truth. This test no longer compares the three hooks against it for
+KNOWN_DISPATCH_NAMES - that comparison would now report permanent, expected
+drift (267 generated vs. 93 frozen), not a real bug. It does still assert
+what actually matters post-migration: the three hooks must be identical to
+each other and to the live generated file (the new single source of truth),
+since a hook silently falling back (generated file missing or broken) while
+the others succeed is real drift worth catching.
 
-These MUST stay in sync. If a new agent is added to one but not the others,
-behavior will drift: governance-log will log it correctly but dispatch-compliance
-will not match it (causing false blocks), and agent-dispatch-check will not
-recognize it (causing false denies).
-
-This test asserts all four copies are identical. Fails loudly on drift.
+SKILL_AGENT_ALIASES (TestSkillAgentAliasesDrift below) is unchanged and out
+of scope for this generator; it still compares against the canonical shared
+module as before.
 
 Run: python .claude/hooks/test_known_dispatch_names_drift.py
 """
@@ -23,10 +32,9 @@ import os
 import sys
 import unittest
 
-
 HOOKS_DIR = os.path.dirname(os.path.abspath(__file__))
 # Add scripts/ to path so we can import the shared canonical set
-SCRIPTS_DIR = os.path.join(HOOKS_DIR, "..", "scripts")
+SCRIPTS_DIR = os.path.join(HOOKS_DIR, "..", "..", "Projects", "your-project", "scripts")
 sys.path.insert(0, os.path.normpath(SCRIPTS_DIR))
 
 
@@ -41,16 +49,19 @@ def load_hook(filename):
 
 
 class TestKnownDispatchNamesDrift(unittest.TestCase):
-    """Ensure all 3 hook copies + shared canonical set stay in sync."""
+    """Ensure all 3 hooks stay in sync with each other and with the generated file."""
 
     @classmethod
     def setUpClass(cls):
         cls.gov = load_hook("governance-log.py")
         cls.disp = load_hook("dispatch-compliance-check.py")
         cls.agent = load_hook("agent-dispatch-check.py")
-        # Load the canonical shared module
-        from shared.known_names import KNOWN_DISPATCH_NAMES as canonical
-        cls.canonical = canonical
+        # Load the generated data file directly (2026-08-19 architecture:
+        # this replaces the old shared.known_names canonical-module load).
+        import json
+        generated_path = os.path.join(HOOKS_DIR, "_known_dispatch_names.json")
+        with open(generated_path, "r", encoding="utf-8") as f:
+            cls.generated = set(json.load(f)["known_dispatch_names"])
 
     def test_governance_log_has_set(self):
         self.assertTrue(hasattr(self.gov, "KNOWN_DISPATCH_NAMES"))
@@ -91,22 +102,22 @@ class TestKnownDispatchNamesDrift(unittest.TestCase):
         """Sanity: set should have 30+ entries (30 agents + 14+ skills)."""
         self.assertGreater(len(self.gov.KNOWN_DISPATCH_NAMES), 30)
 
-    def test_canonical_vs_governance(self):
-        """Shared canonical set must match governance-log."""
-        extra_in_canon = self.canonical - self.gov.KNOWN_DISPATCH_NAMES
-        extra_in_gov = self.gov.KNOWN_DISPATCH_NAMES - self.canonical
-        self.assertEqual(extra_in_canon, set(),
-                         f"Canonical has names missing from governance-log: {extra_in_canon}")
+    def test_generated_file_vs_governance(self):
+        """Generated data file must match governance-log's loaded set."""
+        extra_in_file = self.generated - self.gov.KNOWN_DISPATCH_NAMES
+        extra_in_gov = self.gov.KNOWN_DISPATCH_NAMES - self.generated
+        self.assertEqual(extra_in_file, set(),
+                         f"Generated file has names missing from governance-log: {extra_in_file}")
         self.assertEqual(extra_in_gov, set(),
-                         f"governance-log has names not in canonical: {extra_in_gov}")
+                         f"governance-log has names not in the generated file: {extra_in_gov}")
 
-    def test_canonical_vs_dispatch_compliance(self):
-        """Shared canonical set must match dispatch-compliance."""
-        self.assertEqual(self.canonical, self.disp.KNOWN_DISPATCH_NAMES)
+    def test_generated_file_vs_dispatch_compliance(self):
+        """Generated data file must match dispatch-compliance's loaded set."""
+        self.assertEqual(self.generated, self.disp.KNOWN_DISPATCH_NAMES)
 
-    def test_canonical_vs_agent_dispatch(self):
-        """Shared canonical set must match agent-dispatch-check."""
-        self.assertEqual(self.canonical, self.agent.KNOWN_DISPATCH_NAMES)
+    def test_generated_file_vs_agent_dispatch(self):
+        """Generated data file must match agent-dispatch-check's loaded set."""
+        self.assertEqual(self.generated, self.agent.KNOWN_DISPATCH_NAMES)
 
 
 class TestSkillAgentAliasesDrift(unittest.TestCase):

@@ -18,7 +18,7 @@ The framework operationalizes three research-backed principles: classify before 
 
 ## Architecture
 
-The framework operates across four layers. The repository ships **53 hooks**, **11 shared libraries** they import, and **53 test files** covering them.
+The framework operates across four layers. The repository ships **53 hooks**, **12 shared libraries** they import, and **53 test files** covering them.
 
 **Two numbers describe the hooks and they are worth keeping apart.** `settings/settings.json.template` is the full recommended configuration and registers 42 of them. `settings/settings.json.example` and `settings.local.json.example` register 12: a minimal starter set, the smallest group that makes all four layers below actually enforce something. Start from the 12, add from the 42 as you want them, and treat the remainder as worked examples. `docs/reference/hooks.md` says what each one does and which event it binds to.
 

@@ -29,7 +29,14 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-VAULT = Path(os.environ.get("VAULT_ROOT", ""))
+# Test seam added 2026-08-23. This hook's verdict is a function of the git
+# working tree, not of its stdin payload: with no stored baseline, new_changes
+# is every line of `git status --porcelain`. A probe therefore cannot trip it
+# deterministically unless it controls the repository being inspected. Every
+# path below derives from VAULT, so this single override redirects the git cwd,
+# the baseline state file and the JSONL sink together. Unset in production.
+VAULT = Path(os.environ.get("SUBAGENT_SCOPE_ROOT")
+             or r"C:\Users\exampleuser\Desktop\Vault")
 STATE_DIR = VAULT / ".claude" / "hooks" / "_state"
 STATE_FILE = STATE_DIR / "subagent-scope-baselines.json"
 LOG_FILE = VAULT / ".claude" / "hooks" / "subagent-scope-log.jsonl"
@@ -128,10 +135,37 @@ def main() -> int:
         baseline_entry = state.pop(agent_id, None)
         _save_state(state)
 
-        baseline = set(baseline_entry["baseline"]) if baseline_entry else set()
         current = set(porc_now)
-        new_changes = sorted(current - baseline)
-        resolved_changes = sorted(baseline - current)  # files that returned to clean
+
+        # NO BASELINE means NO MEASUREMENT (2026-08-24). This used to fall back to
+        # `set()`, which makes `current - baseline` the ENTIRE dirty working tree and
+        # writes it out as though the subagent had produced it. Measured over the live
+        # log before this change: 5,249 of 9,641 records had no baseline and averaged
+        # 407 "new" files each, against 0.8 for records that actually had one. Those
+        # records held 161.2 MB of the log's 162.8 MB, and produced 18,967 of 18,981
+        # apparent ownership violations. All of it was the working tree, not the agent.
+        #
+        # So: record the fact and the count, never the tree. This is the fix for the
+        # size problem too; the cap below is the second-order one.
+        if baseline_entry is None:
+            new_changes = []
+            resolved_changes = []
+            no_baseline_note = (
+                "no SubagentStart baseline for this agent_id, so no delta could be "
+                "computed. The dirty tree is NOT recorded here: it would be the "
+                "repository's state, not this subagent's writes.")
+        else:
+            baseline = set(baseline_entry["baseline"])
+            new_changes = sorted(current - baseline)
+            resolved_changes = sorted(baseline - current)  # files that returned to clean
+            no_baseline_note = None
+
+        # Payload cap, ruled 2026-08-24: keep the count, keep enough paths to recognise
+        # what happened, drop the rest. The count is what anyone reads; 20 paths is
+        # enough to see the shape.
+        CAP = 20
+        new_total, resolved_total = len(new_changes), len(resolved_changes)
+        truncated = new_total > CAP or resolved_total > CAP
 
         log_entry = {
             "ts": now,
@@ -139,10 +173,15 @@ def main() -> int:
             "agent_id": agent_id,
             "agent_type": agent_type,
             "started_at": baseline_entry["started_at"] if baseline_entry else None,
-            "new_changes": new_changes,
-            "resolved_changes": resolved_changes,
+            "new_changes": new_changes[:CAP],
+            "new_changes_total": new_total,
+            "resolved_changes": resolved_changes[:CAP],
+            "resolved_changes_total": resolved_total,
+            "new_changes_truncated": truncated,
             "had_baseline": baseline_entry is not None,
         }
+        if no_baseline_note:
+            log_entry["no_baseline_note"] = no_baseline_note
         _log(log_entry)
 
         # Emit WARN to stderr only if there are NEW changes: main session can
@@ -151,11 +190,11 @@ def main() -> int:
         if new_changes:
             print(
                 f"[SCOPE-CHECK] sub-agent {agent_type} ({agent_id[:16]}) "
-                f"modified {len(new_changes)} new file(s). See "
+                f"modified {new_total} new file(s). See "
                 f".claude/hooks/subagent-scope-log.jsonl for paths.",
                 file=sys.stderr,
             )
-            _log_verdict("warn", "%s %d new" % (agent_type, len(new_changes)))
+            _log_verdict("warn", "%s %d new" % (agent_type, new_total))
         else:
             _log_verdict("allow", agent_type)
         return 0

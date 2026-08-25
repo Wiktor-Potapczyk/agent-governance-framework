@@ -27,31 +27,17 @@ import re
 import sys
 import time
 from datetime import datetime
-from pathlib import Path
 
-def _find_workspace_root() -> Path:
-    """Walk up from this file's directory until we find CLAUDE.md (workspace root).
-
-    Falls back to the directory two levels above hooks/ (the conventional layout
-    is <root>/.claude/hooks/<this-file> or <root>/hooks/<this-file>).
-    """
-    here = Path(os.path.abspath(__file__)).parent
-    # Walk up looking for CLAUDE.md
-    candidate = here
-    for _ in range(8):  # cap at 8 levels to avoid runaway
-        if (candidate / "CLAUDE.md").exists():
-            return candidate
-        parent = candidate.parent
-        if parent == candidate:
-            break
-        candidate = parent
-    # Fallback: assume hooks/ is directly inside workspace root
-    return here.parent
-
-
-WORKSPACE = _find_workspace_root()
-PROJECTS_DIR = os.path.join(WORKSPACE, "Projects")
-STATE_DIR = os.path.join(WORKSPACE, ".claude", "hooks", "_state")
+VAULT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+PROJECTS_DIR = os.path.join(VAULT, "Projects")
+# Test seam added 2026-08-23, scoped to this hook rather than named generically,
+# because no other hook honours it and a half-implemented generic override is a
+# trap. Whether this hook emits is a function of elapsed time and of the throttle
+# file, so a probe both depended on ambient state and, worse, WROTE it: every
+# probe run stamped last_emit_ts=now on the live file and suppressed the next
+# real state injection for 30 minutes. Probing the system must not steer it.
+STATE_DIR = os.environ.get("STATE_INJECT_STATE_DIR") or os.path.join(
+    VAULT, ".claude", "hooks", "_state")
 THROTTLE_FILE = os.path.join(STATE_DIR, "last-state-inject.json")
 
 THROTTLE_SECONDS = 30 * 60  # 30 min

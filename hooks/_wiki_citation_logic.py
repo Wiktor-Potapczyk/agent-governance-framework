@@ -14,8 +14,6 @@ from __future__ import annotations
 import hashlib
 import re
 from pathlib import Path
-from typing import Optional
-
 
 WIKI_PATH_PREFIXES = (
     "Resources/KB/",  # always wiki-layer regardless of #wiki tag
@@ -27,10 +25,10 @@ WIKI_BY_TAG_PREFIXES = (
 EXCLUDE_FILES = frozenset({
     "index.md", "INDEX.md",
     "MEMORY.md", "STATE.md", "CLAUDE.md", "PROJECT.md",
-    # Knowledge-base utility / catalog pages: navigational catalogs / registries,
-    # NOT syntheses of raw docs, so a source: citation is meaningless for them 
-    # same class as index.md. Exempting by basename is consistent with the entries
-    # above (also bare-basename, global). Adjust this set to your own catalog pages.
+    # KB utility/catalog pages (2026-06-01, R-2 lint triage, owner-approved):
+    # these are navigational catalogs / registries, NOT syntheses of raw docs, so a
+    # source: citation is meaningless for them: same class as index.md. Exempting
+    # by basename is consistent with the entries above (also bare-basename, global).
     "README.md", "tag-registry.md", "dataview-queries.md",
 })
 
@@ -81,8 +79,7 @@ def has_wiki_tag(content: str) -> bool:
                          - wiki
                          - moc
     Token matching: strips quotes, leading '#', and whitespace, then
-    compares case-insensitively to the bare string 'wiki' (exact match 
-    'wiki-derived' and 'wikilink' do NOT match).
+    compares case-insensitively to the bare string 'wiki' (exact match: 'wiki-derived' and 'wikilink' do NOT match).
     """
     if not content.startswith("---"):
         return False
@@ -135,10 +132,8 @@ def _parse_flow_mapping(s: str) -> dict:
     quoted values or nested braces: vault source entries never contain them.
     """
     inner = s.strip()
-    if inner.startswith("{"):
-        inner = inner[1:]
-    if inner.endswith("}"):
-        inner = inner[:-1]
+    inner = inner.removeprefix("{")
+    inner = inner.removesuffix("}")
     result: dict = {}
     for part in inner.split(","):
         part = part.strip()
@@ -152,7 +147,7 @@ def _parse_flow_mapping(s: str) -> dict:
     return result
 
 
-def parse_source_field(content: str) -> Optional[list[dict]]:
+def parse_source_field(content: str) -> list[dict] | None:
     """Extract source: array from frontmatter. Returns list of dicts or None.
 
     Handles BOTH YAML list forms:
@@ -171,7 +166,7 @@ def parse_source_field(content: str) -> Optional[list[dict]]:
 
     in_source = False
     source_lines: list[str] = []
-    indent: Optional[int] = None
+    indent: int | None = None
     for line in fm.split("\n"):
         if re.match(r"^source\s*:", line):
             in_source = True
@@ -284,8 +279,7 @@ def validate_source_entries(
         if entry.get("type") == "generated":
             continue
 
-        # Volatile hand-edited doctrine sources (e.g. CLAUDE.md, churn >1/wk 
-        # finding_volatile_files_unsuitable_as_source) cannot be SHA-pinned
+        # Volatile hand-edited doctrine sources (e.g. CLAUDE.md, churn >1/wk: # finding_volatile_files_unsuitable_as_source) cannot be SHA-pinned
         # without perpetual false SOURCE_DRIFT, but UNLIKE deterministic script
         # output they ARE mis-citable. So this is STRICTER than type: generated:
         # skip the whole-file SHA gate, but REQUIRE the cited anchor heading to

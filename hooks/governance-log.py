@@ -33,63 +33,28 @@ VALID_TYPES = re.compile(
 # Field labels used as delimiters for multiline capture
 FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
 
-# Known agent and skill names for must_dispatch extraction (P0 fix 2026-04-09)
-# Must_dispatch raw text often contains trailing reasoning after the comma-separated
-# names. This set filters to only valid names, discarding garbage tokens.
-KNOWN_DISPATCH_NAMES = {
-    # Agents (from .claude/agents/)
-    "adversarial-reviewer", "api-designer", "api-security-audit", "architect-review", "architect-reviewer",
-    "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
-    "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
-    "mcp-developer", "mcp-registry-navigator", "mcp-server-architect",
-    "n8n-reviewer", "n8n-workflow-architect", "n8n-workflow-builder",
-    "nosql-specialist", "pm-orchestrator", "postgres-pro", "powershell-7-expert",
-    "prompt-engineer", "query-clarifier", "report-generator", "research-analyst",
-    "research-coordinator", "research-orchestrator", "research-synthesizer",
-    "technical-researcher", "vault-keeper",
-    # Skills (from .claude/skills/): only process/governance skills likely in MUST DISPATCH
-    "process-qa", "process-analysis", "process-build", "process-planning",
-    "process-research", "process-pentest", "pm", "task-classifier", "verify",
-    "ensemble", "architect-loop", "save", "maintain", "index",
-    # Plugin agents (defect 5, 2026-08-07): enumerated from registry.json's
-    # `agents` dict, every entry whose `source` starts with "plugin:" (54
-    # names: academic-research-skills 36 + claude-plugins-official 18).
-    # Without these, MUST DISPATCH text naming a plugin agent (e.g.
-    # "pr-review-toolkit:silent-failure-hunter") was invisible to this
-    # parser's compliance extraction: the vocabulary only knew vault-local
-    # agents/skills. registry.json is READ-ONLY input here, never edited.
-    # Prune follow-up (post-review, 2026-08-07): 7 of the 54 were bare or
-    # near-bare common-English compounds ("analyzer", "compliance_agent")
-    # that extract_dispatch_names could match inside ordinary prose,
-    # producing a phantom DECLARED item unrelated to any real dispatch
-    # intent. Dropped rather than kept namespace-qualified: the suffix
-    # check below reuses this SAME set for both the bare-candidate test and
-    # the post-colon suffix test, so a namespace-only bucket needs a second
-    # set (out of scope for this fix) or a hardcoded "plugin:name" literal
-    # whose namespace slug can't be verified from registry.json's
-    # marketplace-level "source" field (compare "claude-plugins-official"
-    # above with the real dispatch namespace "pr-review-toolkit" in the
-    # silent-failure-hunter example). Dropped: analyzer, comparator,
-    # compliance_agent, formatter_agent, grader, intake_agent,
-    # monitoring_agent.
-    "abstract_bilingual_agent", "agent-creator", "agent-sdk-verifier-py",
-    "agent-sdk-verifier-ts", "argument_builder_agent",
-    "atomic-explorer", "atomic-reviewer", "bibliography_agent",
-    "citation_compliance_agent", "code-architect", "code-explorer",
-    "code-reviewer", "collaboration_depth_agent", "comment-analyzer",
-    "conversation-analyzer",
-    "devils_advocate_agent", "devils_advocate_reviewer_agent", "domain_reviewer_agent",
-    "draft_writer_agent", "editor_in_chief_agent", "editorial_synthesizer_agent",
-    "eic_agent", "ethics_review_agent", "field_analyst_agent",
-    "integrity_verification_agent", "literature_strategist_agent", "meta_analysis_agent",
-    "methodology_reviewer_agent", "peer_reviewer_agent",
-    "perspective_reviewer_agent", "pipeline_orchestrator_agent", "plugin-validator",
-    "pr-test-analyzer", "report_compiler_agent", "research_architect_agent",
-    "research_question_agent", "revision_coach_agent", "risk_of_bias_agent",
-    "silent-failure-hunter", "skill-reviewer", "socratic_mentor_agent",
-    "source_verification_agent", "state_tracker_agent", "structure_architect_agent",
-    "synthesis_agent", "type-design-analyzer", "visualization_agent",
-}
+# Known agent and skill names for must_dispatch extraction (P0 fix 2026-04-09).
+# Generated from registry.json + a local disk scan (2026-08-19,
+# plugin-wiring-investigation fix; see
+# .claude/scripts/generate_known_dispatch_names.py for provenance and
+# .claude/hooks/_known_dispatch_names_loader.py for the shared read path).
+# Must_dispatch raw text often contains trailing reasoning after the
+# comma-separated names. This set filters to only valid names, discarding
+# garbage tokens.
+#
+# Fallback direction for THIS hook if the generated file is missing/unreadable:
+# empty set. This hook is logging-only: its own docstring says it "does NOT
+# block": so an empty set here degrades audit precision (must_dispatch logs
+# as None even when a real dispatch happened) but never blocks a turn and
+# never surfaces a warning to the user. That is a strictly lower-stakes
+# failure than dispatch-compliance-check.py's, so it does not need a bundled
+# last-known-good copy: the loader's stderr warning is enough to make a
+# broken generated file loud without adding a third duplicated snapshot.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _known_dispatch_names_loader import load_known_dispatch_names
+KNOWN_DISPATCH_NAMES = load_known_dispatch_names(
+    fallback=set(), warn_label="governance-log"
+)
 
 
 def extract_dispatch_names(raw_text):
@@ -108,7 +73,15 @@ def extract_dispatch_names(raw_text):
 
     # Split on commas first, then check each segment
     found = []
-    for segment in raw_text.split(","):
+    # Separator handling (2026-08-22, owner-approved). This used to split on
+    # commas only, so "process-qa and pm" declared just process-qa and the
+    # obligation on every name after the "and" was never checked: a silent
+    # bypass of the harness's own mandatory-dispatch rule, reachable by
+    # ordinary English phrasing rather than by intent. "and" requires
+    # whitespace on both sides so it cannot split a name that merely contains
+    # the letters (e.g. "brand"). This makes the gate STRICTER: more declared
+    # names means more names that must actually be dispatched.
+    for segment in re.split(r",|;|\s+and\s+|\s*&\s*", raw_text):
         segment = segment.strip()
         # The name might be followed by reasoning text; try matching the first word(s)
         # that form a known name (handles multi-word like "architect-review")

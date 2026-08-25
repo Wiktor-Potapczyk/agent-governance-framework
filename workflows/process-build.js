@@ -1,7 +1,7 @@
 /*
- * ADOPTED 2026-06-11 — Increment 2, procedure-layer migration (owner GO).
- * Source draft: (design records vault-internal)
- * Scope: routing-as-code — the script drives dispatch sequence; agents reason freely inside steps.
+ * ADOPTED 2026-06-11: Increment 2, procedure-layer migration (owner GO).
+ * Source draft: Projects/your-project/work/2026-06-11-procedure-layer-migration-plan.md Part C §process-build.
+ * Scope: routing-as-code: the script drives dispatch sequence; agents reason freely inside steps.
  * DISPATCHES.json stays authoritative for H11 read-only verification (do not retire it).
  * Quality gates inside derive pass/fail from execution evidence (raw tool output), never from report presence.
  */
@@ -20,7 +20,7 @@ export const meta = {
 }
 
 // ---------------------------------------------------------------------------
-// Typed schemas — judgment nodes return DATA, not prose (corpus Reframe 2).
+// Typed schemas: judgment nodes return DATA, not prose (corpus Reframe 2).
 // ---------------------------------------------------------------------------
 
 // Step 1 output: the BUILD SCOPE block + typed conditional-dispatch flags.
@@ -29,10 +29,10 @@ const SCOPE_SCHEMA = {
   required: ['scope_block', 'output_path', 'underspecified', 'n8n_domain', 'llm_prompts', 'rationale'],
   properties: {
     scope_block: { type: 'string', description: 'The literal BUILD SCOPE block: Goal / Inputs (specs, requirements) / Tech / Output path Projects/<name>/work/YYYY-MM-DD-<artifact>.' },
-    output_path: { type: 'string', description: 'The exact vault-relative output path extracted from scope_block (e.g. Projects/Foo/work/2026-06-11-thing.js). The script uses this — do NOT leave it embedded only in scope_block prose.' },
-    underspecified: { type: 'boolean', description: 'true if no spec/requirements exist — triggers route-to-planning HALT.' },
-    n8n_domain: { type: 'boolean', description: 'true if the build involves n8n workflow JSON or n8n node changes — triggers n8n-chain HALT.' },
-    llm_prompts: { type: 'boolean', description: 'true if the artifact contains LLM prompts or agent designs — adds prompt-engineer to review.' },
+    output_path: { type: 'string', description: 'The exact vault-relative output path extracted from scope_block (e.g. Projects/Foo/work/2026-06-11-thing.js). The script uses this: do NOT leave it embedded only in scope_block prose.' },
+    underspecified: { type: 'boolean', description: 'true if no spec/requirements exist: triggers route-to-planning HALT.' },
+    n8n_domain: { type: 'boolean', description: 'true if the build involves n8n workflow JSON or n8n node changes: triggers n8n-chain HALT.' },
+    llm_prompts: { type: 'boolean', description: 'true if the artifact contains LLM prompts or agent designs: adds prompt-engineer to review.' },
     rationale: { type: 'string', description: 'one line per flag justifying the boolean from actual scope text.' },
   },
 }
@@ -49,7 +49,7 @@ const PLAN_SCHEMA = {
   },
 }
 
-// Step 3 output: the build artifact — must be a verified FILE on disk.
+// Step 3 output: the build artifact: must be a verified FILE on disk.
 const BUILD_SCHEMA = {
   type: 'object',
   required: ['artifact_path', 'artifact_exists', 'summary'],
@@ -71,6 +71,43 @@ const REVIEW_SCHEMA = {
   },
 }
 
+// ---------------------------------------------------------------------------
+// Dual-judge divergence gate (DEF-3 / TA-3 FLAG F3, Tier B; owner-APPROVED 2026-07-16).
+// Pure comparison of the TWO mandatory reviewers' ship/no-ship sides. When architect
+// and adversarial land on OPPOSITE sides of the ship line, the workflow escalates to
+// owner carrying BOTH verdicts instead of silently converging
+// ([[feedback_surface_divergent_verdicts_dont_collapse]]). Unexported (only
+// `export const meta` may be top-level: finding_workflow_script_second_export_breaks_sandbox);
+// the fixture test slices this block by the markers below (never imports the module).
+// No agent/parallel/log/args/Date/fs references: must be evaluable in isolation.
+// >>> DIVERGENCE_HELPER_START
+function classifyDivergence(architectVerdict, adversarialVerdict) {
+  function sideOf(v) {
+    if (!v || typeof v !== 'object' || !v.verdict) return 'missing'
+    if (v.verdict === 'REQUEST_CHANGES') return 'no-ship'
+    if (Array.isArray(v.blocking_issues) && v.blocking_issues.length >= 1) return 'no-ship'
+    return 'ship'
+  }
+  const architect_side = sideOf(architectVerdict)
+  const adversarial_side = sideOf(adversarialVerdict)
+  // A single missing reviewer is NOT divergence (handled by the empty-set guard or
+  // the existing blocking-extraction path). Divergence requires TWO present verdicts
+  // on opposite sides of the ship line.
+  const diverge =
+    (architect_side === 'ship' && adversarial_side === 'no-ship') ||
+    (architect_side === 'no-ship' && adversarial_side === 'ship')
+  let reason
+  if (architect_side === 'missing' || adversarial_side === 'missing') {
+    reason = `no divergence: a mandatory reviewer is missing (architect=${architect_side}, adversarial=${adversarial_side}): single-reviewer failure is not a ship-line disagreement.`
+  } else if (diverge) {
+    reason = `dual-judge divergence: architect side=${architect_side}, adversarial side=${adversarial_side}: the two reviewers sit on opposite sides of the ship line.`
+  } else {
+    reason = `no divergence: architect and adversarial agree (both side=${architect_side}).`
+  }
+  return { diverge, architect_side, adversarial_side, reason }
+}
+// <<< DIVERGENCE_HELPER_END
+
 // Step 6 output: the quality gate verdict (gates on real artifact state).
 const QUALITY_SCHEMA = {
   type: 'object',
@@ -80,17 +117,17 @@ const QUALITY_SCHEMA = {
     criteria_met: { type: 'boolean', description: 'all acceptance criteria from the plan are satisfied per the artifact content.' },
     no_unsolicited_changes: { type: 'boolean', description: 'no changes beyond the stated spec were applied (SKILL.md Step 5 check).' },
     pass: { type: 'boolean', description: 'true only if ALL three checks above are true.' },
-    evidence: { type: 'string', description: 'the tool calls used to verify (Read/Bash/Glob) — NOT "looks correct".' },
+    evidence: { type: 'string', description: 'the tool calls used to verify (Read/Bash/Glob): NOT "looks correct".' },
   },
 }
 
 // ---------------------------------------------------------------------------
 // args contract (passed verbatim by the caller):
-//   { project:      string  (required) — e.g. "MyProject"
-//     spec:         string  (required) — what to build, OR path to spec/blueprint
-//     constraints?: string             — any caller-supplied constraints
-//     llm_prompts?: boolean            — pre-declare if known (scope agent may override)
-//     n8n_domain?:  boolean            — pre-declare if known; scope agent confirms
+//   { project:      string  (required): e.g. "your-project"
+//     spec:         string  (required): what to build, OR path to spec/blueprint
+//     constraints?: string: any caller-supplied constraints
+//     llm_prompts?: boolean: pre-declare if known (scope agent may override)
+//     n8n_domain?:  boolean: pre-declare if known; scope agent confirms
 //   }
 //
 // HALT conditions: project or spec missing.
@@ -102,7 +139,7 @@ if (typeof args === 'string') {
 const PROJECT = A.project || 'UNKNOWN'
 const SPEC    = A.spec    || ''
 if (PROJECT === 'UNKNOWN' || !SPEC) {
-  log('HALT: malformed dispatch — args must be a JSON OBJECT {project, spec, constraints?, llm_prompts?, n8n_domain?} with real values. Refusing to spawn agents on empty scope.')
+  log('HALT: malformed dispatch: args must be a JSON OBJECT {project, spec, constraints?, llm_prompts?, n8n_domain?} with real values. Refusing to spawn agents on empty scope.')
   return { status: 'halted-malformed-args', received_args_type: typeof args, hint: 'pass args as a JSON object with non-empty project and spec' }
 }
 
@@ -121,7 +158,7 @@ CALLER FLAGS (advisory; you override based on actual scope): llm_prompts=${A.llm
 
 1. Read Projects/${PROJECT}/PROJECT.md and Projects/${PROJECT}/STATE.md IF they exist (use the Read tool). Import any active tasks and context. If a file does not exist, proceed without it.
 2. Emit the BUILD SCOPE block:
-   Goal: [what is being built — one sentence]
+   Goal: [what is being built: one sentence]
    Inputs: [specs, requirements, or designs this builds from]
    Tech: [language, platform, framework]
    Output path: Projects/${PROJECT}/work/YYYY-MM-DD-<artifact-name>.<ext>
@@ -131,25 +168,25 @@ CALLER FLAGS (advisory; you override based on actual scope): llm_prompts=${A.llm
    - llm_prompts: artifact contains LLM prompts or agent designs
 4. Extract the output_path from the scope block as a standalone field (e.g. "Projects/Foo/work/2026-06-11-thing.js").
 
-Do not build. Do not guess file contents — if you could not read a file, say so in the rationale.`,
+Do not build. Do not guess file contents: if you could not read a file, say so in the rationale.`,
   { schema: SCOPE_SCHEMA, label: `scope:${PROJECT}`, phase: 'Scope' }
 )
 
 if (!scope || !scope.scope_block) {
-  log('Scope step returned nothing usable — halting.')
+  log('Scope step returned nothing usable: halting.')
   return { status: 'scope-failed', project: PROJECT }
 }
 
-// underspecified: route to Planning (SKILL.md Step 1 — no spec means Planning, not Build)
+// underspecified: route to Planning (SKILL.md Step 1: no spec means Planning, not Build)
 if (scope.underspecified) {
-  log('HALT: spec is underspecified — no requirements exist. Per SKILL.md Step 1, route to process-planning first.')
-  return { status: 'route-to-planning', project: PROJECT, scope, reason: 'underspecified: spec/requirements are missing — run process-planning first, then re-invoke with the resulting spec' }
+  log('HALT: spec is underspecified: no requirements exist. Per SKILL.md Step 1, route to process-planning first.')
+  return { status: 'route-to-planning', project: PROJECT, scope, reason: 'underspecified: spec/requirements are missing: run process-planning first, then re-invoke with the resulting spec' }
 }
 
 // n8n domain: constitutional two-phase orchestration is its own HITL process
 if (scope.n8n_domain) {
   log('HALT: n8n domain detected. The n8n Two-Phase Orchestration is a constitutional process with a mandatory human promotion gate. Do not re-encode it here.')
-  return { status: 'route-to-n8n-chain', project: PROJECT, scope, reason: 'n8n_domain=true — invoke n8n-workflow-architect (Phase 1 design) then n8n-workflow-builder (Phase 2 implementation) via the Two-Phase Orchestration path defined in CLAUDE.md' }
+  return { status: 'route-to-n8n-chain', project: PROJECT, scope, reason: 'n8n_domain=true: invoke n8n-workflow-architect (Phase 1 design) then n8n-workflow-builder (Phase 2 implementation) via the Two-Phase Orchestration path defined in CLAUDE.md' }
 }
 
 // Extract the output path (scope agent dates it; scripts cannot call Date)
@@ -165,7 +202,7 @@ async function plan(feedback) {
 
 ${scope.scope_block}
 
-${feedback ? '\nREVISION REQUIRED — address these blocking issues from review:\n- ' + feedback.join('\n- ') : ''}
+${feedback ? '\nREVISION REQUIRED: address these blocking issues from review:\n- ' + feedback.join('\n- ') : ''}
 
 Produce a detailed sequenced plan with clear steps, dependencies, and acceptance criteria per step. Every step MUST have an acceptance criterion.
 
@@ -182,13 +219,14 @@ FABRICATION WARNING: do NOT invent file inventories. If you reference existing s
 let implementationPlan = await plan(null)
 
 if (!implementationPlan || !implementationPlan.plan_path) {
-  log('Plan step returned no plan artifact — halting.')
+  log('Plan step returned no plan artifact: halting.')
   return { status: 'plan-failed', project: PROJECT, scope }
 }
 
 // Fabrication guard: verify any file inventory the plan cites actually exists.
 // The quality/verify step below also catches missing artifacts, but a pre-build
-// check here avoids spawning blueprint-mode against a plan built on ghost files.
+// check here avoids spawning blueprint-mode against a plan built on ghost files
+// (reference_implementation_plan_fabricates_read_output.md).
 const planVerify = await agent(
   `You are a pre-build sanity check. Read the implementation plan at ${implementationPlan.plan_path}. For any source files, scripts, or artifacts the plan references as EXISTING inputs, verify they exist on disk using Glob or Read. List any referenced files that do NOT exist. If none are missing, say so explicitly.
 
@@ -207,15 +245,15 @@ async function build(feedback) {
   return agent(
     `You are blueprint-mode implementing the build for project "${PROJECT}".
 
-IMPLEMENTATION PLAN (at ${implementationPlan.plan_path}): Read this file — do not assume its contents.
+IMPLEMENTATION PLAN (at ${implementationPlan.plan_path}): Read this file: do not assume its contents.
 ${scope.scope_block}
-${feedback ? '\nREVISION REQUIRED — address these blocking issues from review:\n- ' + feedback.join('\n- ') : ''}
+${feedback ? '\nREVISION REQUIRED: address these blocking issues from review:\n- ' + feedback.join('\n- ') : ''}
 
 Implement according to the plan. Follow existing patterns in the codebase. Include error handling at system boundaries only.
 
 FILE CONTRACT (non-negotiable):
 1. WRITE the completed artifact to EXACTLY this vault path: ${ARTIFACT_PATH}
-   Use the Write tool (default subagent — Write tool IS available to you). If Write is unavailable, use Bash (python with utf-8 encoding).
+   Use the Write tool (default subagent: Write tool IS available to you). If Write is unavailable, use Bash (python with utf-8 encoding).
 2. VERIFY it landed: Read the file and confirm the content matches what you wrote.
 3. Return artifact_path as exactly "${ARTIFACT_PATH}". Any other path, or a path you did not write-and-verify, is a contract violation.
 4. Return artifact_exists = true only after confirming the file is on disk.
@@ -227,7 +265,7 @@ Do not apply changes beyond what the plan specifies. No unsolicited additions.`,
 let buildResult = await build(null)
 
 if (!buildResult || !buildResult.artifact_path) {
-  log('Build step returned no artifact path — halting.')
+  log('Build step returned no artifact path: halting.')
   return { status: 'build-failed', project: PROJECT, scope, plan: implementationPlan }
 }
 
@@ -235,7 +273,7 @@ if (!buildResult || !buildResult.artifact_path) {
 // --- Step 4 + 5: Mandatory parallel review, then capped revise loop ---------
 // architect-reviewer ALWAYS. adversarial-reviewer ALWAYS.
 // prompt-engineer IF llm_prompts.
-const MAX_REVISE_ROUNDS = 2  // cap revise loop — CONVERGED != keep going.
+const MAX_REVISE_ROUNDS = 2  // [[feedback_adversarial_loop_ratchets_past_necessity]]
 
 function reviewPrompt(role, lens) {
   return `You are ${role}. Review the artifact at ${buildResult.artifact_path} for project "${PROJECT}" against this plan and scope.
@@ -245,7 +283,31 @@ ${scope.scope_block}
 
 ${lens}
 
-Return verdict (APPROVE / APPROVE_WITH_NOTES / REQUEST_CHANGES), blocking_issues (only if REQUEST_CHANGES), and notes. Read the artifact file yourself — do not assume its contents.`
+RUBRIC (GAP-2 Tier A, 2026-07-10): walk EVERY criterion below IN ORDER against the actual artifact + plan text, quoting the specific evidence, BEFORE you decide anything. State the verdict LAST (reason-then-verdict).
+R1 Plan adherence: the artifact implements what the plan's steps specify.
+   pass anchor: each plan step maps to a concrete artifact section/change you can quote.
+   fail anchor: a plan step with no corresponding artifact content.
+R2 Completeness: every acceptance criterion in the plan is addressed by the artifact.
+   pass anchor: criterion "suite green" answered by recorded suite output in the artifact.
+   fail anchor: an acceptance criterion the artifact never demonstrates or mentions.
+R3 Correctness: the artifact's claims hold against the evidence it presents; verify cheap checks yourself (Read/Glob) when in doubt.
+   pass anchor: cited file paths open on disk; quoted outputs match the claim.
+   fail anchor: the artifact cites a file or output that does not exist as claimed.
+R4 No unsolicited changes: nothing beyond the plan's scope was added or edited.
+   pass anchor: the artifact's touch list is a subset of the plan's touch map.
+   fail anchor: an edit to a file the plan never named, unflagged.
+R5 Failure handling: errors are handled at system boundaries; no silent-failure path is introduced.
+   pass anchor: boundary calls carry explicit failure handling or a documented fail-open rationale.
+   fail anchor: a new external call whose failure would pass silently, undocumented.
+
+GRADING DISCIPLINE: judge each criterion ONLY as met / partially met / not met, with quoted evidence. NO free-form numeric grading of any kind (no N-out-of-10, no percentages, no numeric self-assessed certainty).
+
+VERDICT MAPPING (decide LAST, only after all five criteria are walked):
+- APPROVE: every criterion met.
+- APPROVE_WITH_NOTES: no criterion not-met; partials go into notes.
+- REQUEST_CHANGES: any criterion not met in a way that breaks the build; each such failure becomes a blocking_issue naming the criterion (R1-R5) and the offending content.
+
+Return verdict (APPROVE / APPROVE_WITH_NOTES / REQUEST_CHANGES), blocking_issues (only if REQUEST_CHANGES), and notes. Read the artifact file yourself: do not assume its contents.`
 }
 
 let round = 0
@@ -263,14 +325,33 @@ while (true) {
     reviewers.push(() => agent(reviewPrompt('prompt-engineer', 'Review only the LLM-prompt / agent-design aspects: prompt clarity, output contracts, failure handling, eval strategy.'),
       { schema: REVIEW_SCHEMA, label: 'review:prompt-engineer', phase: 'Review', agentType: 'prompt-engineer' }))
   }
-  const verdicts = (await parallel(reviewers)).filter(Boolean)
+  const rawVerdicts = await parallel(reviewers)
+  const verdicts = rawVerdicts.filter(Boolean)
   review = verdicts
 
   // Empty verdict set is NOT convergence (architect note N1 / B1 fix pattern from process-planning.js).
   if (verdicts.length === 0) {
-    log(`All ${reviewers.length} reviewer agents returned no verdict — this is a review FAILURE, not convergence. Stopping.`)
+    log(`All ${reviewers.length} reviewer agents returned no verdict: this is a review FAILURE, not convergence. Stopping.`)
     reviewFailed = true
     break
+  }
+
+  // Dual-judge divergence gate (DEF-3 / TA-3 FLAG F3, Tier B). The two mandatory
+  // reviewers are dispatched in a fixed order (architect first, adversarial second)
+  // and parallel() preserves input order, so read them from the UNFILTERED array
+  // (a null architect must NOT shift adversarial into slot 0). prompt-engineer, when
+  // present, is slot 2 and is excluded from the ship-line pair by design.
+  const architectVerdict = rawVerdicts[0]
+  const adversarialVerdict = rawVerdicts[1]
+  const divergence = classifyDivergence(architectVerdict, adversarialVerdict)
+  if (divergence.diverge) {
+    log(`ESCALATION: dual-judge divergence: architect=${architectVerdict.verdict} (side=${divergence.architect_side}) vs adversarial=${adversarialVerdict.verdict} (side=${divergence.adversarial_side}). Surfacing BOTH verdicts to owner; NOT converging (feedback_surface_divergent_verdicts_dont_collapse).`)
+    return {
+      status: 'review-divergence',
+      review_divergence: true,
+      divergence: { architect: architectVerdict, adversarial: adversarialVerdict, classification: divergence },
+      project: PROJECT, scope, plan: implementationPlan, build: buildResult, review, revise_rounds: round,
+    }
   }
 
   const blocking = verdicts
@@ -282,7 +363,7 @@ while (true) {
     break
   }
   if (round >= MAX_REVISE_ROUNDS) {
-    log(`Revise cap (${MAX_REVISE_ROUNDS}) reached with ${blocking.length} blocking issue(s) still open — STOP and surface to the owner rather than ratcheting.`)
+    log(`Revise cap (${MAX_REVISE_ROUNDS}) reached with ${blocking.length} blocking issue(s) still open: STOP and surface to owner rather than ratcheting.`)
     break
   }
   round += 1
@@ -300,22 +381,24 @@ if (reviewFailed) {
 }
 
 // ---------------------------------------------------------------------------
-// --- Step 6: Quality gate — EXECUTION EVIDENCE, not REPORT presence ---------
+// --- Step 6: Quality gate: EXECUTION EVIDENCE, not REPORT presence ---------
 phase('Quality')
 const quality = await agent(
-  `You are the quality gate for the process-build procedure. Verify the artifact EMPIRICALLY — do not trust the build summary.
+  `You are the quality gate for the process-build procedure. Verify the artifact EMPIRICALLY: do not trust the build summary.
 
 1. Use the Read tool to open ${buildResult.artifact_path}. Set artifact_file_exists from whether the read succeeded.
 2. Read the plan at ${implementationPlan.plan_path}. For each acceptance criterion, confirm it is satisfied in the artifact (criteria_met).
-3. Confirm no unsolicited changes were applied — the artifact addresses only what is specified in the plan scope (no_unsolicited_changes).
-Set pass = (artifact_file_exists AND criteria_met AND no_unsolicited_changes). In evidence, name the actual tool calls you made — "looks correct" is not evidence.
+3. Confirm no unsolicited changes were applied: the artifact addresses only what is specified in the plan scope (no_unsolicited_changes).
+
+DISCIPLINE (GAP-2 Tier A): walk checks 1-3 IN ORDER, citing for each the tool call you made and the literal content that decides it, BEFORE setting any boolean (reason-then-verdict). Each check is strictly true/false on that evidence; NO free-form numeric grading of any kind (no N-out-of-10, no percentages, no numeric self-assessed certainty).
+Set pass = (artifact_file_exists AND criteria_met AND no_unsolicited_changes). In evidence, name the actual tool calls you made: "looks correct" is not evidence.
 
 Scope for reference:
 ${scope.scope_block}`,
   { schema: QUALITY_SCHEMA, label: 'quality-gate', phase: 'Quality' }
 )
 
-// Derive pass IN CODE from evidence sub-fields — never trust agent self-report (Reframe 2).
+// Derive pass IN CODE from evidence sub-fields: never trust agent self-report (Reframe 2).
 const qualityPass = !!(quality
   && quality.artifact_file_exists
   && quality.criteria_met

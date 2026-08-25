@@ -14,7 +14,6 @@ if str(_HOOK_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOK_DIR))
 
 import pytest  # noqa: E402
-
 from _wiki_citation_logic import (  # noqa: E402
     EXCLUDE_FILES,
     format_findings_message,
@@ -26,7 +25,6 @@ from _wiki_citation_logic import (  # noqa: E402
     parse_source_field,
     validate_source_entries,
 )
-
 
 # ---------------------------------------------------------------------------
 # normalize_rel_path

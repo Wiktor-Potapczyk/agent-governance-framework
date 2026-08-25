@@ -192,68 +192,30 @@ SKILL_AGENT_ALIASES = {
     "process-qa": {"debugger"},  # dispatched conditionally on QA failure
     "process-pentest": {"debugger"},  # pentest dispatches debugger on findings, not architect-reviewer (skill says "execute yourself")
     "architect-loop": {"architect-reviewer", "adversarial-reviewer"},  # Ralph Loop dispatches reviewers
-    # NOTE: process-research does NOT alias research-synthesizer/report-generator :
-    # those are dispatched by research-orchestrator internally, not by the main session.
+    # NOTE: process-research does NOT alias research-synthesizer/report-generator: # those are dispatched by research-orchestrator internally, not by the main session.
     # Direct dispatch of downstream agents without process-research is a process violation.
 }
 
-# Known agent/skill names: same set as governance-log.py and dispatch-compliance-check.py
-# (P0 fix 2026-04-09). Filters must_dispatch raw text to valid names only,
-# discarding trailing reasoning text that would otherwise cause false DENIES.
-KNOWN_DISPATCH_NAMES = {
-    # Agents
-    "adversarial-reviewer", "api-designer", "api-security-audit", "architect-review", "architect-reviewer",
-    "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
-    "debugger", "git-flow-manager", "implementation-plan", "llm-architect",
-    "mcp-developer", "mcp-registry-navigator", "mcp-server-architect",
-    "n8n-reviewer", "n8n-workflow-architect", "n8n-workflow-builder",
-    "nosql-specialist", "pm-orchestrator", "postgres-pro", "powershell-7-expert",
-    "prompt-engineer", "query-clarifier", "report-generator", "research-analyst",
-    "research-coordinator", "research-orchestrator", "research-synthesizer",
-    "technical-researcher", "vault-keeper",
-    # Skills
-    "process-qa", "process-analysis", "process-build", "process-planning",
-    "process-research", "process-pentest", "pm", "task-classifier", "verify",
-    "ensemble", "architect-loop", "save", "maintain", "index",
-    # Plugin agents (defect 5, 2026-08-07): enumerated from registry.json's
-    # `agents` dict, every entry whose `source` starts with "plugin:" (54
-    # names: academic-research-skills 36 + claude-plugins-official 18).
-    # Without these, MUST DISPATCH text naming a plugin agent (e.g.
-    # "pr-review-toolkit:silent-failure-hunter") was invisible to this
-    # parser's compliance extraction: the vocabulary only knew vault-local
-    # agents/skills. registry.json is READ-ONLY input here, never edited.
-    # Prune follow-up (post-review, 2026-08-07): 7 of the 54 were bare or
-    # near-bare common-English compounds ("analyzer", "compliance_agent")
-    # that extract_dispatch_names could match inside ordinary prose,
-    # producing a phantom DECLARED item unrelated to any real dispatch
-    # intent. Dropped rather than kept namespace-qualified: the suffix
-    # check below reuses this SAME set for both the bare-candidate test and
-    # the post-colon suffix test, so a namespace-only bucket needs a second
-    # set (out of scope for this fix) or a hardcoded "plugin:name" literal
-    # whose namespace slug can't be verified from registry.json's
-    # marketplace-level "source" field (compare "claude-plugins-official"
-    # above with the real dispatch namespace "pr-review-toolkit" in the
-    # silent-failure-hunter example). Dropped: analyzer, comparator,
-    # compliance_agent, formatter_agent, grader, intake_agent,
-    # monitoring_agent.
-    "abstract_bilingual_agent", "agent-creator", "agent-sdk-verifier-py",
-    "agent-sdk-verifier-ts", "argument_builder_agent",
-    "atomic-explorer", "atomic-reviewer", "bibliography_agent",
-    "citation_compliance_agent", "code-architect", "code-explorer",
-    "code-reviewer", "collaboration_depth_agent", "comment-analyzer",
-    "conversation-analyzer",
-    "devils_advocate_agent", "devils_advocate_reviewer_agent", "domain_reviewer_agent",
-    "draft_writer_agent", "editor_in_chief_agent", "editorial_synthesizer_agent",
-    "eic_agent", "ethics_review_agent", "field_analyst_agent",
-    "integrity_verification_agent", "literature_strategist_agent", "meta_analysis_agent",
-    "methodology_reviewer_agent", "peer_reviewer_agent",
-    "perspective_reviewer_agent", "pipeline_orchestrator_agent", "plugin-validator",
-    "pr-test-analyzer", "report_compiler_agent", "research_architect_agent",
-    "research_question_agent", "revision_coach_agent", "risk_of_bias_agent",
-    "silent-failure-hunter", "skill-reviewer", "socratic_mentor_agent",
-    "source_verification_agent", "state_tracker_agent", "structure_architect_agent",
-    "synthesis_agent", "type-design-analyzer", "visualization_agent",
-}
+# Known agent/skill names: generated from registry.json + a local disk scan
+# (2026-08-19, plugin-wiring-investigation fix; see
+# .claude/scripts/generate_known_dispatch_names.py for provenance and
+# .claude/hooks/_known_dispatch_names_loader.py for the shared read path).
+# Was a hand-maintained 93-entry literal duplicated across this file,
+# _dispatch_compliance_logic.py, and governance-log.py: of the 54 plugin
+# agents in the registry only 47 were listed, and of 138 plugin skills, zero.
+#
+# Fallback direction for THIS hook if the generated file is missing/unreadable:
+# empty set. This hook never denies (see module docstring): every code path
+# below ends in allow, always_allowed, allow_exemption, or warn. An empty
+# KNOWN_DISPATCH_NAMES just means extract_dispatch_names() recognizes
+# nothing, so must_dispatch comes back empty and every dispatch takes the
+# existing "no_classification" -> allow path, identical to a classification
+# that declared "none" today. Fail-open matches this hook's already-permissive
+# posture; a bundled snapshot would add complexity without adding safety here.
+from _known_dispatch_names_loader import load_known_dispatch_names
+KNOWN_DISPATCH_NAMES = load_known_dispatch_names(
+    fallback=set(), warn_label="agent-dispatch-check"
+)
 
 
 def extract_dispatch_names(raw_text):
@@ -267,7 +229,15 @@ def extract_dispatch_names(raw_text):
         return []
 
     found = []
-    for segment in raw_text.split(","):
+    # Separator handling (2026-08-22, owner-approved). This used to split on
+    # commas only, so "process-qa and pm" declared just process-qa and the
+    # obligation on every name after the "and" was never checked: a silent
+    # bypass of the harness's own mandatory-dispatch rule, reachable by
+    # ordinary English phrasing rather than by intent. "and" requires
+    # whitespace on both sides so it cannot split a name that merely contains
+    # the letters (e.g. "brand"). This makes the gate STRICTER: more declared
+    # names means more names that must actually be dispatched.
+    for segment in re.split(r",|;|\s+and\s+|\s*&\s*", raw_text):
         segment = segment.strip()
         words = segment.split()
         for i in range(min(3, len(words)), 0, -1):
@@ -325,8 +295,7 @@ def main():
     # Step-11 competence gate (2026-07-13, wired this line): advisory-only
     # structural reliability signal for high-tier named agents. Generic types
     # have already returned above, so the gate sees only named specialist
-    # dispatches. Never denies, never returns early, never writes stdout :
-    # see _competence_gate docstring.
+    # dispatches. Never denies, never returns early, never writes stdout: # see _competence_gate docstring.
     _competence_gate(session_id, agent_type)
 
     # Read transcript for last MUST DISPATCH

@@ -303,8 +303,22 @@ if __name__ == "__main__":
     # Guard: HOOK_SMOKE_TEST=1 env var is set by the parent test runner on child
     # processes so the child does NOT re-enter this block (avoids infinite recursion).
     # -----------------------------------------------------------------------
-    if os.environ.get("HOOK_SMOKE_TEST") == "1":
-        # Running as child subprocess invoked BY a smoke test: execute normally.
+    # Production: Claude Code invokes `python hook.py` with the payload on stdin and
+    # NO flag, so the DEFAULT path must process the payload via main(). The in-file
+    # smoke suite runs ONLY on an explicit `--selftest` arg.
+    #
+    # Bug fixed 2026-08-23 (HA-A-080 / HA-A-081): the prior guard ran main() ONLY
+    # when HOOK_SMOKE_TEST=1, so CC's flagless invocation ran the smoke suite instead
+    # and this hook enforced NOTHING in production. Identical to the defect fixed in
+    # transition-gate-check.py on 2026-06-18; that sweep missed this file.
+    #
+    # The polarity is the point: defaulting to test behaviour and opting in to real
+    # behaviour makes the failure mode silence, which nobody notices. This way round,
+    # a mistake stops the tests running, which somebody does notice.
+    #
+    # The suite's child subprocesses are spawned without --selftest, so they now run
+    # main() naturally; the HOOK_SMOKE_TEST env the runner still sets is harmless.
+    if "--selftest" not in sys.argv:
         main()
         sys.exit(0)
 

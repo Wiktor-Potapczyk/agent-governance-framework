@@ -124,18 +124,27 @@ except Exception:
 # would actually execute, not when it appears inside `python -c "print('rm -rf /')"`
 # or `grep 'rm -rf' logs.txt` or an echo/print about the pattern.
 _INERT_CONTEXT_PATTERNS = [
-    # `python -c "…"` and `python -c '…'` (double or single quoted body)
-    (re.compile(r'\bpython[0-9]*\s+-c\s+"(?:\\.|[^"\\])*"'), "python -c (double)"),
-    (re.compile(r"\bpython[0-9]*\s+-c\s+'(?:\\.|[^'\\])*'"), "python -c (single)"),
-    # `bash -c "…"` / `sh -c "…"` / `cmd -c` etc
-    (re.compile(r'\b(?:bash|sh|zsh|cmd)\s+-c\s+"(?:\\.|[^"\\])*"'), "sh -c (double)"),
-    (re.compile(r"\b(?:bash|sh|zsh|cmd)\s+-c\s+'(?:\\.|[^'\\])*'"), "sh -c (single)"),
+    # `python -c` and `bash|sh|zsh -c` are deliberately NOT listed here.
+    # Their quoted bodies EXECUTE, so treating them as inert string literals and
+    # deleting them before the pattern match laundered every destructive command
+    # through a wrapper: bash -c with any payload sailed past every deny,
+    # force-push included (GATE-1-BYPASS / HA-A-044, confirmed four times).
+    # They are unwrapped instead, see unwrap_executing_wrappers() below.
     # `grep 'pattern'` / `grep -E "pattern"` etc: pattern is not a command
     (re.compile(r'\bgrep(?:\s+-[a-zA-Z]+)*\s+"(?:\\.|[^"\\])*"'), "grep (double)"),
     (re.compile(r"\bgrep(?:\s+-[a-zA-Z]+)*\s+'(?:\\.|[^'\\])*'"), "grep (single)"),
     # `echo "…"` / `printf "…"`: output, not execution
     (re.compile(r'\b(?:echo|printf)\s+"(?:\\.|[^"\\])*"'), "echo/printf (double)"),
     (re.compile(r"\b(?:echo|printf)\s+'(?:\\.|[^'\\])*'"), "echo/printf (single)"),
+    # Unquoted `echo ...` / `printf ...` (2026-08-24). Printing text ABOUT a
+    # dangerous command is not running it, and denying only the UNQUOTED spelling
+    # bought no safety while the quoted one already passed. The character class is
+    # the whole point: the strip stops at a shell separator (; & |), a redirect
+    # (< >), a `$` and a backtick, so it cannot swallow a genuinely chained
+    # command. Without those stops, `echo hi && rm -rf /data` would launder the
+    # delete behind the echo. Listed AFTER the quoted rules so a quoted body is
+    # consumed by them first.
+    (re.compile(r"""\b(?:echo|printf)\s+[^"'\n;&|<>$`]*"""), "echo/printf (unquoted)"),
     # `-m "…"` / `-m '…'`: commit/tag message bodies are text, not shell.
     # Prevents false-positives like `git commit -m "added --no-verify support"`.
     # Negative lookbehind (?<!\w) ensures `-m` is a flag, not part of a longer word.
@@ -221,10 +230,80 @@ def _strip_trailing_comments(command):
     return "".join(out)
 
 
+# Wrappers whose quoted body is EXECUTED rather than quoted prose. The body is
+# kept and scanned; only the wrapper token and its quotes are removed.
+_EXECUTING_WRAPPERS = [
+    re.compile(r'\b(?:bash|sh|zsh|ksh|dash)\s+-c\s+"((?:\\.|[^"\\])*)"'),
+    re.compile(r"\b(?:bash|sh|zsh|ksh|dash)\s+-c\s+'((?:\\.|[^'\\])*)'"),
+]
+
+# A python -c body is Python, not shell, so a destructive-looking string inside
+# print() is genuinely inert and a prior deliberate decision (H2, 2026-04-18)
+# says so. It stops being inert the moment it reaches an execution sink. Only
+# then is the body unwrapped and scanned.
+_PYTHON_WRAPPERS = [
+    re.compile(r'\bpython[0-9]*\s+-c\s+"((?:\\.|[^"\\])*)"'),
+    re.compile(r"\bpython[0-9]*\s+-c\s+'((?:\\.|[^'\\])*)'"),
+]
+# String-literal spans inside a python -c body, one pattern per quote style so
+# neither literal has to contain the character that delimits it. Removed BEFORE
+# looking for an execution sink, because a sink NAMED inside a printed string is
+# prose while a sink CALLED is code, and the difference is which side of the
+# quotes the parentheses sit on. Without this the guard denied
+# print('... os.system() ...'), which the pre-fix code correctly allowed.
+_PYTHON_STRING_LITERALS = [
+    re.compile(r'"(?:\\.|[^"\\])*"'),
+    re.compile(r"'(?:\\.|[^'\\])*'"),
+]
+
+
+def _python_body_calls_a_sink(body):
+    """True only if an execution sink survives the removal of string literals."""
+    stripped = body
+    for pattern in _PYTHON_STRING_LITERALS:
+        stripped = pattern.sub("", stripped)
+    return bool(_PYTHON_EXEC_SINK.search(stripped))
+
+
+_PYTHON_EXEC_SINK = re.compile(
+    r'\b(?:os\.(?:system|popen|exec[lv]?[pe]*|spawn\w+)|subprocess\.\w+|commands\.getoutput|pty\.spawn)\s*\(')
+
+# Bounded so a crafted nested input cannot spin here.
+_MAX_UNWRAP_DEPTH = 5
+
+
+def unwrap_executing_wrappers(command):
+    """Replace a `-c` wrapper with its body, so the body is scanned as a command.
+
+    Runs BEFORE the inert-context strip, and that order is what keeps the benign
+    case working: a shell wrapper around an echo unwraps to the echo, which the
+    echo rule then strips correctly. The old code deleted the wrapper whole, so
+    no later rule ever got to make that judgement."""
+    cleaned = command
+    for _ in range(_MAX_UNWRAP_DEPTH):
+        before = cleaned
+        for pattern in _EXECUTING_WRAPPERS:
+            cleaned = pattern.sub(lambda m: " " + m.group(1) + " ", cleaned)
+        for pattern in _PYTHON_WRAPPERS:
+            # Only unwrap a Python body that actually reaches an execution
+            # sink; otherwise leave it alone so print() of a scary string
+            # stays inert, per the H2 decision this must not undo.
+            cleaned = pattern.sub(
+                lambda m: (" " + m.group(1) + " ") if _python_body_calls_a_sink(m.group(1))
+                else " ", cleaned)   # no sink: delete it, exactly as before
+        if cleaned == before:
+            break
+    return cleaned
+
+
 def strip_inert_contexts(command):
     """Remove substrings that are known to be string literals or pattern args,
-    not executable shell. Returns a cleaned command safe to pattern-match."""
+    not executable shell. Returns a cleaned command safe to pattern-match.
+
+    Order is load-bearing: executing wrappers are unwrapped first so their bodies
+    face every rule below, then genuinely inert contexts are removed."""
     cleaned = _strip_trailing_comments(command)
+    cleaned = unwrap_executing_wrappers(cleaned)
     for pattern, _label in _INERT_CONTEXT_PATTERNS:
         cleaned = pattern.sub(" ", cleaned)
     return cleaned
@@ -241,7 +320,23 @@ WINDOWS_RESERVED_NAMES = {
 BLOCKED_PATTERNS = [
     # Destructive file operations
     (r'\brm\s+(-[rfRF]+\s+|--force\s+|--recursive\s+)*/(?!(?:[a-z]/)?tmp/)', "rm -rf on non-tmp directory"),
-    (r'\brm\s+(-[rfRF]+\s+)+\.(?![a-zA-Z])', "rm -rf on current directory"),
+    # Anchored to the END of the path token (2026-08-24, threat model ruled
+    # "accidental self-harm"). The old lookahead was (?![a-zA-Z]), which a SLASH
+    # satisfies, so `rm -rf ./build` matched the current-directory rule while the
+    # identical `rm -rf build` allowed. Under the ruled model, deleting a NAMED
+    # subdirectory is ordinary work and deleting the CURRENT directory is the
+    # accident, so both spellings of the former now allow. `./` still denies: it
+    # is the same target as `.`, and letting the trailing slash through would
+    # trade one hole for another.
+    #
+    # The `|\.\.` alternative is a FLOOR INVARIANT and must not be dropped. A first
+    # version of this 2026-08-24 change anchored only on `\./?` and thereby let
+    # `rm -rf ..`, `../`, `../y` and `../../x` through, reopening the exact hole an
+    # adversarial floor-integrity pass closed on 2026-07-15. Deleting the parent
+    # directory, or anything reached through it, is the accident this rule exists
+    # for and stays denied in every spelling. Caught by
+    # test_fixA_floor_parent_dir_still_denies, which is why that test exists.
+    (r'\brm\s+(-[rfRF]+\s+)+(?:\./?(?=\s|$|[;&|])|\.\.)', "rm -rf on current or parent directory"),
     # Destructive git operations
     # The option-skipping prefix is shared verbatim with the normal-push WARN row in
     # _IRREVERSIBLE_FALLBACK_SNAPSHOT (P2). Both rows must tolerate git's global options
@@ -293,7 +388,7 @@ BLOCKED_PATTERNS.extend(IRREVERSIBLE_BASH_PATTERNS)
 # WIKTOR RULING 2026-08-05: normal `git push` WARNS, it does not block.
 #
 # The Gate-1 design routed a normal push to a hard deny, on the theory that the
-# human gate is the owner re-running it himself via the `!`-prefix bypass. In
+# human gate is owner re-running it himself via the `!`-prefix bypass. In
 # practice the command he pastes is the command the agent just composed and
 # handed him verbatim, so the ritual moved no decision to a human: it only cost
 # a round trip. His words: "What is the fucking purpose of me copying and

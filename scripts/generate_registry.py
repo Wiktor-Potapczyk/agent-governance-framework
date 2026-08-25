@@ -14,7 +14,7 @@ import re
 import sys
 from pathlib import Path
 
-VAULT = Path(os.environ.get("VAULT_ROOT", ""))
+VAULT = Path(os.environ.get("VAULT_DIR", r"C:\Users\exampleuser\Desktop\Vault"))
 PLUGIN_CACHE = Path.home() / ".claude" / "plugins" / "cache"
 INSTALLED_PLUGINS_JSON = Path.home() / ".claude" / "plugins" / "installed_plugins.json"
 OUTPUT = VAULT / ".claude" / "registry.json"
@@ -350,8 +350,7 @@ def main():
     except Exception as e:
         print(f"  [WARN] hook-liveness summary did not run: {e}")
 
-    # Structural enforcement gates (Phase D dim4 C1/C2/C3). Run at every regen 
-    # the moment framework state changes: and propagate a nonzero exit on hard
+    # Structural enforcement gates (Phase D dim4 C1/C2/C3). Run at every regen: # the moment framework state changes: and propagate a nonzero exit on hard
     # findings (dispatch-name drift, missing registered hook file). Pass
     # --no-validate to regenerate the registry without gating.
     if "--no-validate" not in sys.argv:

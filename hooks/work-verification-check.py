@@ -59,8 +59,7 @@ FAILURE_LANGUAGE_PATTERNS = [
 # Vault-root for path-existence resolution. Hook fires from .claude/hooks/, so
 # vault root is two levels up.
 VAULT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# Note: broader verbs (creates, returns, works, updates) deliberately excluded :
-# they appear in legitimate static-analysis QA claims that Read can verify
+# Note: broader verbs (creates, returns, works, updates) deliberately excluded: # they appear in legitimate static-analysis QA claims that Read can verify
 # (e.g., "verified the function returns a string"). Architect-reviewer
 # 2026-05-25 flagged false-positive risk; tightened to strong-behavioral verbs only.
 
@@ -117,8 +116,7 @@ def main():
     # B-2/B-3 flags (2026-06-11): set when QA/pentest ran inside a Workflow invocation.
     # The workflow's Bash/MCP calls run inside the subagent and never appear in the
     # main transcript's tool list, so the execution_tools list is empty on the relay
-    # turn. B-3 suppresses CHECK 1's zero-execution-tools block when the flag is set :
-    # the execution-evidence obligation moves into the workflow script's typed per-claim
+    # turn. B-3 suppresses CHECK 1's zero-execution-tools block when the flag is set: # the execution-evidence obligation moves into the workflow script's typed per-claim
     # fields (Part C process-qa note). The suppression is keyed on the workflow-invocation
     # flag specifically, never on mere presence of any Workflow tool_use.
     qa_via_workflow = False
@@ -241,6 +239,37 @@ def main():
                 elif skill_name == "process-pentest":
                     has_process_pentest = True
 
+    # --- classification scan, over the REAL turn boundary -------------------
+    # The main loop below starts after `last_user_idx`, which is the last entry
+    # of type 'user'. Tool results are user entries, so on any turn that used a
+    # tool that window begins after the LAST tool result, while the
+    # classification header was emitted at the TOP of the turn. The header
+    # therefore fell outside the window and is_non_quick stayed False, silently
+    # disabling CHECK 1b, the premature-escalation gate and the zero-tool gate.
+    # Fixed 2026-08-23 (HA-A-021 / HA-A-013).
+    #
+    # `_real_last_user_idx_b2` is the correct boundary and was already computed
+    # above for the B2 Workflow-relay case; it just was never applied here. Only
+    # the classification uses it, so every other detection below is unchanged.
+    for _i in range(_real_last_user_idx_b2 + 1, len(lines)):
+        _line = lines[_i].strip()
+        if not _line:
+            continue
+        try:
+            _entry = json.loads(_line)
+        except json.JSONDecodeError:
+            continue
+        if _entry.get("type") != "assistant":
+            continue
+        for _block in _entry.get("message", {}).get("content", []):
+            if _block.get("type") != "text":
+                continue
+            if re.search(r'TASK TYPE:\s*(?:Research|Analysis|Build|Planning|Content|Compound)',
+                         _block.get("text", ""), re.IGNORECASE):
+                is_non_quick = True
+                break
+        if is_non_quick:
+            break
     # Process everything after the last user message
     for i in range(last_user_idx + 1, len(lines)):
         line = lines[i].strip()
@@ -412,8 +441,7 @@ def main():
     # where path X was NOT actually written via Write/Edit/MultiEdit tool_use in
     # this turn AND does NOT exist on disk. Per Q9 (PRD §9): combine Write-trace
     # absence + path-existence + tool_result block parsing (catches sub-agent
-    # fabrications, not just main-session). Per Q8: ergonomic automation framing :
-    # prefer false-negative (miss some) over false-positive (block legitimate).
+    # fabrications, not just main-session). Per Q8: ergonomic automation framing: # prefer false-negative (miss some) over false-positive (block legitimate).
     #
     # Walks the same last-turn window already collected above. Also rescans for
     # tool_result blocks (sub-agent output) because the existing loop only

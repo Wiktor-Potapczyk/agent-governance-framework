@@ -17,6 +17,7 @@ import io
 import json
 import os
 import sys
+import time
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -37,7 +38,7 @@ def _load(filename: str, modname: str):
 
 gate = _load("hook-write-regression-gate.py", "hook_write_regression_gate")
 
-HOOK_PATH = r"C:\Users\exampleuser\Workspace\.claude\hooks\some-hook.py"
+HOOK_PATH = r"C:\Users\exampleuser\Desktop\Vault\.claude\hooks\some-hook.py"
 
 
 def _run(payload: dict, env: dict) -> tuple[int, str]:
@@ -58,26 +59,26 @@ class PathFilterTests(unittest.TestCase):
         self.assertTrue(gate.is_gated_hook_write(HOOK_PATH))
         self.assertTrue(gate.is_gated_hook_write(".claude/hooks/foo.py"))
         self.assertTrue(gate.is_gated_hook_write(
-            "C:/Users/exampleuser/Workspace/.claude/hooks/test_foo.py"
+            "C:/Users/exampleuser/Desktop/Vault/.claude/hooks/test_foo.py"
         ))  # test_*.py INCLUDED by design (plan Step-2 decision)
 
     def test_non_py_ignored(self):
         self.assertFalse(gate.is_gated_hook_write(
-            r"C:\Users\exampleuser\Workspace\.claude\hooks\notes.md"
+            r"C:\Users\exampleuser\Desktop\Vault\.claude\hooks\notes.md"
         ))
 
     def test_outside_hooks_ignored(self):
         self.assertFalse(gate.is_gated_hook_write(
-            r"C:\Users\exampleuser\Workspace\.claude\scripts\foo.py"
+            r"C:\Users\exampleuser\Desktop\Vault\.claude\scripts\foo.py"
         ))
         self.assertFalse(gate.is_gated_hook_write(
-            r"C:\Users\exampleuser\Workspace\Projects\X\work\foo.py"
+            r"C:\Users\exampleuser\Desktop\Vault\Projects\X\work\foo.py"
         ))
 
     def test_excluded_subdirs_ignored(self):
         for sub in ("_state", "archive", "aggregates", "__pycache__"):
             self.assertFalse(gate.is_gated_hook_write(
-                rf"C:\Users\exampleuser\Workspace\.claude\hooks\{sub}\foo.py"
+                rf"C:\Users\exampleuser\Desktop\Vault\.claude\hooks\{sub}\foo.py"
             ), sub)
 
     def test_empty_and_none_like(self):
@@ -117,6 +118,42 @@ class GateBehaviorTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertEqual(out, "")  # a warning on a green suite is a defect
 
+    def test_reentrancy_guard_skips_while_a_run_is_in_flight(self):
+        """The fork-bomb guard. This gate runs the WHOLE suite, so anything inside
+        that suite which reaches the gate spawns another whole suite. That happened:
+        a control-fires probe sent it a hook .py write with no isolated target dir,
+        and an idle session was measured carrying 79 concurrent gate processes with
+        81 pytest children, all under two minutes old.
+
+        A RED mini-suite is used deliberately. The gate would shout on it, so silence
+        here can only be the lock, never a green suite."""
+        with tempfile.TemporaryDirectory() as td:
+            env = self._temp_suite(td, failing=True)
+            lock = Path(td) / 'hook-write-regression-gate.lock'
+            lock.write_text('99999', encoding='utf-8')
+            rc, out = _run(_payload(HOOK_PATH), env)
+            self.assertEqual(rc, 0)
+            self.assertEqual(
+                out, '',
+                'the gate ran its suite while another run held the lock, which is the '
+                'condition that produced the fork bomb')
+
+    def test_reentrancy_guard_reclaims_a_stale_lock(self):
+        """A lock older than the child's own hard timeout cannot belong to a live run.
+        Without reclaiming, one killed gate process would disable this gate forever,
+        which is a silent-failure trade far worse than the bug it guards."""
+        with tempfile.TemporaryDirectory() as td:
+            env = self._temp_suite(td, failing=True)
+            lock = Path(td) / 'hook-write-regression-gate.lock'
+            lock.write_text('99999', encoding='utf-8')
+            stale = time.time() - (120 + 60 + 120)
+            os.utime(lock, (stale, stale))
+            rc, out = _run(_payload(HOOK_PATH), env)
+            self.assertEqual(rc, 0)
+            self.assertIn(
+                'SUITE RED', out,
+                'a stale lock was not reclaimed, so a single killed gate process would have disabled this gate permanently')
+
     def test_edit_tool_also_gated(self):
         with tempfile.TemporaryDirectory() as td:
             env = self._temp_suite(td, failing=True)
@@ -132,7 +169,7 @@ class GateBehaviorTests(unittest.TestCase):
             side_effect=lambda *a, **k: calls.append(a) or (1, "boom"),
         ):
             rc, out = _run(
-                _payload(r"C:\Users\exampleuser\Workspace\Notes\x.py"), {}
+                _payload(r"C:\Users\exampleuser\Desktop\Vault\Notes\x.py"), {}
             )
         self.assertEqual(rc, 0)
         self.assertEqual(out, "")
@@ -145,7 +182,7 @@ class GateBehaviorTests(unittest.TestCase):
             side_effect=lambda *a, **k: calls.append(a) or (1, "boom"),
         ):
             rc, out = _run(_payload(
-                r"C:\Users\exampleuser\Workspace\.claude\hooks\_state\x.py"
+                r"C:\Users\exampleuser\Desktop\Vault\.claude\hooks\_state\x.py"
             ), {})
         self.assertEqual(rc, 0)
         self.assertEqual(out, "")

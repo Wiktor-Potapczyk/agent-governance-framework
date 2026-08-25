@@ -345,7 +345,7 @@ class TwoGateIrreversibleBashTests(unittest.TestCase):
     # --- P5: prod deploy ---
     def test_p5_tp_prod_deploy_denies(self):
         self._deny("docker compose up -d")
-        self._deny("docker build -t example-api:latest .")
+        self._deny("docker build -t awards-api:latest .")
         self._deny("git archive HEAD | ssh root@203.0.113.10 'tar -xf -'")
         # 2026-06-18: real prod deploys named by file must STILL deny (the build-oracle
         # exemption is keyed to the -p example-build-oracle project, not to compose-up itself).
@@ -356,13 +356,13 @@ class TwoGateIrreversibleBashTests(unittest.TestCase):
 
     def test_p5_fp_guards_pass(self):
         self._pass("docker ps")
-        self._pass("docker logs example-api")
+        self._pass("docker logs awards-api")
         self._pass("docker compose logs backup")          # 'backup' contains 'up' but not \bup\b
         self._pass("git archive HEAD -o local.tar")       # no ssh pipe
         self._pass("docker build -t myimg:v1.2 .")        # versioned tag, not :latest
 
     def test_p5_fp_build_oracle_isolated_stage_passes(self):
-        # 2026-06-18 exemption (the owner: "the guard is too harsh"): the isolated, reversible
+        # 2026-06-18 exemption (owner: "the guard is too harsh"): the isolated, reversible
         # build-oracle stage (-p example-build-oracle, throwaway DB, down -v) is the opposite
         # of a prod deploy and MUST be allowed; the real prod deploys above still deny.
         self._pass("docker compose -p example-build-oracle -f docker-compose.build-oracle.yml up --exit-code-from tests --abort-on-container-exit")
@@ -420,7 +420,7 @@ class TwoGateIrreversibleBashTests(unittest.TestCase):
 
 
 class FamilyCDenyCalibrationTests(unittest.TestCase):
-    """Family-C Gate-1 deny-pattern calibration (Fixes A + B, ratified by the owner
+    """Family-C Gate-1 deny-pattern calibration (Fixes A + B, ratified by owner
     2026-07-15). Encodes the mandatory deny/pass matrix from the implementation plan
     [[2026-07-15-family-c-deny-calibration-plan]] / review
     [[2026-07-14-family-c-deny-calibration-review]].
@@ -448,9 +448,21 @@ class FamilyCDenyCalibrationTests(unittest.TestCase):
 
     # --- Fix A: MUST still DENY (current-directory floor invariants) ---
     def test_fixA_floor_current_dir_still_denies(self):
+        # `rm -rf ./subdir` MOVED to the allow side on 2026-08-24, by the owner's ruling
+        # on the bash-guard threat model (recorded in the owner decision brief, item 2:
+        # "accidental self-harm"). It was listed here alongside `.` and `./`, but this
+        # test's own rationale block below covers only the PARENT-directory cases; the
+        # subdir line carried no separate justification. Under the ruled model, deleting
+        # a NAMED subdirectory is ordinary work: `rm -rf subdir` has always been allowed,
+        # and denying only the `./` spelling of the same delete was the inconsistency the
+        # ruling was asked about. The floor itself is untouched: `.`, `./`, `..`, `../`
+        # and anything reached through `..` all still deny, asserted here and in
+        # test_fixA_floor_parent_dir_still_denies.
         self._deny("rm -rf .")
         self._deny("rm -rf ./")
-        self._deny("rm -rf ./subdir")
+        _, _sub = _run({"tool_name": "Bash", "tool_input": {"command": "rm -rf ./subdir"}})
+        self.assertIsNone(_decision(_sub), "expected PASS for: 'rm -rf ./subdir' "
+                          "(ruled 2026-08-24, see the note above)")
         self._deny("rm -rf . && echo done")
 
     # --- Fix A: MUST still DENY (parent-directory floor invariant) ---

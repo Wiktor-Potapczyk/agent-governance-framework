@@ -12,7 +12,6 @@ if str(_HOOK_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOK_DIR))
 
 import pytest  # noqa: E402
-
 from _dispatch_compliance_logic import (  # noqa: E402
     KNOWN_DISPATCH_NAMES,
     SKILL_AGENT_ALIASES,
@@ -28,7 +27,6 @@ from _dispatch_compliance_logic import (  # noqa: E402
     scan_assistant_text_block,
     strip_fences,
 )
-
 
 # ---------------------------------------------------------------------------
 # extract_dispatch_names
@@ -289,3 +287,37 @@ class TestRegistrySanity:
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+# ---------------------------------------------------------------------------
+# Separator handling (2026-08-22, owner-approved strictness increase)
+# ---------------------------------------------------------------------------
+# Before this change the extractor split on commas only, so "process-qa and pm"
+# declared just process-qa and the obligation on every name after the "and" was
+# never checked. That was a silent bypass of the harness's own mandatory-dispatch
+# rule reachable by ordinary English phrasing. These cases are the regression
+# guard; they live here rather than in a scratch script because this file is one
+# of the five governance-hooks-ci checks.
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("process-qa and pm", {"process-qa", "pm"}),
+    ("pm and process-qa", {"pm", "process-qa"}),
+    ("process-build, process-qa and pm", {"process-build", "process-qa", "pm"}),
+    ("process-qa; pm", {"process-qa", "pm"}),
+    ("process-qa & pm", {"process-qa", "pm"}),
+    ("process-qa, pm", {"process-qa", "pm"}),
+])
+def test_separators_beyond_comma(raw, expected):
+    assert set(extract_dispatch_names(raw)) == expected
+
+
+def test_and_inside_a_word_does_not_split():
+    """The rule requires whitespace on both sides, so a name containing the
+    letters 'and' is not torn apart. Guards against a naive substring split."""
+    assert set(extract_dispatch_names("brand, pm")) == {"pm"}
+
+
+@pytest.mark.parametrize("raw", ["none", "n/a", "None deliberately", ""])
+def test_none_forms_still_return_empty(raw):
+    assert extract_dispatch_names(raw) == []

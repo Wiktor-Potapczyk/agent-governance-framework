@@ -38,6 +38,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 
 HOOKS_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -49,6 +50,83 @@ _HOOKS_SEGMENT_RE = re.compile(r"[\\/]\.claude[\\/]hooks[\\/]", re.IGNORECASE)
 
 SUITE_TIMEOUT_SECONDS = 120  # hard cap on the pytest child; gate warns on timeout
 _TAIL_LINES = 12
+
+# Re-entrancy guard, added 2026-08-24 after this gate ran itself into a fork bomb.
+#
+# The gate runs the WHOLE hook suite. If anything inside that suite causes the gate
+# to be invoked again, each invocation spawns another whole suite and the population
+# grows without bound. That is not hypothetical: the control-fires suite gained a
+# probe for this hook whose trip payload was a Write to a hook .py file with no
+# HOOK_REGRESSION_GATE_TARGET_DIR, so the gate ran the live suite, which contains the
+# control-fires suite, which ran the probe again. Measured on an IDLE session: 79
+# concurrent gate processes with 81 pytest children, all under two minutes old,
+# roughly 40 new full-suite runs per minute.
+#
+# The probe was the trigger; the absence of this guard was the defect. A control that
+# executes the entire test suite has to assume it will eventually be called from
+# inside that suite, by a probe, by a future hook, or by a person running the suite
+# while editing. Skipping when a run is already in flight costs nothing, because the
+# in-flight run covers the same suite and this gate only ever warns.
+# The lock travels with HOOK_REGRESSION_GATE_LOG_PATH rather than getting an env var
+# of its own. A caller that has already declared an isolated log has declared that it
+# is not the production gate, and it should not contend for the production lock. The
+# first version of this guard used one machine-wide path and immediately broke this
+# hook's own tests, which run gate invocations while a real gate run may hold the
+# lock: they saw the skip branch and observed silence where they assert a warning.
+# One override, one isolation boundary, is the property worth keeping.
+_LOCK_STALE_SECONDS = SUITE_TIMEOUT_SECONDS + 60
+
+
+def _lock_path() -> str:
+    override = os.environ.get("HOOK_REGRESSION_GATE_LOG_PATH")
+    if override:
+        return os.path.join(os.path.dirname(os.path.abspath(override)),
+                            "hook-write-regression-gate.lock")
+    return os.path.join(HOOKS_DIR, "_state", "hook-write-regression-gate.lock")
+
+
+def _acquire_suite_lock():
+    """Return a lock path if this process may run the suite, else None.
+
+    Atomic via O_CREAT|O_EXCL. A lock older than the child's own hard timeout plus a
+    margin cannot belong to a live run, so it is reclaimed rather than deadlocking
+    the gate forever after a killed process."""
+    try:
+        os.makedirs(os.path.dirname(_lock_path()), exist_ok=True)
+    except Exception:
+        return None  # cannot manage a lock: fail OPEN, matching this gate's contract
+    lock_file = _lock_path()
+    for _ in range(2):
+        try:
+            fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            try:
+                os.write(fd, str(os.getpid()).encode("ascii", "replace"))
+            finally:
+                os.close(fd)
+            return lock_file
+        except FileExistsError:
+            try:
+                age = time.time() - os.path.getmtime(lock_file)
+            except Exception:
+                return None
+            if age <= _LOCK_STALE_SECONDS:
+                return None  # a real run is in flight
+            try:
+                os.unlink(lock_file)  # stale, reclaim and retry once
+            except Exception:
+                return None
+        except Exception:
+            return None
+    return None
+
+
+def _release_suite_lock(lock):
+    if not lock:
+        return
+    try:
+        os.unlink(lock)
+    except Exception:
+        pass
 
 
 def _target_dir() -> str:
@@ -99,8 +177,20 @@ def run_suite(target_dir: str, log_path: str) -> tuple[int, str]:
             # or a forced --rootdir made it 0.08s). Disabling the cache is the
             # conftest-safe variant of the two.
             proc = subprocess.run(
+                # --rootdir: added 2026-08-23, the second of the two fixes the
+                # 2026-07-10 bisect identified and the one that was not taken.
+                # Without it pytest resolves rootdir ABOVE target_dir and stats
+                # its siblings during collection. Against the vault hooks dir
+                # that is harmless, and rootdir already resolves there since the
+                # repo has no root ini file. Against a temp directory it means
+                # the gate's verdict depends on unrelated churn in %TEMP%: any
+                # other process deleting its own temp dir mid-collection raises
+                # FileNotFoundError, pytest exits 2, and the gate reports a RED
+                # suite that is green. Reproduced at roughly 1 run in 4. Pinning
+                # rootdir to the target makes the verdict a function of the
+                # directory under test and nothing above it.
                 [sys.executable, "-m", "pytest", target_dir, "-q",
-                 "-p", "no:cacheprovider"],
+                 "-p", "no:cacheprovider", f"--rootdir={target_dir}"],
                 stdout=fh,
                 stderr=subprocess.STDOUT,
                 timeout=SUITE_TIMEOUT_SECONDS,
@@ -188,7 +278,16 @@ def main() -> int:
     if not is_gated_hook_write(file_path):
         return 0  # fast path: no pytest run
 
-    code, tail = run_suite(_target_dir(), _log_path())
+    lock = _acquire_suite_lock()
+    if lock is None:
+        # Another gate run owns the suite. Silent by design: warning here would fire
+        # on ordinary concurrent edits and train the reader to ignore this gate.
+        _log_fire("skip", "suite already running for another edit")
+        return 0
+    try:
+        code, tail = run_suite(_target_dir(), _log_path())
+    finally:
+        _release_suite_lock(lock)
 
     matrix = _matrix_findings_text()
 

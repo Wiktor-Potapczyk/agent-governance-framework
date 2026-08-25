@@ -11,11 +11,23 @@ writing, and stdout block emission. The logic here is what gets unit-tested.
 
 `vault_root` is not needed by this logic: transcript paths and hook directory
 are passed in by the wrapper when needed.
+
+One exception to the no-I/O rule: the KNOWN_DISPATCH_NAMES module-level
+constant is populated by a single file read at import time via
+_known_dispatch_names_loader (2026-08-19): see the comment at that
+assignment below. This mirrors how the constant was already populated (as a
+literal) before; only the source of the literal moved.
 """
 from __future__ import annotations
 
+import os
 import re
+import sys
 from typing import TypedDict, cast
+
+_HOOK_DIR = os.path.dirname(os.path.abspath(__file__))
+if _HOOK_DIR not in sys.path:
+    sys.path.insert(0, _HOOK_DIR)
 
 
 class ScanState(TypedDict):
@@ -35,15 +47,26 @@ class ScanState(TypedDict):
 FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
 VALID_TASK_TYPES = r'(?:Quick|Research|Analysis|Content|Build|Planning|Compound)'
 
-# Known agent/skill names: kept in sync with governance-log.py.
+# Known agent/skill names: generated from registry.json + a local disk scan
+# (2026-08-19, plugin-wiring-investigation fix; see
+# .claude/scripts/generate_known_dispatch_names.py for provenance and
+# .claude/hooks/_known_dispatch_names_loader.py for the shared read path).
 # Used to filter must_dispatch raw text to valid names only, discarding
 # trailing reasoning text that would otherwise cause false-positive blocks.
-# NOTE: declared as a regular `set`, not `frozenset`, so the pre-existing
-# cross-file drift guard at `test_known_dispatch_names_drift.py` (which uses
-# `assertIsInstance(x, set)`) continues to fire: frozenset is not a subclass
-# of set. Restored 2026-05-14 per architect-reviewer HIGH finding.
-KNOWN_DISPATCH_NAMES = {
-    # Agents
+#
+# _LAST_KNOWN_GOOD_NAMES is the frozen pre-2026-08-19 hand-maintained
+# snapshot (93 names), kept as the fallback for THIS hook specifically. It is
+# the highest-stakes of the three consumers: dispatch-compliance-check.py is
+# the Stop hook with a real `{"decision":"block"}` branch
+# (format_empty_dispatch_reason) that fires whenever MUST DISPATCH extracts
+# to empty on a non-Quick task. An EMPTY fallback set would make every
+# non-Quick turn's MUST DISPATCH extract to empty regardless of what was
+# actually declared, i.e. it would block every non-Quick turn the moment the
+# generated file went missing: exactly the "silently over-block" failure
+# the fallback exists to prevent. Falling back to the exact set this hook
+# already enforced (rather than a superset or an empty set) means a missing
+# generated file degrades this hook to TODAY's behavior, no worse.
+_LAST_KNOWN_GOOD_NAMES = {
     "adversarial-reviewer", "api-designer", "api-security-audit",
     "architect-review", "architect-reviewer",
     "blueprint-mode", "competitive-analyst", "content-marketer", "data-engineer",
@@ -54,31 +77,9 @@ KNOWN_DISPATCH_NAMES = {
     "prompt-engineer", "query-clarifier", "report-generator", "research-analyst",
     "research-coordinator", "research-orchestrator", "research-synthesizer",
     "technical-researcher", "vault-keeper",
-    # Skills
     "process-qa", "process-analysis", "process-build", "process-planning",
     "process-research", "process-pentest", "pm", "task-classifier", "verify",
     "ensemble", "architect-loop", "save", "maintain", "index",
-    # Plugin agents (defect 5, 2026-08-07): enumerated from registry.json's
-    # `agents` dict, every entry whose `source` starts with "plugin:" (54
-    # names: academic-research-skills 36 + claude-plugins-official 18).
-    # Without these, MUST DISPATCH text naming a plugin agent (e.g.
-    # "pr-review-toolkit:silent-failure-hunter") was invisible to this
-    # parser's compliance extraction: the vocabulary only knew vault-local
-    # agents/skills. registry.json is READ-ONLY input here, never edited.
-    # Prune follow-up (post-review, 2026-08-07): 7 of the 54 were bare or
-    # near-bare common-English compounds ("analyzer", "compliance_agent")
-    # that extract_dispatch_names could match inside ordinary prose,
-    # producing a phantom DECLARED item unrelated to any real dispatch
-    # intent. Dropped rather than kept namespace-qualified: the suffix
-    # check below reuses this SAME set for both the bare-candidate test and
-    # the post-colon suffix test, so a namespace-only bucket needs a second
-    # set (out of scope for this fix) or a hardcoded "plugin:name" literal
-    # whose namespace slug can't be verified from registry.json's
-    # marketplace-level "source" field (compare "claude-plugins-official"
-    # above with the real dispatch namespace "pr-review-toolkit" in the
-    # silent-failure-hunter example). Dropped: analyzer, comparator,
-    # compliance_agent, formatter_agent, grader, intake_agent,
-    # monitoring_agent.
     "abstract_bilingual_agent", "agent-creator", "agent-sdk-verifier-py",
     "agent-sdk-verifier-ts", "argument_builder_agent",
     "atomic-explorer", "atomic-reviewer", "bibliography_agent",
@@ -97,6 +98,16 @@ KNOWN_DISPATCH_NAMES = {
     "source_verification_agent", "state_tracker_agent", "structure_architect_agent",
     "synthesis_agent", "type-design-analyzer", "visualization_agent",
 }
+
+# NOTE: declared as a regular `set`, not `frozenset`, so the pre-existing
+# cross-file drift guard at `test_known_dispatch_names_drift.py` (which uses
+# `assertIsInstance(x, set)`) continues to fire: frozenset is not a subclass
+# of set. Restored 2026-05-14 per architect-reviewer HIGH finding.
+from _known_dispatch_names_loader import load_known_dispatch_names  # noqa: E402
+
+KNOWN_DISPATCH_NAMES = load_known_dispatch_names(
+    fallback=set(_LAST_KNOWN_GOOD_NAMES), warn_label="dispatch-compliance-check"
+)
 
 # Skill/short-name → agent-name aliases (must match agent-dispatch-check.py exactly).
 SKILL_AGENT_ALIASES: dict[str, frozenset[str]] = {
@@ -122,11 +133,19 @@ def extract_dispatch_names(raw_text: str) -> list[str]:
     if not raw_text:
         return []
     raw_lower = raw_text.lower().strip()
-    if raw_lower.startswith("none") or raw_lower.startswith("n/a"):
+    if raw_lower.startswith(("none", "n/a")):
         return []
 
     found: list[str] = []
-    for segment in raw_text.split(","):
+    # Separator handling (2026-08-22, owner-approved). This used to split on
+    # commas only, so "process-qa and pm" declared just process-qa and the
+    # obligation on every name after the "and" was never checked: a silent
+    # bypass of the harness's own mandatory-dispatch rule, reachable by
+    # ordinary English phrasing rather than by intent. "and" requires
+    # whitespace on both sides so it cannot split a name that merely contains
+    # the letters (e.g. "brand"). This makes the gate STRICTER: more declared
+    # names means more names that must actually be dispatched.
+    for segment in re.split(r",|;|\s+and\s+|\s*&\s*", raw_text):
         segment = segment.strip()
         words = segment.split()
         for i in range(min(3, len(words)), 0, -1):
