@@ -34,7 +34,12 @@ import unittest
 
 HOOKS_DIR = os.path.dirname(os.path.abspath(__file__))
 # Add scripts/ to path so we can import the shared canonical set
-SCRIPTS_DIR = os.path.join(HOOKS_DIR, "..", "..", "Projects", "your-project", "scripts")
+# LAYOUT ADAPTATION, not a token scrub. In the vault this file sits under
+# .claude/hooks/ and the canonical module under Projects/<project>/scripts/, so the
+# vault copy walks up two levels and back down. In this repo hooks/ and scripts/ are
+# siblings at the root. Substituting the project name into the vault path produces a
+# path correct in NEITHER tree, which is how this shipped broken once.
+SCRIPTS_DIR = os.path.join(HOOKS_DIR, "..", "scripts")
 sys.path.insert(0, os.path.normpath(SCRIPTS_DIR))
 
 
