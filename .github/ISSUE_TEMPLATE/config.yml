@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Framework README
+    url: https://github.com/Wiktor-Potapczyk/agent-governance-framework#readme
+    about: Questions or usage help that are not a specific bug should start here.

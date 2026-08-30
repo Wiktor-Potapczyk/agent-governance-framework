@@ -4,6 +4,27 @@ A deterministic, hook-driven governance framework for Claude Code (Anthropic's o
 
 The framework operationalizes three research-backed principles: classify before acting, delegate specialist work to agents, and falsify rather than confirm. These principles are not left to the model's judgment -- they are enforced at runtime through hooks that can block, redirect, or inject context on every tool call and session boundary.
 
+## Quick Start
+
+```bash
+git clone https://github.com/Wiktor-Potapczyk/agent-governance-framework.git
+cd agent-governance-framework
+cp settings/settings.json.example /your/project/.claude/settings.local.json
+```
+
+These three commands clone the repository and stage a starter hook configuration. They do not yet wire the hooks, agents, or skills into a project: see [INSTALL.md](INSTALL.md) for the full setup.
+
+**Platform:** the maintainer develops and runs this daily on Windows 11 with Python 3.14. Linux and macOS are structurally supported (the hooks are pure Python standard library, no OS-specific calls) but not exercised by the maintainer.
+
+| Document | Covers |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | The four-layer enforcement model |
+| [INSTALL.md](INSTALL.md) | Step-by-step setup |
+| [docs/reference/](docs/reference/) | Per-artifact reference: hooks, agents, skills, workflows |
+| [docs/adr/](docs/adr/) | Decision log (MADR) |
+| [SECURITY.md](SECURITY.md) | Trust model and vulnerability reporting |
+| [CHANGELOG.md](CHANGELOG.md) | Dated history of what shipped and why |
+
 ## Core Innovations
 
 - **Exploration vs. Extraction routing** -- Tasks are classified not by surface keywords but by what they *imply*. The classifier distinguishes open-ended investigation (exploration) from directed retrieval (extraction) and routes each to a different process skill, preventing the model from converging prematurely on a confident answer before the problem space is understood.
@@ -77,10 +98,6 @@ framework-repo/
 ├── LICENSE.txt
 └── INSTALL.md
 ```
-
-## Quick Start
-
-See [INSTALL.md](INSTALL.md) for step-by-step setup instructions.
 
 ## Customization
 

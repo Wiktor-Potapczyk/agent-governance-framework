@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a hook or skill that misbehaves.
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repository is a published mirror of a personal working system (see [CONTRIBUTING.md](../../CONTRIBUTING.md)). Reports are read and reviewed against the upstream, not against this clone alone.
+  - type: input
+    id: artifact
+    attributes:
+      label: Hook or skill
+      description: The file or skill name, for example `bash-safety-guard.py` or `process-qa`.
+    validations:
+      required: true
+  - type: dropdown
+    id: event
+    attributes:
+      label: Event
+      description: Which Claude Code lifecycle event fired it.
+      options:
+        - PreToolUse
+        - PostToolUse
+        - UserPromptSubmit
+        - Stop
+        - SubagentStart
+        - SubagentStop
+        - SessionStart
+        - PreCompact
+        - PostCompact
+        - SessionEnd
+        - Other (describe below)
+    validations:
+      required: true
+  - type: textarea
+    id: registration
+    attributes:
+      label: Settings registration line
+      description: The exact entry for this hook from your `settings.json` or `settings.local.json`.
+      render: json
+    validations:
+      required: false
+  - type: textarea
+    id: log
+    attributes:
+      label: Log excerpt
+      description: The relevant lines from `governance-log.jsonl`, or the hook's own stderr output, if any.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: The minimal prompt or command that triggers the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected versus actual
+      description: What you expected the hook or skill to do, and what it did instead.
+    validations:
+      required: true
