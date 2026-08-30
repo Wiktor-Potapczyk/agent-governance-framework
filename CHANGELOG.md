@@ -1,5 +1,29 @@
 # Changelog
 
+## v2026.08.30 (2026-08-30)
+
+- docs: SECURITY.md, README front door, design invariants, bug-report template
+- fix(ci): adapt the drift test's path to this repo's layout, not the vault's
+- sync: publish 21 hooks, scripts and workflows the running copies had moved ahead of
+- fix(tests): make the long-path fixture platform-aware, it broke the Ubuntu runner
+- fix(tests): pin the unicode-hygiene fixtures to LF so a Windows clone cannot shift their offsets
+- fix(hooks): ship test_unicode_hygiene.py and its fixtures, and unblock the gitignore rule that stopped them
+
+## 2026-08-30: SECURITY.md, a README front door, named design invariants, a bug-report template
+
+Project-operations pass: four documents the repository was missing, none of them a code or hook change.
+
+### Added
+
+- **`SECURITY.md` (new, repo root).** Private disclosure route via GitHub Security Advisories, no bug bounty, and an honest trust model naming four actors (model, hooks, operator, OS). States plainly that the Gate-1 hooks are pattern-based guards against accidental self-harm by a cooperative agent, not a boundary against deliberate evasion, and cites `hooks/bash-safety-guard.py`'s own documented `GATE-1-BYPASS / HA-A-044` incident (a `bash -c` wrapper sailing past every deny pattern before `unwrap_executing_wrappers()` closed that form) as the evidence rather than a hedge. Names regex matching, prompt text, and advisory warnings as non-boundaries; states the operating system and account isolation as the only real one.
+- **`docs/design-invariants.md` (new).** Six named invariants curated from material already in the repository, each with a one-line origin: enforcement over advisory (ADR-0002), blind analysis (`docs/architecture.md` Layer 2), fail-open guards (repo-wide hook pattern plus the Gate-1 frozen-snapshot exception in ADR-0007), measure before gating (`prose-slop-check.py`'s corpus calibration, the classifier's Explicit Imperative fast path), no silent caps (ADR-0003's mandatory Untested Surface), and a gate that cannot fail is not a gate (`epistemic-check.py`'s retirement in `hooks/disabled/README.md`, paired with `dispatch-compliance-check.py`'s H3 empty-MUST-DISPATCH hard block). Curation, not invention: every line traces to an existing ADR, doc section, or hook.
+- **`README.md` front door.** A `## Quick Start` section moved up from below Repository Structure to right after the pitch paragraph, expanded to three commands (clone, enter, stage the starter settings file) plus an honest platform line: developed and run daily on Windows 11 with Python 3.14, Linux and macOS structurally supported but not exercised by the maintainer. Adds a compact documentation table (architecture, INSTALL, reference, ADRs, SECURITY, CHANGELOG); the old one-line `## Quick Start` stub near Customization is removed rather than duplicated. `.doc-consistency.json`'s 13 count assertions were re-run after the edit: 0 mismatches, none of the moved or added text touches a counted sentence.
+- **`.github/ISSUE_TEMPLATE/bug_report.yml` and `config.yml` (new).** A structured GitHub Issue Form asking for the hook or skill name, the firing event (dropdown over the ten Claude Code lifecycle events), the settings registration line, a log excerpt, reproduction steps, and expected-versus-actual, with a lead-in noting reports are reviewed against the upstream working system. `config.yml` keeps blank issues enabled and points the one contact link at the README rather than assuming GitHub Discussions is turned on.
+
+### Docs
+
+- Doc-consistency re-run after all four changes: `python skills/core/doc-consistency/check_doc_consistency.py .doc-consistency.json`, 0 mismatches across 13 checks. Internal Markdown link scan and JSON/YAML validation (the other CI legs, plus a direct YAML parse of the two new issue-template files) all re-run clean.
+
 ## 2026-08-22: closing three deliberately-held items, and a bug that only a scrub could have caused
 
 ### Fixed
