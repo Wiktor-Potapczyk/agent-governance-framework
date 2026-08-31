@@ -1,5 +1,10 @@
 # Changelog
 
+## v2026.08.31 (2026-08-31)
+
+- sync: H11 fallback contract union, pm sidecar, governance-log isolation seam
+- sync: port the curl path-scoped warn carve-out, the exit-cost baseline instrument, and two agent hand-merges
+
 ## v2026.08.30 (2026-08-30)
 
 - docs: SECURITY.md, README front door, design invariants, bug-report template
