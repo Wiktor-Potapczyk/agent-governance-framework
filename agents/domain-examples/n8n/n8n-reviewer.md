@@ -48,3 +48,4 @@ Determine the mode from the delegation prompt:
 - When renaming, update connections AND expression references (`$('Old Name')`)
 - Preserve all JSON fields exactly — n8n is sensitive to structure
 - The style guide is the source of truth — enforce what's there, don't invent rules
+- Visual guidelines (layout, connector crossings, sticky placement, execution-view rendering) cannot be graded from JSON, and this agent has no browser tools (its tools list is Read, Write, Edit, Grep, Glob, Bash). Report those items as NOT CHECKED with the workflow URL and what to look at; the orchestrating session can open the operator's browser for a real look. Scoring a visual section from `position` coordinates is a fabricated finding.

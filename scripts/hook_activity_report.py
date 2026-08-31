@@ -1255,7 +1255,279 @@ def vocab_text():
     return "\n".join(out)
 
 
+# ---------------------------------------------------------------------------
+# --exit-cost: criterion-2 baseline (Quick-turn exit cost).
+#
+# Primary observable: wall-clock of the Stop-hook chain per turn, reconstructed
+# as last-ts minus first-ts over the chain members' sink records, because the
+# sinks carry ONE timestamp per fire and no durations (probed 2026-08-30).
+# Every figure is therefore a LOWER BOUND on the true chain wall-clock, twice
+# over: sub-second tails are invisible at second resolution, and only part of
+# the registered chain writes to any sink at all (the coverage note counts it).
+# Secondary observable: distinct chain hooks observed per turn.
+# Tokens are deliberately OUT of scope (task_plan.md batch entry 2026-08-24).
+#
+# Determinism contract (the batch's CHECK): the window is [--since, --until)
+# at date granularity, --until defaulting to TODAY 00:00 so in-flight traffic
+# never enters, and relative forms (7d) resolve against that same boundary.
+# Two runs inside one day over the same window are byte-identical.
+# ---------------------------------------------------------------------------
+
+# Same pattern as hooks/_event_emit.py::is_test_session (not importable from
+# here without a path hack; the vocabulary check catches drift in sink values,
+# and test_exit_cost_report.py pins the exclusion behaviour).
+_EC_TEST_SESSION_RE = re.compile(
+    r"^(?:fixture-|pentest-|h5-|h3-|fake-|test$|test[-_]|unknown$)",
+    re.IGNORECASE,
+)
+_EC_GAP_S = 30  # chain members fire back-to-back; a >30s gap is a new turn
+_SETTINGS_LOCAL = VAULT / ".claude" / "settings.local.json"
+# SETTINGS_LOCAL_PATH mirrors the sink-path overrides so the fail-loud
+# paths are testable through the CLI (review finding 3, 2026-08-30).
+
+
+def _ec_stop_chain_hooks():
+    """Registered Stop-chain hook names, parsed from settings.local.json.
+    Fail-loud: a missing or Stop-less settings file must never yield a quiet
+    empty set (a selector that breaks passes vacuously)."""
+    ov = os.environ.get("SETTINGS_LOCAL_PATH", "").strip()
+    settings_path = Path(ov) if ov else _SETTINGS_LOCAL
+    if not settings_path.exists():
+        raise RuntimeError("settings file not found at %s; cannot derive the "
+                           "Stop chain" % settings_path)
+    with settings_path.open(encoding="utf-8") as fh:
+        settings = json.load(fh)
+    names = set()
+    for matcher in settings.get("hooks", {}).get("Stop", []):
+        for h in matcher.get("hooks", []):
+            m = re.search(r"([\w-]+)\.py", h.get("command", ""))
+            if m:
+                names.add(m.group(1))
+    if not names:
+        raise RuntimeError("no Stop-chain hooks found in settings.local.json")
+    return names
+
+
+def _ec_parse_ts(ts):
+    s = str(ts).strip().replace("T", " ")
+    if "." in s:
+        s = s.split(".", 1)[0]
+    s = s.split("+", 1)[0].rstrip("Z").strip()
+    return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+
+
+def _ec_window(argv):
+    """Resolve [since, until) at date granularity. Relative Nd forms resolve
+    against --until's date so same-day reruns stay byte-identical.
+    Both --since=X and --since X are accepted; the spec's CHECK clause uses
+    the space form, and a flag whose value cannot be consumed raises instead
+    of silently keeping the default (review finding 1, 2026-08-30)."""
+    since_arg, until_arg = "7d", None
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        for flag in ("--since", "--until"):
+            if arg == flag or arg.startswith(flag + "="):
+                if "=" in arg:
+                    value = arg.split("=", 1)[1]
+                else:
+                    if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
+                        raise RuntimeError("%s given without a value" % flag)
+                    i += 1
+                    value = argv[i]
+                if not value:
+                    raise RuntimeError("%s given without a value" % flag)
+                if flag == "--since":
+                    since_arg = value
+                else:
+                    until_arg = value
+        i += 1
+    if until_arg:
+        try:
+            until = datetime.strptime(until_arg, "%Y-%m-%d")
+        except ValueError:
+            raise RuntimeError("--until value %r is not YYYY-MM-DD"
+                               % until_arg)
+    else:
+        until = datetime.now().replace(hour=0, minute=0, second=0,
+                                       microsecond=0)
+    m = re.fullmatch(r"(\d+)d", since_arg)
+    if m:
+        from datetime import timedelta
+        since = until - timedelta(days=int(m.group(1)))
+    else:
+        try:
+            since = datetime.strptime(since_arg, "%Y-%m-%d")
+        except ValueError:
+            raise RuntimeError("--since value %r is neither Nd nor "
+                               "YYYY-MM-DD" % since_arg)
+    return since, until
+
+
+def _ec_pct(sorted_vals, q):
+    """Nearest-rank percentile over an already-sorted list."""
+    import math
+    if not sorted_vals:
+        return None
+    rank = max(1, math.ceil(q * len(sorted_vals)))
+    return sorted_vals[rank - 1]
+
+
+def exit_cost_report(argv=None):
+    """Collect chain-member fires from both sinks, cluster into turns, and
+    aggregate wall-clock + hooks-fired per classification bucket."""
+    argv = sys.argv if argv is None else argv
+    since, until = _ec_window(argv)
+    chain = _ec_stop_chain_hooks()
+    paths = _sink_paths()
+
+    excluded = 0
+    ts_dropped = 0
+    fires = defaultdict(list)  # session -> [(ts, hook, cls_or_None)]
+    for sink_key in (SINK_ACT, SINK_GOV):
+        for rec in _stream_jsonl(paths[sink_key]):
+            hook = str(rec.get("hook"))
+            if hook not in chain:
+                continue
+            try:
+                ts = _ec_parse_ts(rec.get("ts"))
+            except (ValueError, TypeError):
+                # Counted, never silently swallowed (review finding 4).
+                ts_dropped += 1
+                continue
+            session = str(rec.get("session"))
+            if (session in _SYN_SESSIONS
+                    or _EC_TEST_SESSION_RE.match(session)
+                    or rec.get("environment") == "test"):
+                if since <= ts < until:
+                    excluded += 1
+                continue
+            cls = None
+            if rec.get("event") == "turn_summary" and rec.get("type"):
+                cls = str(rec.get("type"))
+            fires[session].append((ts, hook, cls))
+
+    # Cluster over ALL real records, then window-select whole clusters, so a
+    # turn straddling the window edge is dropped and counted rather than
+    # entering the stats truncated (review finding 2, 2026-08-30).
+    all_clusters = []
+    for session in sorted(fires):
+        rows = sorted(fires[session], key=lambda r: (r[0], r[1]))
+        cluster = []
+        for row in rows:
+            if cluster and (row[0] - cluster[-1][0]).total_seconds() > _EC_GAP_S:
+                all_clusters.append(cluster)
+                cluster = []
+            cluster.append(row)
+        if cluster:
+            all_clusters.append(cluster)
+
+    clusters, clipped = [], 0
+    for cluster in all_clusters:
+        first, last = cluster[0][0], cluster[-1][0]
+        if last < since or first >= until:
+            continue
+        if since <= first and last < until:
+            clusters.append(cluster)
+        else:
+            clipped += 1
+
+    if not clusters:
+        return {"empty": True, "since": since, "until": until,
+                "excluded": excluded, "clipped": clipped,
+                "ts_dropped": ts_dropped}
+
+    measured, single = [], 0
+    for cluster in clusters:
+        if len(cluster) < 2:
+            single += 1
+            continue
+        duration = (cluster[-1][0] - cluster[0][0]).total_seconds()
+        hooks = {r[1] for r in cluster}
+        bucket = next((r[2] for r in cluster if r[2]), "unclassified")
+        measured.append({"duration": duration, "hooks": len(hooks),
+                         "bucket": bucket})
+
+    observed_chain = sorted({r[1] for c in clusters for r in c})
+    buckets = defaultdict(list)
+    for t in measured:
+        buckets[t["bucket"]].append(t)
+
+    def _agg(items):
+        # p50 is the interpolated median (statistics.median); p95 stays
+        # nearest-rank, the usual latency convention. Both deterministic.
+        import statistics
+        durs = sorted(t["duration"] for t in items)
+        mean_hooks = sum(t["hooks"] for t in items) / len(items)
+        return {"n": len(items), "p50": float(statistics.median(durs)),
+                "p95": _ec_pct(durs, 0.95), "mean_hooks": mean_hooks}
+
+    per_bucket = {b: _agg(items) for b, items in buckets.items()}
+    quick = [t for t in measured if t["bucket"] == "Quick"]
+    nonquick = [t for t in measured
+                if t["bucket"] not in ("Quick", "unclassified")]
+    rollup = {}
+    if quick:
+        rollup["Quick"] = _agg(quick)
+    if nonquick:
+        rollup["non-Quick (classified)"] = _agg(nonquick)
+
+    return {"empty": False, "since": since, "until": until,
+            "excluded": excluded, "clipped": clipped,
+            "ts_dropped": ts_dropped, "single": single,
+            "turns_measured": len(measured), "per_bucket": per_bucket,
+            "rollup": rollup, "observed_chain": observed_chain,
+            "registered_chain": sorted(chain)}
+
+
+def exit_cost_text(argv=None):
+    r = exit_cost_report(argv)
+    win = "window [%s .. %s)" % (r["since"].date(), r["until"].date())
+    if r["empty"]:
+        return ("=== EXIT COST (criterion-2 baseline) ===\n%s\n"
+                "EMPTY POPULATION: no Stop-chain records in window "
+                "(excluded records: %d). A selector that finds nothing is "
+                "reported, never a clean zero." % (win, r["excluded"])), 2
+    out = ["=== EXIT COST (criterion-2 baseline) ===", win,
+           "wall-clock = last-ts minus first-ts per chain, at 1s sink "
+           "resolution: every figure is a lower bound",
+           "turns measured: %d  (single-record turns: %d, held out of "
+           "wall-clock stats)  excluded records: %d"
+           % (r["turns_measured"], r["single"], r["excluded"]),
+           "boundary-clipped turns: %d (straddle a window edge, excluded "
+           "whole)  unparseable-ts records: %d (window-independent)"
+           % (r["clipped"], r["ts_dropped"]),
+           "chain members observed in sinks: %d of %d registered "
+           "(dark: %s)"
+           % (len(r["observed_chain"]), len(r["registered_chain"]),
+              ", ".join(sorted(set(r["registered_chain"])
+                               - set(r["observed_chain"]))) or "none"),
+           "", "per classification bucket:"]
+    for b in sorted(r["per_bucket"]):
+        a = r["per_bucket"][b]
+        out.append("  %-14s n=%-5d p50=%.1fs  p95=%.1fs  mean hooks=%.1f"
+                   % (b, a["n"], a["p50"], a["p95"], a["mean_hooks"]))
+    out.append("")
+    out.append("ROLLUP (Quick vs non-Quick, what tiering would change):")
+    for b in r["rollup"]:
+        a = r["rollup"][b]
+        out.append("  %-22s n=%-5d p50=%.1fs  p95=%.1fs  mean hooks=%.1f"
+                   % (b, a["n"], a["p50"], a["p95"], a["mean_hooks"]))
+    if not r["rollup"]:
+        out.append("  (no classified turns in window)")
+    return "\n".join(out), 0
+
+
 if __name__ == "__main__":
+    if "--exit-cost" in sys.argv:
+        try:
+            _txt, _code = exit_cost_text()
+        except RuntimeError as _e:
+            print("=== EXIT COST (criterion-2 baseline) ===")
+            print("ERROR: %s" % _e)
+            raise SystemExit(2)
+        print(_txt)
+        raise SystemExit(_code)
     if "--yield" in sys.argv:
         print(yield_text())
         raise SystemExit(0)

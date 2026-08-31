@@ -549,7 +549,35 @@ CURL_WARN_HOSTS = frozenset({
     "n8n.internal.example.com",
 })
 
+# Path-scoped warn carve-out, added 2026-08-25.
+#
+# Why this is a PATH list and not another CURL_WARN_HOSTS entry: api.github.com is
+# not one surface. The same host serves `DELETE /repos/{o}/{r}` (deletes the
+# repository) and `PATCH /repos/{o}/{r}` (can flip a private repo PUBLIC, which
+# for an operator under an NDA is the worst outcome available). Host-scoping the
+# way the issue tracker was host-scoped would move BOTH of those to warn to buy
+# one PR edit. So the carve-out names the paths that are additive and undoable.
+#
+# Pull-request METADATA only: base branch, title, body, state. Explicitly NOT
+# `/merge`, which lands code and is the irreversible half of a PR.
+CURL_WARN_URL_PATTERNS = (
+    re.compile(
+        r"^https?://api\.github\.com/repos/[^/\s]+/[^/\s]+/pulls/\d+/?(?:\?|$)",
+        re.IGNORECASE,
+    ),
+)
+
+
+def _curl_url_is_warn_scoped(url):
+    """True when a single URL is warn-eligible, by host allowlist OR path pattern."""
+    for rx in CURL_WARN_URL_PATTERNS:
+        if rx.match(url.strip()):
+            return True
+    return False
+
+
 _CURL_URL_HOST_RE = re.compile(r"https?://([^/\s\"'>\\]+)", re.IGNORECASE)
+_CURL_FULL_URL_RE = re.compile(r"https?://[^\s\"'>\\]+", re.IGNORECASE)
 
 
 def curl_write_targets_warn_hosts_only(command):
@@ -562,9 +590,22 @@ def curl_write_targets_warn_hosts_only(command):
     carve-out must not become a laundering route for an off-list write.
 
     Pure stdlib; never raises for normal input."""
+    urls = _CURL_FULL_URL_RE.findall(command or "")
     hosts = _CURL_URL_HOST_RE.findall(command or "")
     if not hosts:
         return False
+    # A URL that matches a warn PATH pattern qualifies on its own, so drop it from the
+    # host check below. Conservative by construction: anything not matched still has to
+    # clear the host allowlist, and one unqualified URL keeps the whole command denied.
+    remaining = []
+    for u in urls:
+        if not _curl_url_is_warn_scoped(u):
+            m = _CURL_URL_HOST_RE.match(u)
+            if m:
+                remaining.append(m.group(1))
+    if urls and not remaining:
+        return True
+    hosts = remaining or hosts
     for raw in hosts:
         host = raw.strip().lower()
         if "@" in host:            # strip user:pass@
