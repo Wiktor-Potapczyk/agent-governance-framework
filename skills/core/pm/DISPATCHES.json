@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "skill": "pm",
+  "purpose": "Machine-readable dispatch contract for pm (the /pm checkpoint skill), authored 2026-08-30 to close finding PPM-001 (pm was the only process-adjacent skill with no DISPATCHES.json). Hooks read this as fallback ground truth when transcript classification is missing or truncated, mirroring the H11 pattern the six process-* skills already use. CAVEAT RESOLVED 2026-08-31 (owner-ruled): is_trackable_process_skill now names 'pm' explicitly, so a Skill-tool dispatch of 'pm' arms recent_process_skill and this sidecar's contract is UNIONED with any other trackable skill's in the H11 fallback (merged_sidecar_contract, added 2026-08-31 after an architect finding that last-wins overwrite let a trailing pm dispatch replace the substantive skill's contract). Unlike process-qa/process-pentest, pm is not a terminal skill, so it arms the fallback itself; the union is what makes that safe. Prose contract in SKILL.md remains canonical; this file mirrors it for enforcement.",
+  "mandatory_dispatches": [
+    {
+      "name": "pm-orchestrator",
+      "role": "step-2-checkpoint",
+      "required": true,
+      "notes": "The pm skill's one mandatory dispatch: SKILL.md Step 2 dispatches pm-orchestrator via the Agent tool with the PM checkpoint prompt (current phase, active tasks and status, blockers, recommended next action, and a Q6 viability check at phase transitions)."
+    }
+  ],
+  "conditional_dispatches": [],
+  "allowed_specialists_via_process_exemption": [],
+  "notes": "Step 3 relay obligation (checked by hooks): after dispatching pm-orchestrator, the pm skill MUST relay its output verbatim (prefixed with a visible warning if it contains a kill recommendation, scope change, or escalation), THEN itself emit a PM CHECKPOINT REPORT block (Project / Phase / Viability / Blockers / Next / Parallel-runnable / Parallel-blocked-by) populated from the orchestrator's output. Missing viability defaults to PASS (checkpoint ran, no kill signal); missing parallel-runnability fields default to 'unknown' rather than being fabricated. 2026-08-30 content review: authored this file from scratch against the current SKILL.md; pm previously had no DISPATCHES.json (finding PPM-001).",
+  "last_reviewed": "2026-08-31",
+  "linked_skill_md": ".claude/skills/pm/SKILL.md"
+}

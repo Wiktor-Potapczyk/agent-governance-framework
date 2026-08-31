@@ -513,5 +513,50 @@ class PluginDispatchEndToEndTests(unittest.TestCase):
         self.assertEqual(out, "")
 
 
+# --- pm trackable + H11 fallback contract-union (2026-08-31) ------------------
+
+def test_pm_is_a_trackable_skill_for_the_h11_fallback():
+    import os as _os
+    import sys as _sys
+    _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+    from _dispatch_compliance_logic import is_trackable_process_skill
+    assert is_trackable_process_skill("pm") is True
+    assert is_trackable_process_skill("task-classifier") is True
+    assert is_trackable_process_skill("process-qa") is False  # terminal
+
+
+def _merged():
+    import os as _os
+    import sys as _sys
+    _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+    from _dispatch_compliance_logic import merged_sidecar_contract
+    return merged_sidecar_contract
+
+
+def test_merged_contract_unions_substantive_skill_with_trailing_pm():
+    """A pm dispatch after process-build must ADD pm-orchestrator, not replace
+    the build skill's contract (the last-wins overwrite the review flagged)."""
+    contracts = {
+        "process-build": ["implementation-plan", "architect-reviewer"],
+        "pm": ["pm-orchestrator"],
+    }
+    merged = _merged()(["process-build", "pm"], lambda s: contracts[s])
+    assert merged == ["implementation-plan", "architect-reviewer", "pm-orchestrator"]
+
+
+def test_merged_contract_dedupes_and_survives_single_lookup_failure():
+    def lookup(s):
+        if s == "broken":
+            raise RuntimeError("no sidecar")
+        return {"process-qa-like": ["architect-reviewer"],
+                "pm": ["pm-orchestrator", "architect-reviewer"]}[s]
+    merged = _merged()(["process-qa-like", "broken", "pm"], lookup)
+    assert merged == ["architect-reviewer", "pm-orchestrator"]
+
+
+def test_merged_contract_empty_input_yields_empty():
+    assert _merged()([], lambda s: ["x"]) == []
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -19,7 +19,7 @@ A reference catalogue of every artifact class in this framework: what is install
 |: of which active enforcement (registered) | 42 | `settings/` |
 | Shared hook libraries | 11 | `hooks/` |
 | Opt-in (disabled) hook files | 11 | `hooks/disabled/` |
-| Analysis and maintenance scripts | 13 | `scripts/` |
+| Analysis and maintenance scripts | 14 | `scripts/` |
 
 ## Workflows (`workflows/`)
 

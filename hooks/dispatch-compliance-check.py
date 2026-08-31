@@ -68,6 +68,36 @@ except ImportError:
 # 200KB window: covers even 10+ agent outputs per turn
 READ_BYTES = 204800
 
+# Captured at import so a monkeypatched _HOOK_DIR is detectable at call time.
+_REAL_HOOK_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def _gov_log_path():
+    """Resolve the governance-log destination, honouring both isolation seams.
+
+    Before 2026-08-24 this hook hardcoded os.path.join(_HOOK_DIR,
+    "governance-log.jsonl"), so GOVERNANCE_LOG_PATH could not redirect it and
+    every test run that reached a logging branch appended to the LIVE
+    governance log.
+
+    Precedence matters and is not obvious. A redirected _HOOK_DIR wins over the
+    env var, because this hook already had a second isolation seam: its tests
+    monkeypatch _HOOK_DIR to a temp directory and then read the file back from
+    there. conftest.py sets GOVERNANCE_LOG_PATH for the whole suite, so putting
+    the env var first would silently defeat that seam and send the record
+    somewhere the test does not look.
+
+    So: an explicitly redirected _HOOK_DIR means a caller has already chosen a
+    destination, and that choice wins. Otherwise the env var applies. Otherwise
+    the live default, unchanged.
+    """
+    local = os.path.join(_HOOK_DIR, "governance-log.jsonl")
+    if os.path.abspath(_HOOK_DIR) != _REAL_HOOK_DIR:
+        return local
+    override = os.environ.get("GOVERNANCE_LOG_PATH", "")
+    if isinstance(override, str) and override.strip():
+        return override.strip()
+    return local
+
 # GAP-4 dual-emit (2026-07-10): date the dual-emit migration landed. The legacy
 # int `schema` field may retire after consumers move to `schema_version`.
 LEGACY_SCHEMA_RETIREMENT_DATE = "2026-07-10"
@@ -143,6 +173,7 @@ def main():
     }
     all_dispatched: set[str] = set()
     recent_process_skill = None
+    trackable_skills_seen: list[str] = []
 
     for line in lines:
         line = line.strip()
@@ -176,6 +207,8 @@ def main():
                     dispatched_name = (inp.get("skill") or "").lower()
                     if is_trackable_process_skill(dispatched_name):
                         recent_process_skill = dispatched_name
+                        if dispatched_name not in trackable_skills_seen:
+                            trackable_skills_seen.append(dispatched_name)
                 elif name == "Agent":
                     dispatched_name = (inp.get("subagent_type") or "").lower()
                 elif name == "Workflow":
@@ -208,10 +241,12 @@ def main():
     # process-* skill was invoked, load mandatory-dispatch contract from
     # the skill's DISPATCHES.json sidecar.
     if not state["found_contract"] and recent_process_skill and _SIDECAR_AVAILABLE:
-        try:
-            sidecar_mandatory = mandatory_agent_names(recent_process_skill)
-        except Exception:
-            sidecar_mandatory = []
+        # Union across every trackable skill seen (architect finding
+        # 2026-08-31): a trailing pm dispatch must ADD its contract, not
+        # replace the substantive skill's one.
+        from _dispatch_compliance_logic import merged_sidecar_contract
+        sidecar_mandatory = merged_sidecar_contract(
+            trackable_skills_seen, mandatory_agent_names)
         if sidecar_mandatory:
             state["must_dispatch"] = sidecar_mandatory
             state["dispatched"] = set(all_dispatched)
@@ -219,7 +254,7 @@ def main():
             state["task_type"] = "sidecar-fallback"
             try:
                 from datetime import datetime
-                log_path = os.path.join(_HOOK_DIR, "governance-log.jsonl")
+                log_path = _gov_log_path()
                 from _governance_logger import session_from
                 session_id = session_from(payload)
                 stamp_and_append({
@@ -227,7 +262,7 @@ def main():
                     "event": "h11_sidecar_fallback_activated",
                     "hook": "dispatch-compliance",
                     "session": session_id,
-                    "skill": recent_process_skill,
+                    "skill": "+".join(trackable_skills_seen) or recent_process_skill,
                     "must_dispatch": state["must_dispatch"],
                     "schema": 2,
                 }, log_path, correlation_id)
@@ -248,7 +283,7 @@ def main():
             print(json.dumps({"decision": "block", "reason": reason}))
             try:
                 from datetime import datetime
-                log_path = os.path.join(_HOOK_DIR, "governance-log.jsonl")
+                log_path = _gov_log_path()
                 from _governance_logger import session_from
                 session_id = session_from(payload)
                 stamp_and_append({
@@ -273,7 +308,7 @@ def main():
         print(json.dumps({"decision": "block", "reason": reason}))
         try:
             from datetime import datetime
-            log_path = os.path.join(_HOOK_DIR, "governance-log.jsonl")
+            log_path = _gov_log_path()
             from _governance_logger import session_from
             session_id = session_from(payload)
             stamp_and_append({
@@ -296,7 +331,7 @@ def main():
                 and task_type_str != "quick"
             ):
                 from datetime import datetime
-                log_path = os.path.join(_HOOK_DIR, "governance-log.jsonl")
+                log_path = _gov_log_path()
                 from _governance_logger import session_from
                 session_id = session_from(payload)
                 stamp_and_append({
@@ -316,7 +351,7 @@ def main():
         # P2-B (2026-04-09): Log pass event when all declared items are dispatched.
         try:
             from datetime import datetime
-            log_path = os.path.join(_HOOK_DIR, "governance-log.jsonl")
+            log_path = _gov_log_path()
             from _governance_logger import session_from
             session_id = session_from(payload)
             matched_alias_aware = compute_matched_alias_aware(must_dispatch, dispatched, SKILL_AGENT_ALIASES)

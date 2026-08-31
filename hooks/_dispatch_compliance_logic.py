@@ -313,4 +313,28 @@ def is_trackable_process_skill(name: str) -> bool:
     """Skill names that count as 'recent process skill' for the H11 sidecar fallback."""
     if not name:
         return False
-    return (name.startswith("process-") or name == "task-classifier") and not is_terminal_skill(name)
+    # "pm" added 2026-08-31 (owner-ruled O5 fix): its DISPATCHES.json existed
+    # but this gate never armed it, so the pm contract was dead weight.
+    trackable = name.startswith("process-") or name in ("task-classifier", "pm")
+    return trackable and not is_terminal_skill(name)
+
+
+def merged_sidecar_contract(skills, mandatory_lookup):
+    """Union the sidecar contracts of every trackable skill seen, in order.
+
+    H11 fallback helper (architect finding 2026-08-31): last-wins overwrite let
+    a terminal-position pm dispatch replace the substantive skill's contract in
+    the fallback, so the check enforced only pm-orchestrator. The fallback now
+    enforces the UNION of all trackable skills' contracts. A lookup failure for
+    one skill drops only that skill's names, never the others'.
+    """
+    merged: list[str] = []
+    for skill in skills:
+        try:
+            names = mandatory_lookup(skill) or []
+        except Exception:
+            names = []
+        for n in names:
+            if n not in merged:
+                merged.append(n)
+    return merged
