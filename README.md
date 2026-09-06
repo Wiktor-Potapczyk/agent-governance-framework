@@ -22,6 +22,7 @@ These three commands clone the repository and stage a starter hook configuration
 | [INSTALL.md](INSTALL.md) | Step-by-step setup |
 | [docs/reference/](docs/reference/) | Per-artifact reference: hooks, agents, skills, workflows |
 | [docs/adr/](docs/adr/) | Decision log (MADR) |
+| [docs/concepts/harness-docs-pattern.md](docs/concepts/harness-docs-pattern.md) | The bike-spec docs pattern: generated per-component pages plus staleness tooling |
 | [SECURITY.md](SECURITY.md) | Trust model and vulnerability reporting |
 | [CHANGELOG.md](CHANGELOG.md) | Dated history of what shipped and why |
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## v2026.09.06 (2026-09-06)
+
+- sync: refresh 24 diverged twins from the vault harness (curation pass; scrub and layout adaptations preserved)
+- feat(scripts): publish the bike-spec docs stack: asset_inventory.py, rationale_extract.py, docs_stub_generate.py, staleness_check.py, staleness_manifest_generate.py (VAULT_DIR layout adaptation; the generated 498-page tree itself stays with each installation)
+- docs: concepts/harness-docs-pattern.md, the pattern page for the docs stack, linked from the README documentation table
+
 ## v2026.08.31 (2026-08-31)
 
 - sync: H11 fallback contract union, pm sidecar, governance-log isolation seam
