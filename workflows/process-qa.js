@@ -24,6 +24,14 @@ export const meta = {
   ],
 }
 
+// O9 increment 2 (2026-09-01): workflow-identity marker. Every subagent
+// prompt begins with 'WORKFLOW-ID: <name>' as its literal first line so
+// the SubagentStop observer (subagent-quality-check.py) can attribute the
+// completion to this workflow in governance-log.jsonl. Inert metadata
+// only: no other prompt text changes. All dispatch sites below call
+// wfAgent; zero bare agent( call sites may remain outside this line.
+const wfAgent = (prompt, opts) => agent('WORKFLOW-ID: process-qa\n\n' + prompt, opts)  // literal: runner strips export const meta, no runtime binding (crash 2026-09-01 wf_31f32926-f97)
+
 // ---------------------------------------------------------------------------
 // Typed schemas
 // ---------------------------------------------------------------------------
@@ -116,7 +124,7 @@ const EXPECTED_COUNT = normalizedClaims.length  // coverage rule: N claims in â†
 
 // --- Step 1: Scope: assign claim_class where omitted -----------------------
 phase('Scope')
-const scopeResult = await agent(
+const scopeResult = await wfAgent(
   `You are the scope node of the process-qa procedure for project "${PROJECT}".
 
 SOURCE (what produced these claims): ${SOURCE_LABEL}
@@ -165,7 +173,7 @@ function satisfiesExecuteClass(toolUsed) {
   return EXECUTE_TOOLS.has(toolUsed) || toolUsed.startsWith('mcp__') || toolUsed.toLowerCase() === 'bash' || toolUsed.toLowerCase() === 'powershell'
 }
 
-const executeAgents = typedClaims.map((tc, i) => () => agent(
+const executeAgents = typedClaims.map((tc, i) => () => wfAgent(
   `You are executing ONE QA verification for project "${PROJECT}".
 
 CLAIM: ${tc.claim}

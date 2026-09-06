@@ -18,6 +18,14 @@ export const meta = {
   ],
 }
 
+// O9 increment 2 (2026-09-01): workflow-identity marker. Every subagent
+// prompt begins with 'WORKFLOW-ID: <name>' as its literal first line so
+// the SubagentStop observer (subagent-quality-check.py) can attribute the
+// completion to this workflow in governance-log.jsonl. Inert metadata
+// only: no other prompt text changes. All dispatch sites below call
+// wfAgent; zero bare agent( call sites may remain outside this line.
+const wfAgent = (prompt, opts) => agent('WORKFLOW-ID: process-analysis\n\n' + prompt, opts)  // literal: runner strips export const meta, no runtime binding (crash 2026-09-01 wf_31f32926-f97)
+
 // ---------------------------------------------------------------------------
 // Typed schemas
 // ---------------------------------------------------------------------------
@@ -111,7 +119,7 @@ if (PROJECT === 'UNKNOWN' || !SUBJECT) {
 
 // --- Step 1: Define Scope + classify mode and specialist list ---------------
 phase('Scope')
-const scope = await agent(
+const scope = await wfAgent(
   `You are the scope+classify node of the process-analysis procedure for project "${PROJECT}".
 
 SUBJECT TO ANALYZE: ${SUBJECT}
@@ -173,7 +181,7 @@ if (specialists.length === 0) {
 phase('Analyze')
 log(`Dispatching ${specialists.length} specialist(s) in parallel: ${specialists.join(', ')}`)
 
-const specialistTasks = specialists.map((agentName, i) => () => agent(
+const specialistTasks = specialists.map((agentName, i) => () => wfAgent(
   `You are ${agentName} conducting a ${scope.mode} analysis for project "${PROJECT}".
 
 ANALYSIS SCOPE:
@@ -207,7 +215,7 @@ let analysisText = specialistResults.length === 1 ? (specialistResults[0].findin
 if (specialistResults.length >= 2) {
   phase('Synthesis')
   log(`Synthesis mandatory: ${specialistResults.length} specialist agents dispatched (enforced in code).`)
-  const synthesis = await agent(
+  const synthesis = await wfAgent(
     `You are research-synthesizer. Merge the specialist findings below into a unified ${scope.mode} analysis for project "${PROJECT}".
 
 ANALYSIS SCOPE:
@@ -232,7 +240,7 @@ let reportResult = null
 
 if (scope.complex) {
   phase('Report')
-  reportResult = await agent(
+  reportResult = await wfAgent(
     `You are report-generator. Write the final analysis report for project "${PROJECT}".
 
 SCOPE:
@@ -255,7 +263,7 @@ FILE CONTRACT (non-negotiable):
 } else {
   // For simple single-agent analysis, write the output directly.
   // The quality gate verifies the file exists — it must be written here.
-  const writeResult = await agent(
+  const writeResult = await wfAgent(
     `You are a writing agent for project "${PROJECT}". Write the analysis output to disk.
 
 ANALYSIS CONTENT:
@@ -279,7 +287,7 @@ FILE CONTRACT (non-negotiable):
 
 // --- Step 5: Quality gate ---------------------------------------------------
 phase('Quality')
-const quality = await agent(
+const quality = await wfAgent(
   `You are the quality gate for the process-analysis procedure. Verify the analysis output EMPIRICALLY.
 
 1. Use the Read tool to open ${reportPath}. Set output_file_exists from whether the read succeeded.

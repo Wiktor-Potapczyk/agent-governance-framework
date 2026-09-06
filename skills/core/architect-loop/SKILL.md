@@ -160,3 +160,11 @@ Tell the user:
 - **The output file should be a requirements doc, not a spec**: specs come after the loop, built by specialist agents
 - **Include the completion promise instruction in the prompt**: "When all problems are answered... output RESEARCH COMPLETE"
 - **`--max-iterations` has a hard ceiling of 30**: never generate a command above it; 15-25 is the normal band. Decompose oversized corpora into multiple loops rather than raising the cap (two-gate Gate-1-adjacent, [[2026-06-15-two-gate-enforcement-spec]] Area E).
+
+## Loop-tool selection appendix
+
+Expands on the loop-tool decision above.
+
+Native `/goal` is the default for simple condition-gated loops ("work until tests pass / queue empty / status=success"): it uses a fresh independent evaluator model, which removes `ralph-loop`'s self-anchoring, has native `--resume` persistence, and `/goal status` spend tracking. `ralph-loop` is superseded for that pattern. It is not superseded for research-heavy or context-rot-sensitive loops: `/goal` accumulates full conversation context across turns, so for overnight investigation, multi-phase analysis, or verification-gated builds, keep `architect-loop` plus `verification-gated-research` (orchestrator to fresh-sub-agent delegation). A customized `/loop` remains the maintenance-loop mechanism. `/workflows` (native dynamic workflows) is the right tool for deterministic fan-out across many independent sub-agents in one script (decompose, parallel, synthesize; migrations; broad audits) where the goal is the conclusion, not the per-agent dumps; native step-recall/resume survives compaction.
+
+**Ralph Loop body delegates, never investigates inline.** A `ralph-loop` plugin installed as a single-session Stop-hook accumulates context across iterations within that one session, so a long loop rots. The mitigation: the loop body orchestrates and consolidates only, all heavy investigation goes to fresh `Agent`-tool sub-agents whose context is fresh and discarded, keeping the loop's own context lean. For depth/research loops, use the `verification-gated-research` skill: it is the structured form of this rule (backlog ledger plus fresh-context workers plus a separate verifier gate).

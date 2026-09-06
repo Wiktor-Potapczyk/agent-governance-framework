@@ -643,5 +643,80 @@ class TestPluginDispatchNames(unittest.TestCase):
         )
 
 
+class TestEmitDispatchPartitionO13(unittest.TestCase):
+    """O13 (2026-09-01): _emit_dispatch partitions MUST DISPATCH into
+    skill_context (skills and short-names) and the NEW agent_context
+    (registry agent names, local + plugin), closing a cross-field mislabel
+    that put agent names into skill_context. Fail-open: a registry failure
+    reverts to the old unpartitioned shape and never raises out of the
+    emitter."""
+
+    def setUp(self):
+        self._orig_emit = mod.emit_event
+        self._orig_load = mod.load_registry_agents
+        self.calls = []
+        mod.emit_event = lambda **kw: self.calls.append(kw)
+
+    def tearDown(self):
+        mod.emit_event = self._orig_emit
+        mod.load_registry_agents = self._orig_load
+
+    def _emitted_extra(self):
+        self.assertEqual(len(self.calls), 1)
+        return self.calls[0]["extra"]
+
+    def test_pure_skill_list_stays_in_skill_context(self):
+        mod.load_registry_agents = lambda: {"architect-reviewer", "adversarial-reviewer"}
+        mod._emit_dispatch("s", "blueprint-mode", ["process-qa", "pm"], False, False, "allow")
+        extra = self._emitted_extra()
+        self.assertEqual(extra["skill_context"], ["process-qa", "pm"])
+        self.assertEqual(extra["agent_context"], [])
+
+    def test_mixed_list_partitions_agents_out(self):
+        mod.load_registry_agents = lambda: {"architect-reviewer", "adversarial-reviewer"}
+        mod._emit_dispatch(
+            "s", "blueprint-mode",
+            ["architect-reviewer", "process-qa", "adversarial-reviewer"],
+            False, False, "allow")
+        extra = self._emitted_extra()
+        self.assertEqual(extra["skill_context"], ["process-qa"])
+        self.assertEqual(extra["agent_context"],
+                         ["architect-reviewer", "adversarial-reviewer"])
+
+    def test_registry_failure_falls_back_unpartitioned(self):
+        def boom():
+            raise RuntimeError("registry unavailable")
+        mod.load_registry_agents = boom
+        mod._emit_dispatch("s", "x", ["architect-reviewer", "process-qa"],
+                           False, False, "allow")
+        extra = self._emitted_extra()
+        self.assertEqual(extra["skill_context"], ["architect-reviewer", "process-qa"])
+        self.assertEqual(extra["agent_context"], [])
+
+    def test_empty_registry_falls_back_unpartitioned(self):
+        mod.load_registry_agents = lambda: set()
+        mod._emit_dispatch("s", "x", ["architect-reviewer"], False, False, "allow")
+        extra = self._emitted_extra()
+        self.assertEqual(extra["skill_context"], ["architect-reviewer"])
+        self.assertEqual(extra["agent_context"], [])
+
+    def test_empty_list_both_empty(self):
+        mod.load_registry_agents = lambda: {"architect-reviewer"}
+        mod._emit_dispatch("s", "general-purpose", [], False, False, "always_allowed")
+        extra = self._emitted_extra()
+        self.assertEqual(extra["skill_context"], [])
+        self.assertEqual(extra["agent_context"], [])
+
+    def test_overlap_name_agent_membership_wins(self):
+        # n8n-reviewer is both a local agent and a local skill; agent
+        # membership wins by design so the post-fix invariant
+        # skill_context-x-agent-names == empty holds by construction.
+        mod.load_registry_agents = lambda: {"n8n-reviewer"}
+        mod._emit_dispatch("s", "x", ["n8n-reviewer"], False, False, "allow")
+        extra = self._emitted_extra()
+        self.assertEqual(extra["skill_context"], [])
+        self.assertEqual(extra["agent_context"], ["n8n-reviewer"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

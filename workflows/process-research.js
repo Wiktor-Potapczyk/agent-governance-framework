@@ -18,6 +18,14 @@ export const meta = {
   ],
 }
 
+// O9 increment 2 (2026-09-01): workflow-identity marker. Every subagent
+// prompt begins with 'WORKFLOW-ID: <name>' as its literal first line so
+// the SubagentStop observer (subagent-quality-check.py) can attribute the
+// completion to this workflow in governance-log.jsonl. Inert metadata
+// only: no other prompt text changes. All dispatch sites below call
+// wfAgent; zero bare agent( call sites may remain outside this line.
+const wfAgent = (prompt, opts) => agent('WORKFLOW-ID: process-research\n\n' + prompt, opts)  // literal: runner strips export const meta, no runtime binding (crash 2026-09-01 wf_31f32926-f97)
+
 // ---------------------------------------------------------------------------
 // Pure, side-effect-free live-citation gate helper (unit-testable in isolation)
 // ---------------------------------------------------------------------------
@@ -131,7 +139,7 @@ const SOURCES = Array.isArray(A.sources) ? A.sources.join(', ') : (A.sources || 
 
 // --- Step 1: Define Scope + classify routing flags --------------------------
 phase('Scope')
-const scope = await agent(
+const scope = await wfAgent(
   `You are the scope+classify node of the process-research procedure for project "${PROJECT}".
 
 RESEARCH QUESTION: ${QUESTION}
@@ -192,7 +200,7 @@ let rawFindings = []
 
 if (scope.coverage === 'orchestrated') {
   // 4+ sub-questions: research-orchestrator coordinates internally
-  const orchResult = await agent(
+  const orchResult = await wfAgent(
     `You are research-orchestrator. Coordinate multi-phase research for project "${PROJECT}".
 
 ${scope.scope_block}
@@ -207,7 +215,7 @@ Conduct thorough multi-phase research. Coordinate research-analyst and technical
   const researchTasks = []
 
   if (scope.coverage === 'web' || scope.coverage === 'both') {
-    researchTasks.push(() => agent(
+    researchTasks.push(() => wfAgent(
       `You are research-analyst. Research the following for project "${PROJECT}" using web sources, trends, and multi-source synthesis.
 
 ${scope.scope_block}
@@ -219,7 +227,7 @@ Gather findings from web sources. State observable facts only: do not pre-judge 
   }
 
   if (scope.coverage === 'technical' || scope.coverage === 'both') {
-    researchTasks.push(() => agent(
+    researchTasks.push(() => wfAgent(
       `You are technical-researcher. Research the following for project "${PROJECT}" using code repos, technical docs, and API behavior.
 
 ${scope.scope_block}
@@ -246,7 +254,7 @@ let synthesisText = rawFindings.length === 1 ? rawFindings[0].findings : null
 if (rawFindings.length >= 2) {
   phase('Synthesis')
   log(`Synthesis mandatory: ${rawFindings.length} researcher agents dispatched (enforced in code).`)
-  const synthesis = await agent(
+  const synthesis = await wfAgent(
     `You are research-synthesizer. Merge the findings below into a coherent synthesis for project "${PROJECT}".
 
 SCOPE (questions to answer):
@@ -267,7 +275,7 @@ Merge findings into a coherent synthesis. Resolve contradictions (note how you r
 
 // --- Step 5: Report (MANDATORY: DISPATCHES.json floor) ---------------------
 phase('Report')
-const report = await agent(
+const report = await wfAgent(
   `You are report-generator. Write the final research report for project "${PROJECT}".
 
 SCOPE:
@@ -295,7 +303,7 @@ if (!report || !report.report_path) {
 
 // --- Step 6: Quality gate ---------------------------------------------------
 phase('Quality')
-const quality = await agent(
+const quality = await wfAgent(
   `You are the quality gate for the process-research procedure. Verify the report EMPIRICALLY.
 
 1. Use the Read tool to open ${report.report_path}. Set report_file_exists from whether the read succeeded.

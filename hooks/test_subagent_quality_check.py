@@ -373,5 +373,105 @@ class PassEventEmissionTests(unittest.TestCase):
             self.assertIn("result=PASS", qlog.read_text(encoding="utf-8"))
 
 
+class WorkflowIdentityTests(unittest.TestCase):
+    """O9 increment 2 (2026-09-01): workflow-identity plumbing. The dispatch
+    site writes 'WORKFLOW-ID: <name>' as the first prompt line; the hook's
+    _workflow_identity() recovers (workflow, workflow_run) from the transcript
+    head + path, fail-open, workflow subagents only."""
+
+    def _make_transcript(self, base: Path, first_line_content) -> Path:
+        run_dir = base / "subagents" / "workflows" / "wf_test-001"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        t = run_dir / "agent-abc123.jsonl"
+        rec = {"type": "user",
+               "message": {"role": "user", "content": first_line_content}}
+        t.write_text(json.dumps(rec) + "\n", encoding="utf-8")
+        return t
+
+    def test_marker_extracted_from_transcript_head(self):
+        with tempfile.TemporaryDirectory() as td:
+            t = self._make_transcript(
+                Path(td), "WORKFLOW-ID: process-qa\n\nYou are the scope node.")
+            self.assertEqual(sqc._workflow_identity(str(t)),
+                             ("process-qa", "wf_test-001"))
+
+    def test_run_extracted_when_marker_absent(self):
+        with tempfile.TemporaryDirectory() as td:
+            t = self._make_transcript(Path(td), "You are the scope node.")
+            self.assertEqual(sqc._workflow_identity(str(t)),
+                             (None, "wf_test-001"))
+
+    def test_fail_open_missing_empty_and_corrupt_transcript(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td) / "subagents" / "workflows" / "wf_test-001"
+            base.mkdir(parents=True)
+            missing = base / "does-not-exist.jsonl"
+            name, run = sqc._workflow_identity(str(missing))
+            self.assertIsNone(name)
+            self.assertEqual(run, "wf_test-001")
+            empty = base / "empty.jsonl"
+            empty.write_text("", encoding="utf-8")
+            self.assertEqual(sqc._workflow_identity(str(empty))[0], None)
+            corrupt = base / "corrupt.jsonl"
+            corrupt.write_text("{not json at all\n\x00\x01", encoding="utf-8")
+            self.assertEqual(sqc._workflow_identity(str(corrupt))[0], None)
+        self.assertEqual(sqc._workflow_identity(None), (None, None))
+        self.assertEqual(sqc._workflow_identity(""), (None, None))
+
+    def test_no_identity_fields_for_non_workflow_agent_type(self):
+        with tempfile.TemporaryDirectory() as td:
+            t = self._make_transcript(
+                Path(td), "WORKFLOW-ID: process-qa\n\nPrompt.")
+            rc, out = _run({
+                "agent_type": "general-purpose",
+                "agent_id": "gp-1",
+                "last_assistant_message": "Found 3 files matching the pattern.",
+                "agent_transcript_path": str(t),
+                "transcript_path": "/tmp/session-fixture.jsonl",
+            }, Path(td))
+            entry = json.loads((Path(td) / "governance-log.jsonl")
+                               .read_text(encoding="utf-8").strip())
+            self.assertEqual(entry["event"], "pass")
+            self.assertNotIn("workflow", entry)
+            self.assertNotIn("workflow_run", entry)
+
+    def test_pass_record_carries_workflow_identity(self):
+        with tempfile.TemporaryDirectory() as td:
+            t = self._make_transcript(
+                Path(td), "WORKFLOW-ID: process-qa\n\nPrompt.")
+            rc, out = _run({
+                "agent_type": "workflow-subagent",
+                "agent_id": "wf-agent-1",
+                "last_assistant_message": "Found 3 files matching the pattern.",
+                "agent_transcript_path": str(t),
+                "transcript_path": "/tmp/session-fixture.jsonl",
+            }, Path(td))
+            self.assertEqual(out, "")  # PASS path stays silent
+            entry = json.loads((Path(td) / "governance-log.jsonl")
+                               .read_text(encoding="utf-8").strip())
+            self.assertEqual(entry["event"], "pass")
+            self.assertEqual(entry["agent_type"], "workflow-subagent")
+            self.assertEqual(entry["workflow"], "process-qa")
+            self.assertEqual(entry["workflow_run"], "wf_test-001")
+
+    def test_marker_miss_emits_null_not_omitted(self):
+        """A workflow subagent whose prompt lacks the marker (pre-plumbing
+        cache, stale script) emits workflow: null, visible, never omitted."""
+        with tempfile.TemporaryDirectory() as td:
+            t = self._make_transcript(Path(td), "No marker here.")
+            rc, out = _run({
+                "agent_type": "workflow-subagent",
+                "agent_id": "wf-agent-2",
+                "last_assistant_message": "Found 3 files matching the pattern.",
+                "agent_transcript_path": str(t),
+                "transcript_path": "/tmp/session-fixture.jsonl",
+            }, Path(td))
+            entry = json.loads((Path(td) / "governance-log.jsonl")
+                               .read_text(encoding="utf-8").strip())
+            self.assertIn("workflow", entry)
+            self.assertIsNone(entry["workflow"])
+            self.assertEqual(entry["workflow_run"], "wf_test-001")
+
+
 if __name__ == "__main__":
     unittest.main()

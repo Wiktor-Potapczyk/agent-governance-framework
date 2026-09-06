@@ -18,6 +18,14 @@ export const meta = {
   ],
 }
 
+// O9 increment 2 (2026-09-01): workflow-identity marker. Every subagent
+// prompt begins with 'WORKFLOW-ID: <name>' as its literal first line so
+// the SubagentStop observer (subagent-quality-check.py) can attribute the
+// completion to this workflow in governance-log.jsonl. Inert metadata
+// only: no other prompt text changes. All dispatch sites below call
+// wfAgent; zero bare agent( call sites may remain outside this line.
+const wfAgent = (prompt, opts) => agent('WORKFLOW-ID: process-planning\n\n' + prompt, opts)  // literal: runner strips export const meta, no runtime binding (crash 2026-09-01 wf_31f32926-f97)
+
 // ---------------------------------------------------------------------------
 // Typed schemas: judgment nodes return DATA, not prose (corpus Reframe 2).
 // ---------------------------------------------------------------------------
@@ -166,7 +174,7 @@ function researchGate(scope) {
 
 // --- Step 1: Define Scope + classify the typed judgment flags ----------------
 phase('Scope')
-const scope = await agent(
+const scope = await wfAgent(
   `You are the scope+classify node of the process-planning procedure for project "${PROJECT}".
 
 GOAL: ${GOAL}
@@ -209,7 +217,7 @@ phase('Design')
 const pathMatch = (scope.scope_block || '').match(/Output path:\s*(\S+\.md)/)
 const PLAN_PATH = pathMatch ? pathMatch[1] : 'Projects/' + PROJECT + '/work/plan-undated.md'
 async function design(feedback) {
-  return agent(
+  return wfAgent(
     `You are implementation-plan producing the sequenced plan for project "${PROJECT}".
 
 ${scope.scope_block}
@@ -280,13 +288,13 @@ let reviewFailed = false
 while (true) {
   phase('Review')
   const reviewers = [
-    () => agent(reviewPrompt('architect-reviewer', 'Assess feasibility, completeness, SOLID, over-engineering, missing edge cases, and whether every step has an acceptance criterion.'),
+    () => wfAgent(reviewPrompt('architect-reviewer', 'Assess feasibility, completeness, SOLID, over-engineering, missing edge cases, and whether every step has an acceptance criterion.'),
       { schema: REVIEW_SCHEMA, label: `review:architect`, phase: 'Review', agentType: 'architect-reviewer' }),
-    () => agent(reviewPrompt('adversarial-reviewer', 'Challenge the plan\'s assumptions. Try to find where it fails: unstated dependencies, optimistic sequencing, an irreversible step with no rollback, a constraint silently violated.'),
+    () => wfAgent(reviewPrompt('adversarial-reviewer', 'Challenge the plan\'s assumptions. Try to find where it fails: unstated dependencies, optimistic sequencing, an irreversible step with no rollback, a constraint silently violated.'),
       { schema: REVIEW_SCHEMA, label: `review:adversarial`, phase: 'Review', agentType: 'adversarial-reviewer' }),
   ]
   if (scope.llm_prompts) {
-    reviewers.push(() => agent(reviewPrompt('prompt-engineer', 'Review only the LLM-prompt / agent-design aspects of the plan: prompt clarity, output contracts, failure handling, eval strategy.'),
+    reviewers.push(() => wfAgent(reviewPrompt('prompt-engineer', 'Review only the LLM-prompt / agent-design aspects of the plan: prompt clarity, output contracts, failure handling, eval strategy.'),
       { schema: REVIEW_SCHEMA, label: `review:prompt-engineer`, phase: 'Review', agentType: 'prompt-engineer' }))
   }
   const rawVerdicts = await parallel(reviewers)
@@ -346,7 +354,7 @@ if (reviewFailed) {
 
 // --- Step 6: Quality gate: EXECUTION EVIDENCE, not REPORT presence -----------
 phase('Quality')
-const quality = await agent(
+const quality = await wfAgent(
   `You are the quality gate for the process-planning procedure. Verify the plan EMPIRICALLY: do not trust the summary.
 
 1. Use the Read tool to open ${plan.plan_path}. Set plan_file_exists from whether the read succeeded.

@@ -29,17 +29,43 @@ except Exception:  # pragma: no cover
 
 
 def _emit_dispatch(session_id, agent_type, must_dispatch, exempted, warn, outcome):
-    """Fire event 5 agent_dispatched. Silent on any error."""
+    """Fire event 5 agent_dispatched. Silent on any error.
+
+    O13 (2026-09-01): the classifier MUST DISPATCH list routinely names
+    AGENTS (architect-reviewer, adversarial-reviewer), which this emitter
+    used to write wholesale into skill_context, the cross-field mislabel
+    behind most unmatched skill-side join items in the same-day evidence.
+    Partition: entries that are registry agent names (local + plugin, via
+    load_registry_agents) go to the NEW agent_context field; the remainder
+    stays in skill_context. Agent membership wins when a name is in both
+    sets. Fail-open: any partition error falls back to the old unpartitioned
+    shape, a dispatch must never break because logging broke. Historical
+    sink lines are never rewritten; the record-shape change is
+    owner-acknowledged (O13 ratification ask 3, 2026-09-01).
+    """
     if emit_event is None:
         return
     try:
+        items = list(must_dispatch or [])
+        skill_ctx = items
+        agent_ctx = []
+        try:
+            registry_agents = load_registry_agents()
+            if registry_agents:
+                agent_ctx = [n for n in items
+                             if isinstance(n, str) and n.lower() in registry_agents]
+                skill_ctx = [n for n in items if n not in agent_ctx]
+        except Exception:
+            skill_ctx = items
+            agent_ctx = []
         emit_event(
             event="agent_dispatched",
             hook="agent-dispatch-check",
             session=session_id,
             extra={
                 "agent_type": agent_type,
-                "skill_context": must_dispatch or [],
+                "skill_context": skill_ctx,
+                "agent_context": agent_ctx,
                 "exempted_via_registry": bool(exempted),
                 "warn_downgrade": bool(warn),
                 "outcome": outcome,  # one of: allow, always_allowed, allow_exemption, warn, warn_research_direct, no_classification

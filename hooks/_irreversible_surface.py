@@ -545,8 +545,28 @@ def curl_external_write(command):
 # host-scoped carve-out rather than a loosened pattern. The call is still LOGGED
 # to governance-log.jsonl as a `warn`, so the audit trail keeps every write.
 # ---------------------------------------------------------------------------
+#
+# WIKTOR RULING 2026-08-20: the same failure mode, third time, this time on an
+# issue-tracker ticket after he had already read and approved the exact ticket
+# body: "you're posting those all the time, stop slacking and do what I asked
+# you for". Filing a ticket on the team's own board is routine, additive and
+# editable, and the `!`-prefix round trip moved no decision to a human, since
+# the payload he was asked to paste was the one he had just signed off. So the
+# issue-tracker host joins the allowlist on the same reasoning as the dev n8n
+# instance.
+#
+# Known widening, stated rather than hidden: the carve-out is HOST-scoped, and a
+# shared issue-tracker tenant commonly serves a wiki/docs product too. Adding the
+# host warns writes to both, which reach a wider audience than a ticket does.
+# Both are versioned and recoverable, so this stays inside the ruling's logic,
+# but it is a real increase in surface and not a ticket-only change. Narrowing it
+# to a single API path would need a path-aware predicate; the host-set is this
+# mechanism's designed extension point, and per
+# finding_narrowing_gate1_deny_pattern_can_open_floor_hole, editing the matching
+# logic is the riskier of the two moves.
 CURL_WARN_HOSTS = frozenset({
     "n8n.internal.example.com",
+    "example-corp.atlassian.net",
 })
 
 # Path-scoped warn carve-out, added 2026-08-25.
@@ -556,13 +576,45 @@ CURL_WARN_HOSTS = frozenset({
 # repository) and `PATCH /repos/{o}/{r}` (can flip a private repo PUBLIC, which
 # for an operator under an NDA is the worst outcome available). Host-scoping the
 # way the issue tracker was host-scoped would move BOTH of those to warn to buy
-# one PR edit. So the carve-out names the paths that are additive and undoable.
+# one PR edit. So the carve-out names the paths that are additive and undoable
+# instead.
 #
 # Pull-request METADATA only: base branch, title, body, state. Explicitly NOT
 # `/merge`, which lands code and is the irreversible half of a PR.
+#
+# WIKTOR RULING 2026-09-04: the same failure mode again, on a PR review comment he
+# had already read and approved, in his words: "do it yourself. i'm not going to
+# be a stupid forwarded" and then "remove that fucking gate or make it possible to
+# overrule it when I directly ask you to fucking do it". Posting and editing a
+# review comment is additive and editable in place, and the `!`-prefix round trip
+# moved no decision to a human when the body pasted is the one he had just signed
+# off. So issue and PR comment endpoints join the path list.
+#
+# Note on why this is not an "override token": a marker the agent types into its
+# own command is self-authorization, which is exactly what the floor exists to
+# prevent. Widening the carve-out is the honest implementation of "overrulable",
+# because it is a deliberate, reviewable edit to the surface rather than a phrase
+# the agent can emit at will.
+#
+# Scope: comment CREATE and EDIT only. Comment DELETE is not matched (the patterns
+# are shared by the predicate for any method, so a DELETE to the same URL would
+# also warn; that is a known and accepted consequence of a path-scoped rather than
+# method-scoped carve-out, and a deleted comment is recoverable only from the
+# author's own copy). Still NOT matched: repo-level PATCH/DELETE, `/merge`,
+# releases, or anything outside `/issues/.../comments`.
 CURL_WARN_URL_PATTERNS = (
     re.compile(
         r"^https?://api\.github\.com/repos/[^/\s]+/[^/\s]+/pulls/\d+/?(?:\?|$)",
+        re.IGNORECASE,
+    ),
+    # POST a new comment on an issue or PR: /repos/{o}/{r}/issues/{n}/comments
+    re.compile(
+        r"^https?://api\.github\.com/repos/[^/\s]+/[^/\s]+/issues/\d+/comments/?(?:\?|$)",
+        re.IGNORECASE,
+    ),
+    # PATCH an existing comment: /repos/{o}/{r}/issues/comments/{comment_id}
+    re.compile(
+        r"^https?://api\.github\.com/repos/[^/\s]+/[^/\s]+/issues/comments/\d+/?(?:\?|$)",
         re.IGNORECASE,
     ),
 )

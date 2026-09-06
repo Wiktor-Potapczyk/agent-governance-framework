@@ -19,6 +19,14 @@ export const meta = {
   ],
 }
 
+// O9 increment 2 (2026-09-01): workflow-identity marker. Every subagent
+// prompt begins with 'WORKFLOW-ID: <name>' as its literal first line so
+// the SubagentStop observer (subagent-quality-check.py) can attribute the
+// completion to this workflow in governance-log.jsonl. Inert metadata
+// only: no other prompt text changes. All dispatch sites below call
+// wfAgent; zero bare agent( call sites may remain outside this line.
+const wfAgent = (prompt, opts) => agent('WORKFLOW-ID: process-build\n\n' + prompt, opts)  // literal: runner strips export const meta, no runtime binding (crash 2026-09-01 wf_31f32926-f97)
+
 // ---------------------------------------------------------------------------
 // Typed schemas: judgment nodes return DATA, not prose (corpus Reframe 2).
 // ---------------------------------------------------------------------------
@@ -149,7 +157,7 @@ if (PROJECT === 'UNKNOWN' || !SPEC) {
 
 // --- Step 1: Define Scope + classify typed flags ----------------------------
 phase('Scope')
-const scope = await agent(
+const scope = await wfAgent(
   `You are the scope+classify node of the process-build procedure for project "${PROJECT}".
 
 SPEC / WHAT TO BUILD: ${SPEC}
@@ -197,7 +205,7 @@ const ARTIFACT_PATH = scope.output_path || (pathMatch ? pathMatch[0] : 'Projects
 // --- Step 2: Plan (implementation-plan) -------------------------------------
 phase('Plan')
 async function plan(feedback) {
-  return agent(
+  return wfAgent(
     `You are implementation-plan producing the sequenced implementation plan for project "${PROJECT}".
 
 ${scope.scope_block}
@@ -227,7 +235,7 @@ if (!implementationPlan || !implementationPlan.plan_path) {
 // The quality/verify step below also catches missing artifacts, but a pre-build
 // check here avoids spawning blueprint-mode against a plan built on ghost files
 // (reference_implementation_plan_fabricates_read_output.md).
-const planVerify = await agent(
+const planVerify = await wfAgent(
   `You are a pre-build sanity check. Read the implementation plan at ${implementationPlan.plan_path}. For any source files, scripts, or artifacts the plan references as EXISTING inputs, verify they exist on disk using Glob or Read. List any referenced files that do NOT exist. If none are missing, say so explicitly.
 
 Return a JSON object: { "missing_inputs": ["path1", ...], "all_inputs_verified": boolean }`,
@@ -242,7 +250,7 @@ if (planVerify && planVerify.missing_inputs && planVerify.missing_inputs.length 
 // --- Step 3: Build (blueprint-mode) -----------------------------------------
 phase('Build')
 async function build(feedback) {
-  return agent(
+  return wfAgent(
     `You are blueprint-mode implementing the build for project "${PROJECT}".
 
 IMPLEMENTATION PLAN (at ${implementationPlan.plan_path}): Read this file: do not assume its contents.
@@ -316,13 +324,13 @@ let reviewFailed = false
 while (true) {
   phase('Review')
   const reviewers = [
-    () => agent(reviewPrompt('architect-reviewer', 'Assess correctness, completeness, SOLID principles, adherence to the plan, over-engineering, missing edge cases.'),
+    () => wfAgent(reviewPrompt('architect-reviewer', 'Assess correctness, completeness, SOLID principles, adherence to the plan, over-engineering, missing edge cases.'),
       { schema: REVIEW_SCHEMA, label: 'review:architect', phase: 'Review', agentType: 'architect-reviewer' }),
-    () => agent(reviewPrompt('adversarial-reviewer', 'Challenge the build\'s assumptions. Try to find where it fails: unstated dependencies, optimistic code paths, an irreversible action with no rollback, a constraint silently violated, a security gap.'),
+    () => wfAgent(reviewPrompt('adversarial-reviewer', 'Challenge the build\'s assumptions. Try to find where it fails: unstated dependencies, optimistic code paths, an irreversible action with no rollback, a constraint silently violated, a security gap.'),
       { schema: REVIEW_SCHEMA, label: 'review:adversarial', phase: 'Review', agentType: 'adversarial-reviewer' }),
   ]
   if (scope.llm_prompts) {
-    reviewers.push(() => agent(reviewPrompt('prompt-engineer', 'Review only the LLM-prompt / agent-design aspects: prompt clarity, output contracts, failure handling, eval strategy.'),
+    reviewers.push(() => wfAgent(reviewPrompt('prompt-engineer', 'Review only the LLM-prompt / agent-design aspects: prompt clarity, output contracts, failure handling, eval strategy.'),
       { schema: REVIEW_SCHEMA, label: 'review:prompt-engineer', phase: 'Review', agentType: 'prompt-engineer' }))
   }
   const rawVerdicts = await parallel(reviewers)
@@ -383,7 +391,7 @@ if (reviewFailed) {
 // ---------------------------------------------------------------------------
 // --- Step 6: Quality gate: EXECUTION EVIDENCE, not REPORT presence ---------
 phase('Quality')
-const quality = await agent(
+const quality = await wfAgent(
   `You are the quality gate for the process-build procedure. Verify the artifact EMPIRICALLY: do not trust the build summary.
 
 1. Use the Read tool to open ${buildResult.artifact_path}. Set artifact_file_exists from whether the read succeeded.

@@ -62,6 +62,65 @@ def _final_turn_used_tool(agent_transcript_path):
         return False
 
 
+# O9 increment 2 (2026-09-01): workflow-identity plumbing. The dispatch site
+# (.claude/workflows/*.js, wfAgent wrapper) writes 'WORKFLOW-ID: <meta.name>'
+# as the literal first line of every agent() prompt; that prompt is the FIRST
+# record of the subagent's own transcript (verified on live run dirs), so a
+# bounded head read recovers the identity, the symmetric operation to the
+# tail read above. The run id is the path component after
+# subagents/workflows/. Fails OPEN: identity is telemetry, never a gating
+# input, so any failure returns (None, None) and the pass/block decision is
+# untouched. A marker miss on a real workflow subagent is emitted as JSON
+# null rather than omitted, so it stays visible in the record.
+_WORKFLOW_HEAD_BYTES = 65536
+_WORKFLOW_MARKER_RE = re.compile(r"\AWORKFLOW-ID:[ \t]*([A-Za-z0-9._-]+)")
+
+
+def _workflow_identity(agent_transcript_path):
+    """(workflow_name_or_None, workflow_run_or_None) from a workflow subagent's
+    own transcript path. Fail-open on every error path."""
+    try:
+        name = None
+        run = None
+        if not agent_transcript_path:
+            return (None, None)
+        norm = str(agent_transcript_path).replace(chr(92), "/")
+        m = re.search(r"/subagents/workflows/([^/]+)/", norm)
+        if m:
+            run = m.group(1)
+        if os.path.exists(agent_transcript_path):
+            with open(agent_transcript_path, "r", encoding="utf-8", errors="replace") as fh:
+                head = fh.read(_WORKFLOW_HEAD_BYTES)
+            for raw in head.splitlines():
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    entry = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if entry.get("type") != "user":
+                    continue
+                content = entry.get("message", {}).get("content")
+                text = None
+                if isinstance(content, str):
+                    text = content
+                elif isinstance(content, list):
+                    for b in content:
+                        if isinstance(b, dict) and b.get("type") == "text":
+                            text = b.get("text")
+                            break
+                if isinstance(text, str):
+                    mm = _WORKFLOW_MARKER_RE.match(text)
+                    if mm:
+                        name = mm.group(1)
+                # only the FIRST user record is the dispatch prompt
+                break
+        return (name, run)
+    except Exception:
+        return (None, None)
+
+
 def main():
     try:
         raw = sys.stdin.read()
@@ -106,6 +165,14 @@ def main():
     from _governance_logger import session_from
     session_id = session_from(payload) or "unknown"
 
+    # O9 increment 2 (2026-09-01): workflow identity for the two governance
+    # emits below. Only workflow subagents pay the head read; every other
+    # agent_type skips it entirely and its records carry no new fields.
+    workflow_name = None
+    workflow_run = None
+    if agent_type == "workflow-subagent":
+        workflow_name, workflow_run = _workflow_identity(payload.get("agent_transcript_path"))
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "subagent-quality.log")
 
@@ -125,18 +192,23 @@ def main():
         # 2026-05-10: added violation_excerpt + reason for actionable diagnostics
         try:
             from _event_emit import emit_event
+            _extra = {
+                "agent_type": agent_type,
+                "agent_id": agent_id,
+                "message_len": message_len,
+                "check_failed": check_failed,
+                "violation_excerpt": violation_excerpt,
+                "block_reason": reason,
+            }
+            # O9 increment 2: identity fields for workflow subagents only.
+            if agent_type == "workflow-subagent":
+                _extra["workflow"] = workflow_name
+                _extra["workflow_run"] = workflow_run
             emit_event(
                 event="block",
                 hook="subagent-quality-check",
                 session=session_id,
-                extra={
-                    "agent_type": agent_type,
-                    "agent_id": agent_id,
-                    "message_len": message_len,
-                    "check_failed": check_failed,
-                    "violation_excerpt": violation_excerpt,
-                    "block_reason": reason,
-                },
+                extra=_extra,
             )
         except Exception:
             pass
@@ -164,15 +236,20 @@ def main():
     # §Q4d). Fail-silent: telemetry must never break the SubagentStop flow.
     try:
         from _event_emit import emit_event
+        _extra = {
+            "agent_type": agent_type,
+            "agent_id": agent_id,
+            "message_len": message_len,
+        }
+        # O9 increment 2: identity fields for workflow subagents only.
+        if agent_type == "workflow-subagent":
+            _extra["workflow"] = workflow_name
+            _extra["workflow_run"] = workflow_run
         emit_event(
             event="pass",
             hook="subagent-quality-check",
             session=session_id,
-            extra={
-                "agent_type": agent_type,
-                "agent_id": agent_id,
-                "message_len": message_len,
-            },
+            extra=_extra,
         )
     except Exception:
         pass
