@@ -1,0 +1,47 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(C:\\Users\\WiktorPotapczyk\\.claude\\fixture-tools\\**)",
+      "mcp__alpha__query_things"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:\\Program Files\\Python314\\python.exe\" \"C:\\Users\\WiktorPotapczyk\\Desktop\\Vault\\.claude\\hooks\\fx-guard.py\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/fx-start.sh\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo o17-fixture-portable-check"
+          },
+          {
+            "type": "command",
+            "command": "powershell -NonInteractive -ExecutionPolicy Bypass -File \"D:\\LocalFixtureTools\\fx-extra-stop.ps1\""
+          }
+        ]
+      }
+    ]
+  }
+}

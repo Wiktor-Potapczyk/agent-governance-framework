@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "artifacts": [
+    {"class": "lint-reports", "path": "Resources/Observability/lint-sweeps/*.md", "owner": "R-2 lint sweep", "purpose": "weekly structural health record", "retention": "last 4 plus 1 per month"},
+    {"class": "work-backups", "path": "Projects/*/work/backups/*", "owner": "researchers", "purpose": "scratch and superseded research", "retention": "30 days"},
+    {"class": "review-build-records", "path": "Projects/*/work/*review*.md, Projects/*/work/*build-record*.md", "owner": "project owner", "purpose": "review and build history", "retention": "archive at track close"},
+    {"class": "experience-daily", "path": "Resources/Observability/experience/*.json", "owner": "self-heal exporter", "purpose": "improver input", "retention": "14 days active, then MOVED (never deleted) to experience/archive/<YYYY-MM>/, plus a monthly rollup line"},
+    {"class": "trust-ledger", "path": ".claude/hooks/_state/trust-contract-ledger.jsonl", "owner": "trust contract", "purpose": "weekly PASS/FAIL streak record", "retention": "last 52 rows"},
+    {"class": "watchdog-issue", "path": "GitHub issue #1, label vault-watchdog", "owner": "outcome watchdog", "purpose": "current alert state", "retention": "one upserted issue, body history bounded to 30 rows"},
+    {"class": "self-heal-promotion-state", "path": ".claude/hooks/_state/self-heal-promotion-state.json", "owner": "self-heal accept script", "purpose": "per-class merge-eligibility streak", "retention": "current state only"},
+    {"class": "self-heal-open-prs", "path": "GitHub PRs, branch prefix self-heal/", "owner": "self-heal accept script", "purpose": "propose-only or streak-pending rounds", "retention": "one open PR per target class maximum, by construction (3.2, 3.5); closed PRs are the only permanent history, never deleted (GitHub does not support PR deletion), accepted as unbounded closed-list growth per the note below"}
+  ]
+}

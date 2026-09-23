@@ -1,0 +1,24 @@
+{
+  "env": {
+    "WORKFLOW_TOKEN": "FIXTURE-SECRET-VALUE-BBB222"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Read(//c/Users/FIXTUR~1/AppData/Local/Temp/scratchpad/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/Users/FixtureUser/Desktop/FixtureVault/.claude/hooks/a.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

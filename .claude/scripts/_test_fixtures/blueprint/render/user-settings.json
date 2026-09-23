@@ -1,0 +1,10 @@
+{
+  "env": {
+    "GH_TOKEN": "FIXTURE-SECRET-VALUE-CCC333"
+  },
+  "enabledPlugins": [
+    "plugin-one",
+    "plugin-two"
+  ],
+  "model": "sonnet"
+}

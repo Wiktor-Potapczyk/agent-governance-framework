@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "qmd": {
+      "command": "node",
+      "args": [
+        "{{npm:bs2}}\\node_modules\\@tobilu\\qmd\\dist\\cli\\qmd.js",
+        "mcp",
+        "--dir",
+        "{{vault:bs2}}\\Resources\\KB"
+      ],
+      "env": {
+        "XDG_CACHE_HOME": "{{home:bs2}}\\.cache",
+        "QMD_CONFIG_DIR": "{{home:bs2}}\\.config\\qmd"
+      }
+    },
+    "memory": {
+      "command": "node",
+      "args": [
+        "{{npm:bs2}}\\node_modules\\@modelcontextprotocol\\server-memory\\dist\\index.js"
+      ],
+      "env": {
+        "MEMORY_FILE_PATH": "{{vault:bs2}}\\.claude\\mcp-memory-graph.json"
+      }
+    },
+    "codegraph": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "{{npm:bs2}}\\codegraph.cmd",
+        "serve",
+        "--mcp"
+      ]
+    }
+  }
+}

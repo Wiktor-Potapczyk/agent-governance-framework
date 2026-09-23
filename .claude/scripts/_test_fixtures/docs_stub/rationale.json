@@ -1,0 +1,65 @@
+{
+  "generated_at": "2026-09-04T00:00:00Z",
+  "generator_version": "fixture-1",
+  "source_asset_inventory": ".claude/scripts/_test_fixtures/docs_stub/inventory.json",
+  "source_asset_inventory_generated_at": "2026-09-04T00:00:00Z",
+  "row_count": 7,
+  "rows": [
+    {
+      "name": "alpha-agent",
+      "kind": "agent",
+      "source_path": ".claude/agents/alpha-agent.md",
+      "rationale": "Use this agent to test the docs stub generator.",
+      "extraction_status": "EXTRACTED",
+      "extraction_locus": "frontmatter"
+    },
+    {
+      "name": "gamma-server",
+      "kind": "mcp-server",
+      "source_path": ".mcp.json",
+      "rationale": "Serves the fixture graph over MCP.",
+      "extraction_status": "EXTRACTED",
+      "extraction_locus": "meta"
+    },
+    {
+      "name": "settings.json:PostToolUse[0.0]",
+      "kind": "settings-registration",
+      "source_path": ".claude/settings.json",
+      "rationale": "Runs the fixture check after every Write.",
+      "extraction_status": "EXTRACTED",
+      "extraction_locus": "claude-md"
+    },
+    {
+      "name": "toolkit-code-review",
+      "kind": "skill",
+      "source_path": "C:/somewhere/toolkit-code-review",
+      "rationale": "Reviews toolkit changes before a PR.",
+      "extraction_status": "EXTRACTED",
+      "extraction_locus": "frontmatter"
+    },
+    {
+      "name": "omega-log.jsonl",
+      "kind": "telemetry-sink",
+      "source_path": ".claude/hooks/omega-log.jsonl",
+      "rationale": "",
+      "extraction_status": "NO_STATED_WHY",
+      "extraction_locus": null
+    },
+    {
+      "name": "epsilon-flow",
+      "kind": "workflow",
+      "source_path": ".claude/workflows/epsilon-flow.md",
+      "rationale": "Drives the fixture build end to end.",
+      "extraction_status": "EXTRACTED",
+      "extraction_locus": "docstring"
+    },
+    {
+      "name": "mcp:zeta",
+      "kind": "settings-registration",
+      "source_path": ".mcp.json",
+      "rationale": "Declares the zeta server for fixture runs.",
+      "extraction_status": "EXTRACTED",
+      "extraction_locus": "claude-md"
+    }
+  ]
+}

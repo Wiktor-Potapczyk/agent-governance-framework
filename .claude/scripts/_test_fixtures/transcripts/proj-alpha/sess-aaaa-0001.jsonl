@@ -1,0 +1,11 @@
+{"type": "user", "uuid": "a-u1", "timestamp": "2026-08-01T10:00:00Z", "sessionId": "sess-aaaa-0001", "cwd": "C:/fixture", "message": {"role": "user", "content": "Please investigate the quokka indexing pipeline"}}
+{"type": "assistant", "uuid": "a-a1", "timestamp": "2026-08-01T10:00:05Z", "sessionId": "sess-aaaa-0001", "message": {"role": "assistant", "content": [{"type": "text", "text": "The quokka pipeline has three stages and a wombat cache."}, {"type": "thinking", "thinking": "draft reasoning secretthink not for the index"}]}}
+{"type": "user", "uuid": "a-u2", "timestamp": "2026-08-01T10:00:10Z", "sessionId": "sess-aaaa-0001", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "tu1", "content": "toolresultsecret raw file body"}, {"type": "text", "text": "Check the special characters: \"quoted\" AND star* NEAR (colon:value) NOT"}]}}
+{"type": "attachment", "uuid": "a-at1", "sessionId": "sess-aaaa-0001", "message": {"role": "user", "content": [{"type": "text", "text": "attachsecret body"}]}}
+{"type": "system", "uuid": "a-sy1", "sessionId": "sess-aaaa-0001", "content": "systemsecret hook output"}
+{"type": "file-history-snapshot", "uuid": "a-fh1", "snapshot": "snapsecret body"}
+{"type": "custom-title", "uuid": "a-ct1", "title": "titlesecret body"}
+{"type": "agent-name", "uuid": "a-an1", "name": "namesecret body"}
+{"type": "started", "uuid": "a-st1", "note": "startedsecret body"}
+{"type": "permission-mode", "uuid": "a-pm1", "mode": "permsecret body"}
+{"type": "assistant", "uuid": "a-a2", "timestamp": "2026-08-01T10:01:00Z", "sessionId": "sess-aaaa-0001", "message": {"role": "assistant", "content": [{"type": "text", "text": "Unicode probe star ★ nihon 日本 end quokka"}]}}

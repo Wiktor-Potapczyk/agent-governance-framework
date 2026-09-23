@@ -1,0 +1,92 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/bash-safety-guard.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/mcp-irreversible-guard.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Edit(.claude/docs/harness/**)",
+      "Write(.claude/docs/harness/**)",
+      "Edit(.claude/harness-self-model.md)",
+      "Write(.claude/harness-self-model.md)",
+      "Edit(.claude/scripts/staleness-manifest.json)",
+      "Write(.claude/scripts/staleness-manifest.json)",
+      "Edit(Resources/KB/cmdb-vault-setup.md)",
+      "Write(Resources/KB/cmdb-vault-setup.md)",
+      "Edit(.claude/scripts/test_*.py)",
+      "Write(.claude/scripts/test_*.py)",
+      "Edit(.claude/hooks/test_*.py)",
+      "Write(.claude/hooks/test_*.py)",
+      "Edit(.claude/scripts/*.py)",
+      "Write(.claude/scripts/*.py)",
+      "Edit(.claude/hooks/_*_logic.py)",
+      "Write(.claude/hooks/_*_logic.py)",
+      "Edit(.claude/skills/*/SKILL.md)",
+      "Write(.claude/skills/*/SKILL.md)",
+      "Edit(.claude/registry.json)",
+      "Write(.claude/registry.json)",
+      "Edit(.claude/hooks/_known_dispatch_names.json)",
+      "Write(.claude/hooks/_known_dispatch_names.json)",
+      "Edit(Projects/*/work/**)",
+      "Write(Projects/*/work/**)",
+      "Edit(Projects/*/archive/**)",
+      "Write(Projects/*/archive/**)",
+      "Read(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Bash"
+    ],
+    "deny": [
+      "Edit(.claude/hooks/bash-safety-guard.py)",
+      "Write(.claude/hooks/bash-safety-guard.py)",
+      "Edit(.claude/hooks/_irreversible_surface.py)",
+      "Write(.claude/hooks/_irreversible_surface.py)",
+      "Edit(.claude/hooks/mcp-irreversible-guard.py)",
+      "Write(.claude/hooks/mcp-irreversible-guard.py)",
+      "Edit(CLAUDE.md)",
+      "Write(CLAUDE.md)",
+      "Edit(.claude/rules/**)",
+      "Write(.claude/rules/**)",
+      "Edit(.claude/settings.json)",
+      "Write(.claude/settings.json)",
+      "Edit(.claude/self-heal/ci-settings.json)",
+      "Write(.claude/self-heal/ci-settings.json)",
+      "Edit(.github/**)",
+      "Write(.github/**)",
+      "Edit(.claude/self-heal/**)",
+      "Write(.claude/self-heal/**)",
+      "Edit(.claude/scripts/trust_contract_verify.py)",
+      "Write(.claude/scripts/trust_contract_verify.py)",
+      "Edit(.claude/scripts/test_trust_contract_verify.py)",
+      "Write(.claude/scripts/test_trust_contract_verify.py)",
+      "Edit(.claude/user-claude-mirror/**)",
+      "Write(.claude/user-claude-mirror/**)",
+      "Edit(.claude/hooks/_state/self-heal-promotion-state.json)",
+      "Write(.claude/hooks/_state/self-heal-promotion-state.json)",
+      "Edit(.claude/scripts/*_logic.py)",
+      "Write(.claude/scripts/*_logic.py)",
+      "Edit(Projects/*/work/backups/**)",
+      "Write(Projects/*/work/backups/**)"
+    ]
+  },
+  "_comment_permissions": "Generated from targets.json: allowed_classes paths (allow), forbidden_paths (deny) and each class's excludes (deny; a bare-filename exclude is expanded against every path of its class, a slashed exclude is used as is). Phase (c) fix of 2026-09-18 plus the write-path build of the same day. Regenerate with the patch logic recorded in the build record if targets.json changes; test_self_heal_stage.py pins allow, deny and the excludes to targets.json."
+}

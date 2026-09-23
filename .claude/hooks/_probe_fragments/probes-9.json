@@ -1,0 +1,119 @@
+{
+ "batch_index": 9,
+ "probes": [
+  {
+   "hook": "prose-slop-check.py",
+   "event": "PostToolUse",
+   "path": ".claude/hooks/prose-slop-check.py",
+   "trip": {
+    "stdin": {
+     "tool_name": "Write",
+     "tool_input": {
+      "file_path": "Projects/Demo/work/2026-08-23-note.md",
+      "content": "We delve into the intricate design. Furthermore, a plethora of options is a testament to the realm."
+     }
+    },
+    "expect": "warn",
+    "why": "Path matches _TARGET_RE (Projects/<name>/work/*.md, the linted wiki-work layer) and the prose carries 6 distinct SLOP_WORDS (delve, intricate, furthermore, plethora, testament, realm), clearing both DISTINCT_THRESHOLD=2 and TOTAL_THRESHOLD=3. The file need not exist: the hook reads tool_input only.",
+    "observed": "exit 0, one stderr line: '[prose-slop-check WARN] 2026-08-23-note.md contains LLM-register slop in prose: `delve`, `furthermore`, `intricate`, `plethora`, `realm`, `testament`. ... (advisory - write was kept.)'. Nothing on stdout. Ran 2026-08-23 with GOVERNANCE_LOG_PATH and HOOK_ACTIVITY_LOG_PATH redirected to a temp dir; the temp act.jsonl gained one decision=warn record."
+   },
+   "pass": {
+    "stdin": {
+     "tool_name": "Write",
+     "tool_input": {
+      "file_path": "Projects/Demo/work/2026-08-23-note.md",
+      "content": "Rewrote the parser to read the file once and cache the result. Added a test for the empty-input case."
+     }
+    },
+    "must_not": [
+     "deny",
+     "block"
+    ],
+    "why": "Same in-scope path and same tool shape, but the prose contains zero SLOP_WORDS, so distinct=0 and total=0 stay under both thresholds. Isolates the word list rather than the path filter.",
+    "observed": "exit 0, no stdout, no stderr (silent). The temp act.jsonl gained one decision=allow record, confirming the hook ran and reached a verdict rather than exiting early."
+   }
+  },
+  {
+   "hook": "process-step-check.py",
+   "event": "Stop",
+   "path": ".claude/hooks/process-step-check.py",
+   "trip": {
+    "stdin": {
+     "transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/probe9-process-step-trip.jsonl"
+    },
+    "expect": "block",
+    "why": "The fixture transcript holds an assistant Skill tool_use with skill=process-qa followed by assistant text carrying neither a QA SCOPE block nor a QA REPORT with PASS/FAIL. That is two HARD failures (check_scope and check_qa_report), the documented blocking condition. The fixture has no TaskCreate and no /pm, so both earlier PM gates pass and the block is attributable to the QA checks alone.",
+    "observed": "exit 0 with stdout {\"decision\": \"block\", \"reason\": \"PROCESS STEP CHECK (process-qa): Missing QA SCOPE block | Missing QA REPORT with PASS/FAIL counts. Complete the missing step(s) before proceeding.\"}. NOTE for the runner: this hook blocks via the Stop-hook decision JSON, not via exit code 2, so classify on the stdout decision field rather than the exit status."
+   },
+   "pass": {
+    "stdin": {
+     "transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/probe9-process-step-pass.jsonl"
+    },
+    "must_not": [
+     "deny",
+     "block"
+    ],
+    "why": "Identical transcript shape and the same process-qa invocation, but the assistant text carries 'QA SCOPE' and a 'QA REPORT' with a PASS verdict, satisfying both HARD checks. The soft checks never block, and process-qa is exempt from the agent-dispatch soft check.",
+    "observed": "exit 0, no stdout, no stderr (silent)."
+   }
+  },
+  {
+   "hook": "user-prompt-state-inject.py",
+   "event": "UserPromptSubmit",
+   "path": ".claude/hooks/user-prompt-state-inject.py",
+   "trip": {
+    "stdin": {
+     "prompt": "where does the governance work stand",
+     "session_id": "probe9"
+    },
+    "expect": "warn",
+    "why": "Main-session payload (no agent_id or agent_type), non-trivial prompt, no effort.level=low, so no skip rule applies; should_emit then fires on project-change, STATE.md mtime change, or more than 30 min since the last injection, and the hook injects the orientation block.",
+    "observed": "TWO RUNS, DIFFERENT RESULTS, both recorded. Run 1 (20:53): exit 0, stdout hookSpecificOutput.additionalContext beginning '[STATE REMINDER 20:53 - trigger: elapsed]\\nActive project: Agent-Governance-Research\\nStatus: active\\nLast action: ...' plus the top 5 open task lines - the injection fired. Run 2, a replay of this exact recorded stdin ~7 minutes later: exit 0, stdout with additionalContext EMPTY, because the live session had re-stamped the throttle file .claude/hooks/_state/last-state-inject.json at 20:55 and should_emit was inside its 30-minute window with an unchanged STATE.md and an unchanged active project. The fire is therefore throttle-dependent and NOT a pure function of stdin; it is deterministic only when the throttle file is absent (last_project '' != the discovered project fires the project-change branch) or when its last emit is older than 30 minutes. What this probe does prove on every run is that the hook executes, exits 0, and emits well-formed UserPromptSubmit JSON. The throttle file was backed up before each run and restored afterwards.",
+    "runner_discriminator": "additionalContext contains '[STATE REMINDER' ONLY when the throttle file .claude/hooks/_state/last-state-inject.json is absent or its last_emit_ts is older than 30 min. Do NOT assert on it unconditionally: a live vault will legitimately return empty context."
+   },
+   "pass": {
+    "stdin": {
+     "prompt": "where does the governance work stand",
+     "agent_id": "sub-1"
+    },
+    "must_not": [
+     "deny",
+     "block"
+    ],
+    "why": "Same prompt text, but agent_id marks it a subagent invocation, which the documented skip rule short-circuits to emit_empty before any project discovery or throttle write. Deterministic and side-effect free, so it isolates the skip rule rather than the throttle.",
+    "observed": "exit 0, stdout exactly {\"hookSpecificOutput\": {\"hookEventName\": \"UserPromptSubmit\", \"additionalContext\": \"\"}} - empty context, and the throttle state file was not written."
+   },
+   "limitation": "Partial control. The subagent-skip pass case is deterministic and stdin-controlled; the injection trip case is state-throttled and cannot be forced from stdin. A runner that only distinguishes printed-vs-silent cannot tell this hook's fire from its skip, since it prints JSON on every path."
+  }
+ ],
+ "waivers": [
+  {
+   "hook": "mcp-circuit-breaker.py",
+   "event": "PreToolUse",
+   "reason": "Not stdin-reachable, and separately disarmed in this environment. (a) The deny is a pure function of the on-disk state file .claude/hooks/_state/mcp-circuit-breaker.json (at least 3 failure timestamps for the server inside a 600s window, or an unexpired tripped_at). The event payload supplies only the server name via tool_name, so no stdin object can construct the trip; a stdin-only probe would read 'silent' against a clean state file and be scored a false defect. Unlike memory-nudge.py there is no env override for the state PATH. (b) Verified out-of-band by seeding the live state file with a fake server 'probesrv' (3 timestamps seconds old), running the registered hook, then removing only that key so the rest of live state was left untouched: with MCP_HEALTH_FAIL_OPEN cleared it emitted permissionDecision 'deny' with the full breaker reason, so the hook logic is intact; with the ambient environment as-is it stayed silent at exit 0. See defects_found: MCP_HEALTH_FAIL_OPEN=1 is set at Windows User scope, so every hook subprocess inherits it and the deny branch is unreachable in a live session."
+  },
+  {
+   "hook": "memory-nudge.py",
+   "event": "SessionStart",
+   "reason": "Not stdin-reachable. _handle_session_start reads nothing from the payload beyond hook_event_name; it fires only when the counter file (.claude/hooks/_state/memory-nudge.json, or MEMORY_NUDGE_STATE_PATH) satisfies turns_since_memory_write >= 10 AND turns minus turns_at_last_nudge >= 10. A stdin-only probe therefore reads whatever the live counter holds that minute, which is non-deterministic, and firing it against live state consumes the user's pending nudge by stamping turns_at_last_nudge. The live file stood at turns=12 / watermark=0 during this batch, meaning one real nudge was pending, so I deliberately did not fire it. Verified out-of-band with MEMORY_NUDGE_STATE_PATH pointed at a temp file: seeded {turns:12, watermark:0} produced the SessionStart additionalContext '[MEMORY PERSISTENCE] 12 main-session turns have closed...' at exit 0, and seeded {turns:3} was silent at exit 0. This becomes probeable if the probe schema gains an env or state-seed field."
+  }
+ ],
+ "defects_found": [
+  {
+   "hook": "mcp-circuit-breaker.py",
+   "detail": "The breaker cannot deny in this environment. MCP_HEALTH_FAIL_OPEN=1 is set as a Windows USER-scope environment variable ([Environment]::GetEnvironmentVariable('MCP_HEALTH_FAIL_OPEN','User') returns 1; Machine scope is empty), so every hook subprocess Claude Code spawns inherits it and _is_override_set() returns True on every evaluation. Proven by running the registered hook against a state file seeded with 3 failures seconds old: with the inherited environment it printed nothing and exited 0; with identical state and stdin under 'env -u MCP_HEALTH_FAIL_OPEN' it printed permissionDecision deny. The documented purpose of that variable is a per-call escape hatch (bypass the breaker for the next call), not a standing setting. This is the audit's own pattern: registered, green sibling tests (test_mcp_circuit_breaker.py sets and clears the variable inside the test process, so the suite never sees the ambient one), and zero enforcement. The fix is an environment change, not a code change, so it is reported and not applied."
+  },
+  {
+   "hook": "process-step-check.py",
+   "detail": "Not an enforcement defect, a classifier hazard for the merged suite: this hook blocks with stdout {\"decision\":\"block\"} at exit code 0. A runner that defines 'block' as exit code 2 (the taxonomy in the authoring brief) scores every trip of this hook as a mere 'warn', and would score a gutted version that printed any stray line as equally green. The suite must read the decision field for Stop-event hooks."
+  },
+  {
+   "hook": "suite-wide (probe schema)",
+   "detail": "Three of the five controls in this batch (mcp-circuit-breaker.py, memory-nudge.py, and the fire path of user-prompt-state-inject.py) gate on an on-disk state file rather than on the event payload, so a stdin-only probe cannot construct their trip and would score a working hook as silent. Two are waived here for exactly that reason. If the probe schema gained a per-probe 'env' map and a 'state_seed' (path plus JSON body written before the run and restored after), all three become genuinely probeable; memory-nudge.py already exposes MEMORY_NUDGE_STATE_PATH for this, mcp-circuit-breaker.py exposes no state-path override at all."
+  }
+ ],
+ "fixtures": {
+  "note": "The Stop probe needs a transcript on disk. Two fixtures were written next to this fragment and must persist for the merged suite to run: fixtures/probe9-process-step-trip.jsonl and fixtures/probe9-process-step-pass.jsonl.",
+  "dir": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures"
+ }
+}

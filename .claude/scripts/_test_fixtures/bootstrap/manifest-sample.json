@@ -1,0 +1,47 @@
+{
+  "buckets": {
+    ".claude/hooks": "core",
+    ".claude/scripts": "core",
+    ".claude/self-heal": "overlay",
+    "Resources/KB": "knowledge",
+    "Templates": "schema",
+    "Home.md": "schema",
+    "CLAUDE.md": "schema",
+    "Projects": "instance",
+    "Inbox": "instance",
+    "log.md": "instance",
+    "Archives": "archive"
+  },
+  "counts": {
+    "archive": 1,
+    "core": 2,
+    "instance": 3,
+    "knowledge": 1,
+    "overlay": 1,
+    "schema": 3,
+    "unclassified": 0
+  },
+  "generated_at": "2026-09-22",
+  "generator_version": "1.0.0",
+  "machine_local": [
+    {
+      "name": "hook wiring",
+      "provisioning_step": "fixture stub, not exercised by the bootstrap tests"
+    }
+  ],
+  "overrides": {},
+  "secrets": {
+    "filled_by": "blueprint_render",
+    "items": []
+  },
+  "sparse_patterns": [
+    "/.claude/hooks/",
+    "/.claude/scripts/",
+    "/.claude/self-heal/",
+    "/Resources/KB/",
+    "/Templates/",
+    "/Home.md",
+    "/CLAUDE.md",
+    "!/.claude/user-claude-mirror/memory/"
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "env": {
+    "O17_FIXTURE_WINDOW": "123456"
+  },
+  "enabledMcpjsonServers": [
+    "alpha",
+    "beta",
+    "delta",
+    "gamma"
+  ],
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/WIKTOR~1/**)",
+      "Bash(\"C:\\Program Files\\Python314\\python.exe\":*)",
+      "mcp__alpha__query_things",
+      "Bash(git status)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/fx-local-a.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/fx-local-a.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/fx-local-b.py\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo o17-fixture-local-portable"
+          }
+        ]
+      }
+    ]
+  }
+}

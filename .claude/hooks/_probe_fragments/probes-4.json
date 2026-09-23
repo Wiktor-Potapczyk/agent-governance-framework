@@ -1,0 +1,114 @@
+{
+ "batch_index": 4,
+ "probes": [
+  {
+   "hook": "hook-write-regression-gate.py",
+   "event": "PostToolUse",
+   "path": ".claude/hooks/hook-write-regression-gate.py",
+   "trip": {
+    "stdin": {
+     "tool_name": "Write",
+     "tool_input": {"file_path": ".claude/hooks/bias-guard.py"},
+     "session_id": "test-probe-b4"
+    },
+    "expect": "warn",
+    "why": "is_gated_hook_write() is true for a .py path under .claude/hooks/ that is not in _state/archive/aggregates/__pycache__, so the gate leaves the fast path and runs pytest; a non-zero pytest exit takes the SUITE RED branch (line 216) and emits the PostToolUse additionalContext warning. REQUIRES the hook's own documented isolation env (module docstring lines 25-28): HOOK_REGRESSION_GATE_TARGET_DIR=C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/.b4-redsuite (a one-test deliberately-failing fixture committed for this probe, in a dot-directory so `pytest .claude/hooks/` never recurses into it, verified 0 collection hits) and HOOK_REGRESSION_GATE_LOG_PATH=<temp>. WITHOUT that env the gate runs the live 900+ test suite, which is green, and the same stdin is externally silent: a harness that omits the env will score this control as dead when it is not.",
+    "observed": "exit 0, stdout {\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"[HOOK-WRITE REGRESSION GATE - SUITE RED] The edit to .claude/hooks/bias-guard.py landed with a FAILING regression suite (pytest exit 1). DO NOT report success. Root-cause and fix before proceeding. Suite tail: ... test_probe_red_marker ...\"}}; hook-activity record decision=warn detail='suite red (exit 1) after edit of bias-guard.py'."
+   },
+   "pass": {
+    "stdin": {
+     "tool_name": "Write",
+     "tool_input": {"file_path": "Inbox/probe-note.md"},
+     "session_id": "test-probe-b4"
+    },
+    "must_not": ["deny", "block"],
+    "why": "A non-.py path outside .claude/hooks/ fails is_gated_hook_write(), so main() returns at the fast path (line 189) with no pytest run at all. Same tool and same event shape as the trip; only the gated-ness of the path differs.",
+    "observed": "exit 0, stdout empty, stderr empty (silent, and instant, no pytest child spawned)."
+   }
+  },
+  {
+   "hook": "skill-routing-check.py",
+   "event": "PreToolUse",
+   "path": ".claude/hooks/skill-routing-check.py",
+   "trip": {
+    "stdin": {
+     "tool_name": "Skill",
+     "tool_input": {"skill": "process-build"},
+     "transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/probe4-skill-routing.jsonl",
+     "session_id": "test-probe-b4"
+    },
+    "expect": "deny",
+    "why": "process-build is in PROCESS_SKILLS, so routing is validated. The transcript fixture's last assistant text block asserts 'TASK TYPE: Research', and ROUTING['research'] is process-research, so the invoked skill does not match the expected skill and the hook emits permissionDecision deny (lines 207-220). The fixture contains no Workflow tool_use and no process-analysis Skill under a Compound classification, so neither the workflow reset nor the decomposition-handoff reset clears last_type.",
+    "observed": "exit 0, stdout {\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"SKILL ROUTING: TASK TYPE is 'research' which should invoke 'process-research', but 'process-build' was invoked instead. Use the correct process skill.\"}}; the deny event landed in the redirected GOVERNANCE_LOG_PATH temp file, since this hook emits via _event_emit which honours the env var."
+   },
+   "pass": {
+    "stdin": {
+     "tool_name": "Skill",
+     "tool_input": {"skill": "process-research"},
+     "transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/probe4-skill-routing.jsonl",
+     "session_id": "test-probe-b4"
+    },
+    "must_not": ["deny", "block"],
+    "why": "Identical transcript and event shape; the invoked skill now matches ROUTING['research'], which is the correct-routing branch. This is the discriminating pass case: it keeps the classification in play rather than dodging the check with a non-process skill.",
+    "observed": "exit 0, stdout empty, stderr empty."
+   }
+  },
+  {
+   "hook": "dispatch-compliance-check.py",
+   "event": "Stop",
+   "path": ".claude/hooks/dispatch-compliance-check.py",
+   "trip": {
+    "stdin": {
+     "transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/probe4-dispatch-trip.jsonl",
+     "session_id": "test-probe-b4-dispatch"
+    },
+    "expect": "block",
+    "why": "The transcript fixture carries one assistant text block with 'TASK TYPE: Research' and 'MUST DISPATCH: process-research, pm-orchestrator' (both in KNOWN_DISPATCH_NAMES) and no Skill/Agent/Workflow tool_use anywhere, so found_contract is true and compute_missing returns both declared names. TAXONOMY NOTE: a Stop hook signals a block through the stdout JSON field {\"decision\":\"block\"}, not through exit code 2, so an exit-code-2 assertion would misgrade this control as merely 'warn'.",
+    "observed": "exit 0, stdout {\"decision\": \"block\", \"reason\": \"DISPATCH COMPLIANCE: MUST DISPATCH declared [process-research, pm-orchestrator] but missing: [process-research, pm-orchestrator]. Invoke them before completing.\"}. Side effect checked and confirmed: the matching block record was appended to the LIVE .claude/hooks/governance-log.jsonl despite GOVERNANCE_LOG_PATH being set (live file grew 35023940 to 35024289 bytes). See defects_found."
+   },
+   "pass": {
+    "stdin": {
+     "transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/probe4-dispatch-pass.jsonl",
+     "session_id": "test-probe-b4-dispatch"
+    },
+    "must_not": ["deny", "block"],
+    "why": "Same classification block, followed by a later assistant entry containing tool_use Skill(process-research) and tool_use Agent(pm-orchestrator). Both declared names are then in the dispatched set, compute_missing returns empty, and the hook takes the pass branch (log only, no stdout). Order matters: the tool_use blocks must follow the classification, because scan_assistant_text_block resets `dispatched` on every new classification block.",
+    "observed": "exit 0, stdout empty, stderr empty; a 'pass' record with declared_count=2 matched_count=2 was appended to the live governance log (same isolation gap as the trip)."
+   }
+  },
+  {
+   "hook": "bias-guard.py",
+   "event": "SubagentStart",
+   "path": ".claude/hooks/bias-guard.py",
+   "trip": {
+    "stdin": {"agent_type": "adversarial-reviewer", "session_id": "test-probe-b4"},
+    "expect": "warn",
+    "why": "adversarial-reviewer is in the EVALUATORS list (lines 35-43), so the hook injects the BLIND ANALYSIS RULE notice as SubagentStart additionalContext. This hook is an injector, not a blocker: its only enforcement surface is that stdout payload, so 'the notice is present' is the whole control.",
+    "observed": "exit 0, stdout {\"hookSpecificOutput\":{\"hookEventName\":\"SubagentStart\",\"additionalContext\":\"BLIND ANALYSIS RULE: You are an evaluator agent. Evaluate ONLY what you are given against the stated criteria...\"}}; hook-activity record decision=inject detail=adversarial-reviewer."
+   },
+   "pass": {
+    "stdin": {"agent_type": "general-purpose", "session_id": "test-probe-b4"},
+    "must_not": ["deny", "block"],
+    "why": "general-purpose is not an evaluator, so the else branch prints the empty object and injects nothing. Confirms the guard is selective rather than firing on every subagent.",
+    "observed": "exit 0, stdout exactly '{}' (empty JSON object, no additionalContext); hook-activity record decision=skip detail=general-purpose. Grader note: '{}' is stdout output, so a naive 'printed anything equals warn' rule would misread this benign case. Assert on absence of additionalContext, not on empty stdout."
+   }
+  }
+ ],
+ "waivers": [
+  {
+   "hook": "pre-compact.py",
+   "event": "PreCompact",
+   "reason": "Not a gate: it has no deny, block, warn, or non-zero-exit path to trip. It is a state-writer that unconditionally rebuilds ~/.claude/pre-compact-recovery.md from every Projects/*/STATE.md and task_plan.md plus a transcript tail, then rewrites ~/.claude/last-checkpoint. Its one stdout block was deliberately REMOVED 2026-05-10 (source comment lines 196-202: PreCompact rejects hookSpecificOutput.additionalContext), so by construction every input produces the same silent success. Verified rather than assumed: ran it with a fixture transcript and USERPROFILE redirected to a temp home, giving exit 0, stdout empty, stderr empty, and a 1,988,302-byte recovery file written to the redirected home. What COULD be probed here is snapshot CONTENT (does the recovery file contain the active project's STATE.md), which is an output-quality assertion, not a trip case, and does not fit this schema. The one internal failure mode it does distinguish, a _project_discovery import failure that empties the entire snapshot and logs decision=degraded, cannot be induced from stdin or env without editing files, which this task forbids."
+  }
+ ],
+ "defects_found": [
+  {
+   "hook": "dispatch-compliance-check.py",
+   "detail": "NOT a failure-to-trip: it tripped correctly. Test-isolation defect. main() builds its own log path as os.path.join(_HOOK_DIR, 'governance-log.jsonl') and passes it to stamp_and_append (lines 222, 251, 276, 299, 319), bypassing _event_emit._log_path() and therefore ignoring GOVERNANCE_LOG_PATH. Measured: with GOVERNANCE_LOG_PATH set to a temp file, the block record still landed in the live .claude/hooks/governance-log.jsonl (35023940 to 35024289 bytes) while the temp file received only skill-routing-check's deny, which does route through _event_emit. Consequence for this suite: every future run of this control appends synthetic block and pass records to the live governance log, which is the exact pollution .claude/hooks/conftest.py was written to stop (it redirects the two shared helpers; this writer is not one of them) and which the weekly governance-mine sweep reads. Mitigation used here, not a fix: the probe session_id 'test-probe-b4-dispatch' matches _event_emit.is_test_session(), so downstream aggregators classify the records as synthetic. A real fix would route those five writes through emit_event or honour the env var, deliberately NOT applied per the no-modification rule."
+  },
+  {
+   "hook": "hook-write-regression-gate.py",
+   "detail": "NOT a failure-to-trip: it tripped correctly under its documented isolation env. Probeability caveat the harness must carry. This control's trip is invisible unless HOOK_REGRESSION_GATE_TARGET_DIR points at a red suite. Run with only the two standard log-redirect env vars, the identical trip stdin makes the gate execute the live 900+ test hooks suite; while that suite is green the hook exits 0 with empty stdout, so the control reads as silent and dead. A suite that replays stdin alone will therefore record a false negative on exactly the hook whose job is to catch regressions."
+  }
+ ]
+}

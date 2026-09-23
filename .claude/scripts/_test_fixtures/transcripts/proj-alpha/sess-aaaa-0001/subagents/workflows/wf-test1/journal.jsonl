@@ -1,0 +1,2 @@
+{"type": "started", "key": "agent-test2", "agentId": "agent-test2"}
+{"type": "result", "key": "agent-test2", "agentId": "agent-test2", "result": "journalsecret bookkeeping"}

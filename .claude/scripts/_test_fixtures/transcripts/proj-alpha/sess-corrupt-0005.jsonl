@@ -1,0 +1,4 @@
+{"type": "user", "uuid": "c-u1", "timestamp": "2026-08-05T09:00:00Z", "sessionId": "sess-corrupt-0005", "message": {"role": "user", "content": "The osprey file starts clean"}}
+{"type":"assistant","uuid":"c-a1","timestamp":"2026-08-05T09:00:05Z","sessionId":"sess-corrupt-0005","message":{"role":"assistant","content":[{"type":"text","text":"mid ÿþ corrupted osprey"}]}}
+{"type": "user", "uuid": "c-u2", "timestamp": "2026-08-05T09:00:10Z", "sessionId": "sess-corrupt-0005", "message": {"role": "user", "content": "The osprey tail is intact tailmarker"}}
+{"type":"assistant","uuid":"c-a2","timestamp":"2026-08-05T09:00:15Z","sessionId":"sess-corrupt-0005","message":{"role":"assistant","content":[{"type":"text","text":"surrogate \ud83c half osprey"}]}}

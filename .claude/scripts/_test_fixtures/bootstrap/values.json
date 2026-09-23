@@ -1,0 +1,9 @@
+{
+  "home": "/c/fixture/home",
+  "home_bs": "C:\\fixture\\home",
+  "npm": "/c/fixture/home/AppData/Roaming/npm",
+  "project_key": "C--fixture-target",
+  "python": "C:/Program Files/Python314/python.exe",
+  "vault": "/c/fixture/target",
+  "vault_bs": "C:\\fixture\\target"
+}

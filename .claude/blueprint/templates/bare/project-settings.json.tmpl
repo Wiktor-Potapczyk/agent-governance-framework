@@ -1,0 +1,97 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash({{home:bs2}}\\.claude\\plugins\\cache\\claude-plugins-official\\ralph-loop\\**)",
+      "Edit({{vault:bs4}}\\\\.obsidian\\\\**\\) + Write\\({{vault:bs4}}\\\\.obsidian\\\\**)"
+    ],
+    "deny": [],
+    "defaultMode": "bypassPermissions"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/qmd-recall-nudge.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/restore-compact.sh\""
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/post-compact.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Agent|WebFetch|WebSearch|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/checkpoint.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/ps1\" -ExecutionPolicy Bypass -NonInteractive -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/ralph-stop-hook.ps1\""
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/bias-guard.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

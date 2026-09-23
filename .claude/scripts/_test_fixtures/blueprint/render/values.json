@@ -1,0 +1,8 @@
+{
+  "project_key": "C--Users-FixtureUser-Desktop-FixtureVault",
+  "vault": "C:/Users/FixtureUser/Desktop/FixtureVault",
+  "home": "C:/Users/FixtureUser",
+  "npm": "C:/Users/FixtureUser/AppData/Roaming/npm",
+  "python": "C:/Program Files/Python314/python.exe",
+  "mcp-svc-a-n8n-api-url": "https://fixture-n8n.example.com/webhook-path"
+}

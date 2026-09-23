@@ -1,0 +1,32 @@
+{
+  "generated_at": "2026-09-15T09:04:49Z",
+  "generator_version": "1.0",
+  "notes": "O2 increment 1 fresh-machine prerequisite manifest (2026-08-30-harness-spec-objectives.md). Generated from compiled sources only: asset-inventory.json mcp-server rows, .mcp.json, settings.local.json/settings.json hook registrations, and probed interpreter facts. Increment 2 (the exhaustive runtime-import walk across every hook and script) is a named follow-up, out of this manifest's scope, per O2's close bar. No env-kind entries are populated this pass: determining real environment-variable prerequisites requires reading individual hook script bodies, which is increment-2 scope; the env_var_set probe type is implemented and tested for forward use.",
+  "entries": [
+    {
+      "id": "binary-git",
+      "kind": "binary",
+      "probe": {
+        "type": "executable",
+        "path": null,
+        "command": "git",
+        "version_flag": [
+          "--version"
+        ],
+        "version_regex": "git version (\\d+\\.\\d+\\.\\d+)",
+        "min_version": null
+      },
+      "source": "probed interpreter fact (task instruction); this vault is a git repository (CLAUDE.md Tool & Environment Quirks)"
+    },
+    {
+      "id": "file-qmd-cli",
+      "kind": "file",
+      "probe": {
+        "type": "file_exists",
+        "path": "{{npm:bs2}}\\node_modules\\@tobilu\\qmd\\dist\\cli\\qmd.js"
+      },
+      "source": ".mcp.json (qmd server args: absolute qmd.js path)",
+      "note": "Globally npm-installed package; a fresh machine needs 'npm install -g @tobilu/qmd' (or equivalent) before this path exists."
+    }
+  ]
+}

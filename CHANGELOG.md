@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-23
+
+- Repository regenerated from the vault blueprint's bare profile: the harness under `.claude/`, the bare vault skeleton beside it, generic MCP wiring only (memory, qmd, codegraph), scrubbed doctrine, 0 company-term hits over the whole tree. Older curated layout removed.
+
 ## v2026.09.06 (2026-09-06)
 
 - sync: refresh 24 diverged twins from the vault harness (curation pass; scrub and layout adaptations preserved)

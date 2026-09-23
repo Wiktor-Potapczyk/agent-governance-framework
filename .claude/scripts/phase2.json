@@ -1,0 +1,153 @@
+{
+  "results": {
+    "Resources/KB/moc-active.md": {
+      "queries": [
+        {
+          "kind": "dataview",
+          "count": 191,
+          "query_preview": "TABLE status, date, tags\nFROM \"Projects\" OR \"Notes\"\nWHERE status = \"active\"\nSORT date DESC"
+        }
+      ],
+      "total_count": 191,
+      "moc_date": "2026-04-21",
+      "prior": 258,
+      "prior_date": "2026-04-21"
+    },
+    "Resources/KB/moc-agent-governance.md": {
+      "queries": [
+        {
+          "kind": "dataview",
+          "count": 11,
+          "query_preview": "LIST\nFROM #agent-governance\nWHERE file.path != this.file.path\nSORT date DESC"
+        }
+      ],
+      "total_count": 11,
+      "moc_date": "2026-04-21",
+      "prior": 2,
+      "prior_date": "2026-04-21"
+    },
+    "Resources/KB/moc-cross-project.md": {
+      "queries": [
+        {
+          "kind": "dataview",
+          "count": 1167,
+          "query_preview": "TABLE file.outlinks, date\nFROM \"\"\nWHERE length(file.outlinks) > 0\nSORT date DESC"
+        }
+      ],
+      "total_count": 1167,
+      "moc_date": "2026-04-21",
+      "prior": 55,
+      "prior_date": "2026-04-21"
+    },
+    "Resources/KB/moc-decisions.md": {
+      "queries": [
+        {
+          "kind": "dataview",
+          "count": 1,
+          "query_preview": "LIST\nFROM #decision\nWHERE file.path != this.file.path\nSORT date DESC"
+        }
+      ],
+      "total_count": 1,
+      "moc_date": "2026-04-21",
+      "prior": 4,
+      "prior_date": "2026-04-21"
+    },
+    "Resources/KB/moc-life.md": {
+      "queries": [
+        {
+          "kind": "dataview",
+          "count": 0,
+          "query_preview": "LIST\nFROM \"Areas/Personal/life\" OR \"Areas/Personal/reflection\"\nSORT date DESC"
+        }
+      ],
+      "total_count": 0,
+      "moc_date": "2026-04-21",
+      "prior": 0,
+      "prior_date": "2026-04-21"
+    },
+    "Resources/KB/moc-n8n-patterns.md": {
+      "queries": [
+        {
+          "kind": "dataview",
+          "count": 10,
+          "query_preview": "LIST\nFROM #n8n-patterns OR #n8n\nWHERE file.path != this.file.path\nSORT date DESC"
+        }
+      ],
+      "total_count": 10,
+      "moc_date": "2026-04-21",
+      "prior": 5,
+      "prior_date": "2026-04-21"
+    },
+    "Resources/KB/moc-people.md": {
+      "queries": [
+        {
+          "kind": "dataview",
+          "count": 0,
+          "query_preview": "LIST\nFROM \"Areas/Personal/people\"\nSORT file.name ASC"
+        }
+      ],
+      "total_count": 0,
+      "moc_date": "2026-04-21",
+      "prior": 0,
+      "prior_date": "2026-04-21"
+    },
+    "Resources/KB/moc-research-findings.md": {
+      "queries": [
+        {
+          "kind": "dataview",
+          "count": 178,
+          "query_preview": "TABLE summary, date\nFROM #research\nWHERE file.path != this.file.path\nSORT date DESC"
+        },
+        {
+          "kind": "dataview",
+          "count": 86,
+          "query_preview": "TABLE summary, date\nFROM \"Archives/\"\nWHERE contains(file.tags, \"research\")\nSORT date DESC"
+        }
+      ],
+      "total_count": 264,
+      "moc_date": "2026-04-21",
+      "prior": 121,
+      "prior_date": "2026-04-21"
+    }
+  },
+  "flags_zero_with_prior": [],
+  "flags_stale_30day": [],
+  "flags_drift": [
+    {
+      "moc": "Resources/KB/moc-active.md",
+      "prior": 258,
+      "current": 191,
+      "diff": -67
+    },
+    {
+      "moc": "Resources/KB/moc-agent-governance.md",
+      "prior": 2,
+      "current": 11,
+      "diff": 9
+    },
+    {
+      "moc": "Resources/KB/moc-cross-project.md",
+      "prior": 55,
+      "current": 1167,
+      "diff": 1112
+    },
+    {
+      "moc": "Resources/KB/moc-decisions.md",
+      "prior": 4,
+      "current": 1,
+      "diff": -3
+    },
+    {
+      "moc": "Resources/KB/moc-n8n-patterns.md",
+      "prior": 5,
+      "current": 10,
+      "diff": 5
+    },
+    {
+      "moc": "Resources/KB/moc-research-findings.md",
+      "prior": 121,
+      "current": 264,
+      "diff": 143
+    }
+  ]
+}

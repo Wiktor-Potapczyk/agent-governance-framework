@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "svc-a": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "fixture-svc-a"],
+      "env": {
+        "MCP_MODE": "stdio",
+        "API_TOKEN": "FIXTURE-SECRET-VALUE-AAA111",
+        "N8N_API_URL": "https://fixture-n8n.example.com"
+      }
+    },
+    "svc-prefix": {
+      "type": "http",
+      "url": "https://fixture-n8n.example.com/mcp/1ce0f7a2-fixture-path"
+    },
+    "svc-tenant": {
+      "type": "http",
+      "url": "https://mcp.example.com/mcp?project_ref=fixturetenantref&features=docs"
+    }
+  }
+}

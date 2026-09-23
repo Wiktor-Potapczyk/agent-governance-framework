@@ -1,0 +1,5 @@
+collections:
+  agr-kb:
+    path: C:/Users/FixtureUser/Desktop/FixtureVault/Resources/KB
+  memory:
+    path: C:/Users/FixtureUser/.claude/projects/fixture/memory

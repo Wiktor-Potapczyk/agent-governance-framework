@@ -1,0 +1,146 @@
+{
+  "batch_index": 5,
+  "probes": [
+    {
+      "hook": "inbox-auto-ingest.py",
+      "event": "PostToolUse",
+      "path": ".claude/hooks/inbox-auto-ingest.py",
+      "trip": {
+        "stdin": {
+          "tool_name": "Write",
+          "tool_input": {
+            "file_path": "C:\\Users\\WiktorPotapczyk\\Desktop\\Vault\\Inbox\\probe-batch5.md",
+            "content": "x"
+          }
+        },
+        "expect": "warn",
+        "why": "is_ingest_trigger_path(): file_path resolves inside VAULT and the vault-relative path starts with the INGEST_PREFIXES entry 'Inbox/', and the basename is not in EXCLUDE_FILES, so main() logs the trigger and prints the process-ingest additionalContext (hook lines 27-33, 75-100).",
+        "observed": "rc=0, 495 bytes on stdout: {\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": \"[inbox-auto-ingest] New/edited file in Inbox/: Inbox/probe-batch5.md ... invoke `process-ingest` skill on this file ...\"}}. Nothing on stderr. Classified warn."
+      },
+      "pass": {
+        "stdin": {
+          "tool_name": "Write",
+          "tool_input": {
+            "file_path": "C:\\Users\\WiktorPotapczyk\\Desktop\\Vault\\Resources\\KB\\probe-batch5.md",
+            "content": "x"
+          }
+        },
+        "must_not": ["deny", "block"],
+        "why": "Same event shape, same vault, but the vault-relative path starts with 'Resources/KB/', which is not an ingest prefix, so is_ingest_trigger_path() is False and main() returns 0 before logging or printing. A wiki-layer write must never be nominated for ingest.",
+        "observed": "rc=0, 0 bytes stdout, 0 bytes stderr. Fully silent."
+      }
+    },
+    {
+      "hook": "agent-dispatch-check.py",
+      "event": "PreToolUse",
+      "path": ".claude/hooks/agent-dispatch-check.py",
+      "trip": {
+        "stdin": {
+          "tool_name": "Agent",
+          "tool_input": { "subagent_type": "content-marketer" },
+          "transcript_path": "C:\\Users\\WiktorPotapczyk\\.claude\\jobs\\67e82ff4\\tmp\\probe5-fixtures\\tr-dispatch.jsonl",
+          "session_id": "probe-batch5"
+        },
+        "expect": "warn",
+        "why": "Off-contract dispatch. The transcript fixture is one JSONL line {\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"TASK TYPE: Analysis\\nMUST DISPATCH: pm-orchestrator\"}]}}, so extract_dispatch_names yields ['pm-orchestrator']. 'content-marketer' is not in ALWAYS_ALLOWED, not in the declared list, not an alias of it, and no PROCESS_ROUTING_SKILLS entry is present to authorize specialist routing, so the hook takes the warn-downgrade branch (lines 390-429). NOTE: this hook has NO deny path at all; 'warn' is the maximum severity it can express, by the 2026-04-18 downgrade decision recorded in its own comments.",
+        "observed": "rc=0, 0 bytes stdout, 178 bytes stderr: \"AGENT DISPATCH (advisory): 'content-marketer' is not in MUST DISPATCH list [pm-orchestrator] and no process-* skill is present to authorize specialist routing. Logged for review.\" Classified warn. A governance-log record was written to the redirected GOVERNANCE_LOG_PATH, not the live sink."
+      },
+      "pass": {
+        "stdin": {
+          "tool_name": "Agent",
+          "tool_input": { "subagent_type": "pm-orchestrator" },
+          "transcript_path": "C:\\Users\\WiktorPotapczyk\\.claude\\jobs\\67e82ff4\\tmp\\probe5-fixtures\\tr-dispatch.jsonl",
+          "session_id": "probe-batch5"
+        },
+        "must_not": ["deny", "block"],
+        "why": "Identical transcript and event shape; only the dispatched agent changes. 'pm-orchestrator' IS the declared MUST DISPATCH name, so the hook takes the final allow path. Holding the transcript constant isolates the agent-name check as the sole variable.",
+        "observed": "rc=0, 0 bytes stdout, 0 bytes stderr. Fully silent (allow)."
+      }
+    },
+    {
+      "hook": "transition-gate-check.py",
+      "event": "PreToolUse",
+      "path": ".claude/hooks/transition-gate-check.py",
+      "trip": {
+        "stdin": {
+          "tool_name": "Write",
+          "tool_input": {
+            "file_path": "C:\\Users\\WiktorPotapczyk\\.claude\\jobs\\67e82ff4\\tmp\\probe5-fixtures\\sdlc-phase-probe.json",
+            "content": "{\"current_phase\": \"verify\", \"completed_gates\": {}}"
+          },
+          "session_id": "probe-batch5"
+        },
+        "expect": "deny",
+        "why": "SDLC phase-sentinel advance with no oracle evidence. _is_sentinel() matches ('sdlc-phase-' in path and .json), proposed_phase 'verify' is enforced (not in ADVISORY_PHASES), prior phase 'build' is also enforced, and completed_gates carries no {'build': {'evidence_type': 'external_oracle'}} entry, so check() returns the deny reason at lines 169-183. The sentinel path does not exist on disk, so the (f) FileNotFoundError bootstrap branch is taken and the evidence gate is still the deciding branch.",
+        "observed": "rc=0, 289 bytes stdout: {\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"sdlc-phase sentinel: cannot advance to 'verify' ... prior phase 'build' has no recorded external-oracle evidence. Run the build DoD oracle and record its evidence first.\"}}. Classified deny. Second trip case also run: {\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":<same sentinel>,\"old_string\":\"a\",\"new_string\":\"b\"}} -> rc=0, deny, 196 bytes ('Edit to sentinel is a violation; must Write the whole file'), confirming the Write-only restriction branch also fires."
+      },
+      "pass": {
+        "stdin": {
+          "tool_name": "Write",
+          "tool_input": {
+            "file_path": "C:\\Users\\WiktorPotapczyk\\.claude\\jobs\\67e82ff4\\tmp\\probe5-fixtures\\notes.md",
+            "content": "hello"
+          },
+          "session_id": "probe-batch5"
+        },
+        "must_not": ["deny", "block"],
+        "why": "Ordinary Write to a non-sentinel path. _is_sentinel() is False, so check() returns None at the (c) fast path. This is the dominant real-world case: the gate must be invisible to every write that is not a phase sentinel.",
+        "observed": "rc=0, 0 bytes stdout, 0 bytes stderr. Fully silent (allow)."
+      }
+    },
+    {
+      "hook": "em-dash-guard.py",
+      "event": "Stop",
+      "path": ".claude/hooks/em-dash-guard.py",
+      "trip": {
+        "stdin": {
+          "transcript_path": "C:\\Users\\WiktorPotapczyk\\.claude\\jobs\\67e82ff4\\tmp\\probe5-fixtures\\tr-emdash-trip.jsonl",
+          "session_id": "probe-batch5",
+          "stop_hook_active": false
+        },
+        "expect": "block",
+        "why": "The transcript fixture's last assistant message is the single text block \"The plan is ready \\u2014 ship it.\" The U+2014 em dash sits in bare prose, so strip_noise() (which only removes frontmatter, fenced blocks, inline code spans, and whole markdown table rows) leaves it in place and find_fancy_dashes() matches BLOCKED_DASHES. stop_hook_active is false so the loop-safety early return does not apply.",
+        "observed": "rc=2 (exit code 2 = block), 0 bytes stdout, 638 bytes stderr beginning \"[em-dash-guard BLOCK] Your response contains a dash character Wiktor never uses in writing: em dash (U+2014). Rewrite the whole response...\". Classified block."
+      },
+      "pass": {
+        "stdin": {
+          "transcript_path": "C:\\Users\\WiktorPotapczyk\\.claude\\jobs\\67e82ff4\\tmp\\probe5-fixtures\\tr-emdash-pass.jsonl",
+          "session_id": "probe-batch5",
+          "stop_hook_active": false
+        },
+        "must_not": ["deny", "block"],
+        "why": "Same shape; the last assistant text is \"The plan is ready, ship it. Self-hosted is fine.\" It contains a plain hyphen-minus U+002D in 'Self-hosted', which is explicitly ALLOWED, and no glyph from BLOCKED_DASHES. A guard that also blocked plain hyphens would make ordinary compound words unshippable.",
+        "observed": "rc=0, 0 bytes stdout, 0 bytes stderr. Fully silent (allow)."
+      }
+    },
+    {
+      "hook": "subagent-governance.py",
+      "event": "SubagentStart",
+      "path": ".claude/hooks/subagent-governance.py",
+      "trip": {
+        "stdin": {
+          "hook_event_name": "SubagentStart",
+          "agent_type": "general-purpose",
+          "agent_id": "probe-batch5",
+          "session_id": "probe-batch5"
+        },
+        "expect": "warn",
+        "why": "This hook is an unconditional context injector, not a gate: for ANY parseable non-empty JSON payload it appends an agent_type/agent_id line to subagent-governance.log and prints the AGENT GOVERNANCE additionalContext block. The only live condition is 'stdin parsed to JSON', so a well-formed SubagentStart payload is the genuine trigger. The probe proves the control is alive and actually emits its payload rather than being registered-but-inert.",
+        "observed": "rc=0, 530 bytes stdout: {\"hookSpecificOutput\": {\"hookEventName\": \"SubagentStart\", \"additionalContext\": \"AGENT GOVERNANCE: Use multiple perspectives when analyzing - do not settle on the first answer. Cite specific evidence ... Blind analysis rule: ...\"}}. Nothing on stderr. Classified warn."
+      },
+      "pass": {
+        "stdin": {
+          "hook_event_name": "SubagentStart",
+          "agent_type": "general-purpose",
+          "agent_id": "probe-batch5-benign",
+          "session_id": "probe-batch5"
+        },
+        "must_not": ["deny", "block"],
+        "why": "HONEST LIMITATION: this hook has no discriminating trigger, so no benign SubagentStart payload can make it go silent. The pass case therefore asserts only the property that IS falsifiable here, that it never denies and never blocks a subagent start. Verified against the code: the sole outputs are the additionalContext print and exit code 0; there is no permissionDecision path and no non-zero exit anywhere in the file.",
+        "observed": "rc=0, 530 bytes stdout carrying the same additionalContext block, 0 bytes stderr. No permissionDecision field, no exit 2. Behaves identically to the trip case, as the code predicts."
+      }
+    }
+  ],
+  "waivers": [],
+  "defects_found": []
+}

@@ -1,0 +1,14 @@
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -8,12 +8,4 @@
+ context line 8
+ context line 9
+-removed 10
+-removed 11
+-removed 12
+-removed 13
+-removed 14
+-removed 15
++pointer line
+ context line 16
+ context line 17

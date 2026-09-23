@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "max_diff_lines": 400,
+  "max_files_changed": 8,
+  "required_checks": ["pytest", "ruff", "trust-contract-live", "docs-chain"],
+  "conditional_checks": {"work-curation": ["wikilink-integrity"]},
+  "review_verdicts_required": {"architect-reviewer": "APPROVE", "adversarial-reviewer": "APPROVE"},
+  "forbidden_diff_signatures": [
+    {"id": "new-dependency", "description": "new entry in pyproject.toml/requirements.txt (new dependency)"},
+    {"id": "secret-shaped-string", "description": "secret-shaped string"},
+    {"id": "out-of-class-path", "description": "any path outside targets.json's assigned class globs"},
+    {"id": "forbidden-path-touch", "description": "any path inside targets.json's forbidden_paths"},
+    {"id": "rename-into-forbidden", "description": "a rename whose source OR destination is a forbidden path or falls outside the assigned class"},
+    {"id": "symlink-escape", "description": "a new or modified symlink entry inside an allowed-class glob resolving outside that class"},
+    {"id": "test-weakening", "description": "a decrease in def test_ count, or a new skip/xfail marker, on any touched test_*.py file"},
+    {"id": "protected-prose-byte-change", "description": "a byte-level change to a ## Why or ## How sub-section inside a PROSE:BEGIN/PROSE:END block whose OLD content was not byte-equal to that row's pristine UNFILLED marker (docs_stub_generate.py:65,332-351,479-481; an unparseable PROSE block falls back to the strict whole-block rule)"},
+    {"id": "suspicious-path", "description": "a changed path (including a rename's source/destination and a symlink's own path/resolved target), after NFKC normalization, contains a '..' segment, a backslash, a control character, leading/trailing whitespace in a segment, mixed scripts within a segment, or, under .claude/**, a non-printable-ASCII character; kept as a ninth entry rather than folded under forbidden-path-touch because it is a distinct mechanism (Unicode/traversal hygiene, checked before any glob decision) from literal membership in the forbidden_paths list"}
+  ],
+  "work_dir_file_count_rule": "the round must not leave Projects/*/work/ with more files than it found, unless the new file matches the PR body's own deliverable_path field",
+  "promotion": {
+    "generated-docs": {"promotable": true, "consecutive_green_required": 10},
+    "tests": {"promotable": true, "consecutive_green_required": 10},
+    "scripts": {"promotable": true, "consecutive_green_required": 10},
+    "registry": {"promotable": true, "consecutive_green_required": 10},
+    "work-curation": {"promotable": true, "consecutive_green_required": 10},
+    "hook-logic-with-tests": {"promotable": false},
+    "skill-prose": {"promotable": false}
+  },
+  "slow_regression_demotion_days": 7
+}

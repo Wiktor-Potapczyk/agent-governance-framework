@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "alpha": {
+      "command": "node",
+      "args": [
+        "alpha-server.js"
+      ],
+      "env": {
+        "ALPHA_API_KEY": "O17-DUMMY-CREDENTIAL-VALUE-1"
+      }
+    },
+    "beta": {
+      "type": "http",
+      "url": "https://beta.example.invalid/mcp",
+      "headers": {
+        "Authorization": "O17-DUMMY-CREDENTIAL-VALUE-2"
+      }
+    },
+    "gamma": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\WiktorPotapczyk\\fixture-tools\\gamma-server.js"
+      ]
+    },
+    "delta": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "delta-mcp",
+        "--endpoint",
+        "https://delta.example.invalid/api"
+      ]
+    }
+  }
+}

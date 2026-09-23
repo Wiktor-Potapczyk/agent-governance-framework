@@ -1,0 +1,67 @@
+{
+ "batch_index": 6,
+ "probes": [
+  {
+   "hook": "aggregate-write-guard.py",
+   "event": "PreToolUse",
+   "path": ".claude/hooks/aggregate-write-guard.py",
+   "trip": {
+    "stdin": {
+     "tool_name": "Write",
+     "tool_input": {
+      "file_path": "C:\\Users\\WiktorPotapczyk\\Desktop\\Vault\\.claude\\hooks\\governance-log.jsonl",
+      "content": "{\"probe\":1}\n"
+     },
+     "session_id": "probe-b6"
+    },
+    "expect": "deny",
+    "why": "Write targets one of the three exact protected paths (classify_target returns 'aggregate_log', matching the module default GOVERNANCE_LOG_PATH, derived as dirname(__file__)/governance-log.jsonl). The live file is ~35MB and non-empty, so the bootstrap allow-branch is skipped, and the proposed content does not have the current on-disk bytes as a prefix, so aggregate_log_is_append_shaped() is False and _emit_deny_jsonl fires. Note the protected surface is keyed on AGGREGATE_WRITE_GUARD_GOVLOG_PATH, a DIFFERENT env var from the GOVERNANCE_LOG_PATH telemetry redirect, so the standard probe-isolation env does not move the target: verified by running with GOVERNANCE_LOG_PATH pointed at a temp file and still getting the deny. PreToolUse, so nothing is written and the live log is untouched.",
+    "observed": "exit 0; stdout carried hookSpecificOutput.permissionDecision=\"deny\" with reason \"AGGREGATE WRITE GUARD: blocked write to 'governance-log.jsonl'. The proposed content is not the current on-disk content followed by new material only...\"; stderr empty. hook-activity record: decision=\"deny\", detail=\"jsonl:non-append:governance-log.jsonl\". FIRST ATTEMPT WAS A FALSE SILENT: piping this JSON through the shell's echo builtin collapsed the doubled backslashes, so json.loads failed and main() returned 0 with no output. The input was fixed (stdin fed from a file written by json.dumps), not the expectation."
+   },
+   "pass": {
+    "stdin": {
+     "tool_name": "Write",
+     "tool_input": {
+      "file_path": "C:\\Users\\WiktorPotapczyk\\AppData\\Local\\Temp\\probe6\\governance-log.jsonl",
+      "content": "{\"probe\":1}\n"
+     },
+     "session_id": "probe-b6"
+    },
+    "must_not": [
+     "deny",
+     "block"
+    ],
+    "why": "Same basename and the same non-append content, but a different directory. classify_target does an exact normalized-path match by design (the v2 scope decision that superseded v1's basename heuristic), so this is not a protected path and main() returns at the 'not protected: stay silent' branch. This is the sharper benign case: it proves the guard is scoped to the three real aggregates rather than firing on anything named governance-log.jsonl.",
+    "observed": "exit 0; stdout empty; stderr empty; no hook-activity record emitted (this hook logs only on a protected path)."
+   }
+  }
+ ],
+ "waivers": [
+  {
+   "hook": "mcp-circuit-breaker-record.py",
+   "event": "PostToolUse",
+   "reason": "No deny/block/warn path exists in the file: it is the PostToolUse recorder half of the circuit breaker and contains no print to stdout or stderr and no non-zero exit (its own docstring: 'Exit codes: 0 always'). The enforcement lives in the PreToolUse half, mcp-circuit-breaker.py, which is a different control. Its real observable is a state mutation, which the trip/pass vocabulary cannot express, so a probe expecting deny|block|warn would red-flag a healthy hook. VERIFIED OUT OF BAND rather than assumed: fed {tool_name: mcp__probeserver__thing, tool_response: {is_error: true, error: 'MCP error -32000: connection closed'}} and got exit 0, stdout and stderr empty, _state/mcp-circuit-breaker.json gaining probeserver.failures=['2026-08-23T18:52:54Z'], and a hook-activity row decision='failure' detail='probeserver n=1'. Benign twin (tool_response.content=[{text: 'ok, 3 results'}]) gave exit 0, silence, failures reset to [] with last_success_at set, decision='recovery'. So it does fire and it does discriminate. SECOND REASON IT IS NOT HERMETICALLY PROBEABLE: STATE_FILE is hardcoded to _state/mcp-circuit-breaker.json with no env override, so any run mutates live breaker state; this probe used a nonexistent server key and then restored the file from a byte-identical snapshot."
+  },
+  {
+   "hook": "git-credential-scope-check.py",
+   "event": "SessionStart",
+   "reason": "The trigger is not in the event. The hook reads stdin only to recover a session id for telemetry; its verdict comes entirely from machine state, namely `git config --global --get credential.usehttppath` plus a 24h cache at _state/git-credential-scope.json. No stdin payload can make it warn, and none can make it stay silent either, so both halves of a stdin-driven probe would be decoration. Neither the git config path nor the cache file has an env override the fragment schema could carry. VERIFIED OUT OF BAND that the warn path is real: with the cache file removed and GIT_CONFIG_GLOBAL pointed at an empty config, exit 0 with SessionStart additionalContext '[GIT CREDENTIAL SCOPE: WARNING] credential.usehttppath is NOT set to true...' and hook-activity decision='warn' detail='key-absent'; with usehttppath=false, the same 461-byte warning and detail='value=false'; with usehttppath=true, silent and decision='ok'. Live machine state at probe time was healthy (usehttppath=true), so on this machine today no input trips it. See defects_found for the cache-suppression result. The live cache file was snapshotted and restored byte-identically."
+  },
+  {
+   "hook": "governance-log.py",
+   "event": "Stop",
+   "reason": "Logging-only by construction: the file contains no print, no sys.exit(2), and no hookSpecificOutput, and its own docstring says 'Does NOT block; logging only.' Its trip is an appended turn_summary record, which the deny|block|warn expectation vocabulary cannot express. VERIFIED OUT OF BAND with a hand-written fake transcript: a Stop payload whose transcript holds an assistant text block with 'TASK TYPE: Build / DOMAIN: hooks / MUST DISPATCH: process-qa, pm' plus an Agent tool_use produced exit 0, empty stdout and stderr, and exactly one line in GOVERNANCE_LOG_PATH: event='turn_summary', type='Build', domain='hooks', must_dispatch='process-qa, pm', agents=['pm-orchestrator'], agent_count=1. The benign twin (a transcript with no classification line) produced exit 0, silence, and zero additional lines, via the `if not last_type: return` guard. So it records and it discriminates. Isolation was clean here: GOVERNANCE_LOG_PATH and HOOK_ACTIVITY_LOG_PATH both redirect, so no live sink was written."
+  },
+  {
+   "hook": "subagent-scope-check.py",
+   "event": "SubagentStart",
+   "reason": "This registration is the baseline-capture half only. The SubagentStart branch writes a `git status --porcelain` baseline into _state/subagent-scope-baselines.json, logs decision='pass', and returns 0 with no output. The single warn in this file (the '[SCOPE-CHECK] sub-agent ... modified N new file(s)' line on stderr) is unreachable from SubagentStart: it lives in the SubagentStop branch, which is a separate registration and a separate control (batch 8). VERIFIED OUT OF BAND: {hook_event_name: 'SubagentStart', agent_id: 'probe-agent-b6', agent_type: 'general-purpose'} gave exit 0, stdout and stderr empty, a baseline recorded with 4 porcelain entries, and hook-activity decision='pass' detail='baseline general-purpose'. Also probed the degenerate case: a payload with no hook_event_name falls through to the unknown-event no-op (exit 0, silent, decision='skip'), so this hook is entirely dependent on the platform supplying hook_event_name. STATE_FILE and LOG_FILE are hardcoded absolute paths with no env override, so the probe mutated live state; the baselines file was snapshotted and restored byte-identically."
+  }
+ ],
+ "defects_found": [
+  {
+   "hook": "git-credential-scope-check.py",
+   "detail": "A genuine trigger produced no warning, observed directly. Sequence, all three runs using the same SessionStart stdin: (1) ran against the healthy live machine, which wrote a fresh result='ok' into _state/git-credential-scope.json; (2) immediately re-ran with GIT_CONFIG_GLOBAL pointed at a config with credential.usehttppath absent, the exact condition the hook exists to catch, and got exit 0 with EMPTY stdout and hook-activity decision='cached-ok'; (3) deleted the cache file, re-ran the identical trigger, and got the full warning. So _cache_is_fresh_ok() short-circuits the live check for 24h after any healthy session start, and during that window the NDA-relevant misconfiguration (host-level work-account credential becoming the GCM fallback for every github.com push) is not reported at all. This is documented in the hook's own docstring as an intentional cache and the direction is deliberate (only a fresh 'ok' may skip work; a 'warn' or a missing file always re-runs), so it is design rather than a coding bug. It is recorded here because it is exactly the failure shape this suite hunts: registered, healthy, green, and for up to 24 hours at a stretch unable to fire on a real trigger. Worth a human ruling on whether a 24h blind window is the right price for one `git config` subprocess call per session, when the hook's whole purpose is to catch a config line going missing between sessions."
+  }
+ ]
+}

@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "generated_iso": "2026-09-08T00:00:00Z",
+  "claims": [
+    {
+      "id": "wiki-write-path-advisory",
+      "claim_kind": "tier",
+      "doctrine_file": "Projects/Vault-Maintenance/STATE.md",
+      "anchor": "No wiki-write-path hook blocks today",
+      "claimed": "advisory",
+      "authority_file": ".claude/rules/wiki-architecture.md",
+      "authority_kind": "rules_md",
+      "authority_anchor": "ruled advisory by Wiktor 2026-08-22",
+      "provenance": "Roadmap ROAD-9 seed entry 1 (2026-09-08-vault-trust-roadmap.md): the warn-only-gap [CORRECTED 2026-09-08] On Watch annotation; authority is wiki-architecture.md Wiki Layer Invariants layer 2."
+    },
+    {
+      "id": "wiki-citation-check-advisory",
+      "claim_kind": "tier",
+      "doctrine_file": "Projects/Vault-Maintenance/STATE.md",
+      "anchor": "keep wiki-citation-check.py advisory",
+      "claimed": "advisory",
+      "authority_file": ".claude/rules/wiki-architecture.md",
+      "authority_kind": "rules_md",
+      "authority_anchor": "ruled advisory by Wiktor 2026-08-22",
+      "provenance": "ROAD-1 candidate table line-110 row, verdict ACCURATE (2026-09-08-road-1-build.md); authority wiki-architecture.md layer 2."
+    },
+    {
+      "id": "h9-structure-check-advisory",
+      "claim_kind": "tier",
+      "doctrine_file": "Projects/Vault-Maintenance/STATE.md",
+      "anchor": "the hook is advisory, warn-only, never blocks",
+      "claimed": "advisory",
+      "authority_file": ".claude/hooks/vault-structure-check.py",
+      "authority_kind": "hook_source",
+      "provenance": "ROAD-1 candidate table line-145 row (STALE) and its annotation (2026-09-08-road-1-build.md); the hook self-declares ADVISORY v1 / Does NOT block the Write in its header."
+    },
+    {
+      "id": "routing-table-validation-wired",
+      "claim_kind": "registration",
+      "doctrine_file": "Projects/Vault-Maintenance/STATE.md",
+      "anchor": "routing-table-validation.py WIRED",
+      "claimed": "registered:PreToolUse",
+      "authority_file": ".claude/settings.local.json",
+      "authority_kind": "settings",
+      "provenance": "ROAD-1 candidate table line-90 row, verdict ACCURATE (2026-09-08-road-1-build.md): registered at settings.local.json:373 inside the PreToolUse section."
+    }
+  ]
+}

@@ -1,0 +1,162 @@
+{
+  "batch_index": 2,
+  "probes": [
+    {
+      "hook": "claude-md-provenance-check.py",
+      "event": "PostToolUse",
+      "path": ".claude/hooks/claude-md-provenance-check.py",
+      "trip": {
+        "stdin": {
+          "tool_name": "Edit",
+          "tool_input": {
+            "file_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/CLAUDE.md",
+            "old_string": "x",
+            "new_string": "## CRITICAL RULE: Never Skip The Gate\n\nYou must always run the gate before shipping.\n"
+          },
+          "session_id": "PROBE-B2-SYNTH"
+        },
+        "expect": "warn",
+        "why": "file_path is the exact vault-root CLAUDE.md (is_vault_root_claude_md). new_string matches two rule-shaped patterns (a heading line and the literal CRITICAL RULE) and matches none of the four provenance patterns (no [[wikilink]], no feedback_/finding_/decision_/reference_ memo name, no Projects/*/work/ path, no dated parenthetical). rule_shaped AND NOT has_provenance is the sole WARN branch. The hook is warn-only by design (docstring: SEVERITY: WARN only, stderr + exit 0, NEVER blocks), so warn is the maximum true trip, not a downgraded expectation.",
+        "observed": "exit 0. One line on stderr: '[claude-md-provenance-check WARN] behavioral-rule change without a one-line origin citation; add the originating decision or research file inline ... (advisory - edit was kept.)'. stdout empty. HOOK_ACTIVITY_LOG_PATH was honored: the warn record went to the isolated temp sink, not the live hook-activity.jsonl."
+      },
+      "pass": {
+        "stdin": {
+          "tool_name": "Edit",
+          "tool_input": {
+            "file_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/CLAUDE.md",
+            "old_string": "87 agents",
+            "new_string": "88 agents"
+          },
+          "session_id": "PROBE-B2-SYNTH"
+        },
+        "must_not": ["deny", "block", "warn"],
+        "why": "Same file, so this exercises content discrimination and not path scoping: a count-maintenance edit carries no heading, no CRITICAL RULE marker, and no bolded modal-verb rule line, so rule_shaped() is False and the hook takes the silent allow branch. This is the exact maintenance-edit case the docstring promises stays silent.",
+        "observed": "exit 0, stdout empty, stderr empty. Silent."
+      }
+    },
+    {
+      "hook": "vault-structure-check.py",
+      "event": "PostToolUse",
+      "path": ".claude/hooks/vault-structure-check.py",
+      "trip": {
+        "stdin": {
+          "tool_name": "Write",
+          "tool_input": {
+            "file_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/Clippings/DeusData-codebase-memory-mcp.md"
+          },
+          "tool_response": {},
+          "session_id": "PROBE-B2-SYNTH"
+        },
+        "expect": "warn",
+        "why": "tool_name is Write (the hook returns for anything else). The path is in scope: the vault-relative path starts with the INCLUDE_PREFIXES entry clippings/, ends in .md, is not an EXCLUDE_FILENAMES name, and matches no EXCLUDE_PREFIXES and no MOC pattern. The file exists on disk and violates three of check_structure's five checks: it has a frontmatter block but no date/tags/status fields, its only tag (hybrid-lsp) is not canonical, and it carries zero wikilinks. FIXTURE DEPENDENCY: this hook re-reads the named file from disk, so the probe is only valid while that Clippings file stays unedited. Clippings/ is raw-layer, which doctrine says is never LLM-edited, which is why it was chosen over a Projects/ file. v1 is ADVISORY by design (does NOT block the Write), so warn is the maximum true trip.",
+        "observed": "exit 0. stdout carried a PostToolUse hookSpecificOutput.additionalContext block: '[H-9 STRUCTURE CHECK - ADVISORY] Clippings/DeusData-codebase-memory-mcp.md / Violations detected on write:' followed by all three violations (missing frontmatter fields date, tags, status; no canonical tag, file tags ['hybrid-lsp']; no outgoing wiki-links). It also appended a VIOLATIONS line to .claude/hooks/logs/vault-structure.log; that sink path is hardcoded and is NOT redirectable by GOVERNANCE_LOG_PATH or HOOK_ACTIVITY_LOG_PATH."
+      },
+      "pass": {
+        "stdin": {
+          "tool_name": "Write",
+          "tool_input": {
+            "file_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/Resources/claude-code-infrastructure-reference.md"
+          },
+          "tool_response": {},
+          "session_id": "PROBE-B2-SYNTH"
+        },
+        "must_not": ["deny", "block", "warn"],
+        "why": "Also in scope (starts with resources/, .md, no exclusion matches), so this tests structural compliance rather than scope exclusion: the file carries complete frontmatter, at least one canonical tag, at least one outgoing wikilink, and at least one moc- link, so check_structure returns an empty violations list and emit_advisory returns without printing. Verified clean by running check_structure over every in-scope .md in the vault (343 clean, 401 violating) and taking a clean file that is referenced from CLAUDE.md and MEMORY.md, so it is unlikely to disappear.",
+        "observed": "exit 0, stdout empty, stderr empty. Silent."
+      }
+    },
+    {
+      "hook": "reviewer-scope-violation-check.py",
+      "event": "PreToolUse",
+      "path": ".claude/hooks/reviewer-scope-violation-check.py",
+      "trip": {
+        "stdin": {
+          "agent_type": "architect-reviewer",
+          "tool_name": "Edit",
+          "tool_input": {
+            "file_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/CLAUDE.md"
+          },
+          "transcript_path": "",
+          "session_id": "PROBE-B2-SYNTH"
+        },
+        "expect": "deny",
+        "why": "This is the hook's canonical block case and its own TP1 fixture scenario: agent_type is in REVIEWER_AGENTS, a file_path is present, the path does NOT match REVIEW_OUTPUT_RE (Rule A), and the file DOES exist on disk (so Rule C does not apply), which is exactly Step 4, print hookSpecificOutput.permissionDecision deny.",
+        "observed": "DEFECT, NO DENY. Invoked exactly as registered in settings.local.json (python.exe <hook>, no extra env): exit 0, stdin never parsed. stdout was the hook's own smoke-test report: 'Smoke tests: reviewer-scope-violation-check.py', four [PASS] lines, then 'Results: 4 passed, 0 failed out of 4 tests'. Cause: the __main__ block calls main() only when os.environ['HOOK_SMOKE_TEST'] == '1'; with that variable unset it runs the self-test harness instead. Re-running the identical stdin with HOOK_SMOKE_TEST=1 produced the correct {\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", ...}} at exit 0, which proves main() is sound and the production entrypoint is the break. See defects_found."
+      },
+      "pass": {
+        "stdin": {
+          "tool_name": "Edit",
+          "tool_input": {
+            "file_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/CLAUDE.md"
+          },
+          "transcript_path": "",
+          "session_id": "PROBE-B2-SYNTH"
+        },
+        "must_not": ["deny", "block"],
+        "why": "A main-session edit: agent_type is absent and transcript_path is empty, so the fallback lookup finds nothing, agent_type stays outside REVIEWER_AGENTS and the fast-path allow fires. Benign: the guard is about reviewer sub-agents editing what they review, not about ordinary edits.",
+        "observed": "exit 0, no deny. WARNING, this pass leg is vacuous in production: stdout was again the smoke-test report, not an evaluated allow, because the same __main__ guard means the payload is never read. With HOOK_SMOKE_TEST=1 the same stdin returned a genuine silent allow (empty stdout, exit 0). Until the entrypoint is fixed, this control's pass leg proves nothing about discrimination."
+      }
+    },
+    {
+      "hook": "classifier-field-check.py",
+      "event": "Stop",
+      "path": ".claude/hooks/classifier-field-check.py",
+      "trip": {
+        "stdin": {
+          "transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/b2-classifier-trip.jsonl",
+          "stop_hook_active": false,
+          "session_id": "PROBE-B2-SYNTH"
+        },
+        "expect": "block",
+        "why": "Fixture is one assistant text block reading 'IMPLIES: ... / TASK TYPE: Research / DOMAIN: governance'. TASK TYPE matches a valid non-Quick type so last_classifier_text is set, is_quick is False, and APPROACH, MISSED and MUST DISPATCH are all absent, which are the three mandatory non-Quick slots. missing is non-empty, so the hook prints the Stop-hook block JSON.",
+        "observed": "stdout: {\"decision\": \"block\", \"reason\": \"INCOMPLETE CLASSIFICATION: Missing fields: APPROACH, MISSED, MUST DISPATCH. All classifier fields are mandatory. Re-classify with all fields before proceeding.\"}. Exit code 0. Note this hook blocks via the Stop-hook JSON decision protocol, NOT via exit 2, so a classifier keyed only on exit codes would misread this enforcing gate as advisory."
+      },
+      "pass": {
+        "stdin": {
+          "transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/b2-classifier-pass.jsonl",
+          "stop_hook_active": false,
+          "session_id": "PROBE-B2-SYNTH"
+        },
+        "must_not": ["deny", "block"],
+        "why": "Same non-Quick TASK TYPE: Research, but the fixture fills every mandatory slot (IMPLIES, TASK TYPE, APPROACH, MISSED, MUST DISPATCH) and the MUST DISPATCH line contains a bare pm token, which satisfies the extra PM-enforcement branch. missing stays empty so no block is printed. This is the discriminating benign case: a complete classification of the same task type, not a Quick task dodging the non-Quick checks.",
+        "observed": "exit 0, stdout empty, stderr empty. Silent. The classification_emitted observability event went to the isolated GOVERNANCE_LOG_PATH sink, confirming env redirection works for this hook."
+      }
+    },
+    {
+      "hook": "verifier-gate-check.py",
+      "event": "Stop",
+      "path": ".claude/hooks/verifier-gate-check.py",
+      "trip": {
+        "stdin": {
+          "transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/b2-verifier-trip.jsonl",
+          "stop_hook_active": false,
+          "session_id": "PROBE-B2-SYNTH"
+        },
+        "expect": "block",
+        "why": "Fixture is two assistant tool_use entries: a Skill call with skill verification-gated-research (sets skill_invoked, without which the hook is dormant), then one Agent dispatch whose description (research worker) lacks the token verifier. So dispatches holds one worker and zero verifiers, valid_verifier stays False, and the block branch fires: the harness skill was invoked and its separate-verifier step was skipped.",
+        "observed": "stdout: {\"decision\": \"block\", \"reason\": \"VERIFIER GATE: the `verification-gated-research` skill was invoked but no VALID separate verifier agent was dispatched. ...\"}. Exit code 0 (Stop-hook JSON block protocol, same as classifier-field-check). Side effect: a block record was appended to the LIVE governance-log.jsonl despite GOVERNANCE_LOG_PATH being set. See defects_found."
+      },
+      "pass": {
+        "stdin": {
+          "transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/b2-verifier-pass.jsonl",
+          "stop_hook_active": false,
+          "session_id": "PROBE-B2-SYNTH"
+        },
+        "must_not": ["deny", "block"],
+        "why": "Same skill invocation and same worker, plus a third Agent dispatch that satisfies all three structural parts: its description contains verifier and its index is greater than last_worker_idx (part 1), its prompt is not byte-identical to the worker prompt (part 2), and its prompt carries a re-derivation contract, the keywords independently verify and re-derive (part 3). This is the compliant use of the harness, so the gate must stay silent.",
+        "observed": "exit 0, stdout empty, stderr empty. Silent, and a pass record with subagent_types ['general-purpose','general-purpose'] was written (again to the live log, per the same leak)."
+      }
+    }
+  ],
+  "waivers": [],
+  "defects_found": [
+    {
+      "hook": "reviewer-scope-violation-check.py",
+      "detail": "ENFORCES NOTHING IN PRODUCTION. The __main__ block runs main() only when the env var HOOK_SMOKE_TEST=1; otherwise it executes an embedded smoke-test harness. The registered command in settings.local.json is a bare python.exe <hook> with no env, so on every Write/Edit/MultiEdit the hook ignores the real stdin payload, runs four self-tests against its own fixtures, prints a test report to stdout, and exits 0. Probed directly: the canonical trip (agent_type architect-reviewer editing an existing non-report file) produced NO permissionDecision deny. main() itself is correct, since the identical stdin with HOOK_SMOKE_TEST=1 denies properly, so the break is purely the entrypoint guard. Second-order damage: the self-test's TP1 child writes a real reviewer_scope_violation record into the live governance-log.jsonl on every fire. Measured on the live log: 30,788 reviewer_scope_violation records, of which 30,784 carry the TP1 fixture path Projects/Agent-Governance-Research/STATE.md with session unknown. So 99.99 percent of this hook's recorded blocks are its own self-test, and any audit reading that count as enforcement activity is reading a self-portrait. Not fixed, reported only."
+    },
+    {
+      "hook": "verifier-gate-check.py",
+      "detail": "TEST-ISOLATION LEAK (telemetry, not enforcement). Its private _log() writes to os.path.join(_HOOK_DIR, 'governance-log.jsonl') directly and ignores the GOVERNANCE_LOG_PATH override that _event_emit.py and _governance_logger.py both honor. Verified: with GOVERNANCE_LOG_PATH pointed at a temp file, both probe runs still appended to the live .claude/hooks/governance-log.jsonl (rows tagged session PROBE-B2-SYNTH, events block and pass, hook verifier-gate), and the temp sink received zero verifier-gate rows. Consequence runs both ways: every test or probe of this hook corrupts production telemetry, and every measurement of verifier-gate block rates is inflated by test traffic. The gate's blocking behaviour itself is correct."
+    }
+  ]
+}

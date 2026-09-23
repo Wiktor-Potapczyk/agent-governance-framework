@@ -1,0 +1,6 @@
+{
+  "last_iso": "2026-06-08T00:00:00+00:00",
+  "counts": "87 agents / 163 skills / 36 plugins (22 enabled) / 8 MCP servers",
+  "report_path": "Projects/Agent-Governance-Research/work/2026-05-29-cmdb-v3.json",
+  "note": "Stamped 2026-06-08 after pm-skills install + registry regen + CLAUDE.md count reconcile. 30-day rolling cadence. Re-stamp on each full refresh."
+}

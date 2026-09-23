@@ -1,0 +1,16 @@
+{
+  "last_iso": "2026-09-11T10:25:54Z",
+  "partial": false,
+  "counts": {
+    "blind": 0,
+    "detected": 66,
+    "errored": 0,
+    "no_tests": 2
+  },
+  "blind": [],
+  "errored": [],
+  "no_tests": [
+    "conftest.py",
+    "sidecar_loader.py"
+  ]
+}

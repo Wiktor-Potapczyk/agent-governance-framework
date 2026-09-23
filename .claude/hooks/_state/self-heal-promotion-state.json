@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "classes": {
+    "generated-docs": {"consecutive_green": 0, "promoted": false, "last_revert_round": null},
+    "tests": {"consecutive_green": 0, "promoted": false, "last_revert_round": null},
+    "scripts": {"consecutive_green": 0, "promoted": false, "last_revert_round": null},
+    "registry": {"consecutive_green": 0, "promoted": false, "last_revert_round": null},
+    "work-curation": {"consecutive_green": 0, "promoted": false, "last_revert_round": null}
+  }
+}

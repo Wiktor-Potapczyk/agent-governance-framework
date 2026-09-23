@@ -1,0 +1,14 @@
+{
+  "tokens": [
+    {
+      "pattern": "TODO_FIXME_BLOCKER",
+      "reason": "Unresolved blocker marker — resolve or rename before writing to vault",
+      "case_sensitive": false
+    },
+    {
+      "pattern": "DO_NOT_COMMIT",
+      "reason": "Explicit commit-guard marker — remove before writing to vault",
+      "case_sensitive": false
+    }
+  ]
+}

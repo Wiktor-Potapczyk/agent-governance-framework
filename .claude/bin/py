@@ -1,0 +1,42 @@
+#!/bin/sh
+# POSIX sh interpreter resolver for vault hook/script commands
+# (self-healing loop phase (a), spec TASK-001).
+#
+# Resolution order:
+#   1. $VAULT_PYTHON, if set, a regular file, and executable
+#   2. C:/Program Files/Python314/python.exe, if it exists
+#   3. python3 on PATH
+#   4. python on PATH
+#
+# Execs the resolved interpreter with every argument passed through
+# unchanged, with PYTHONIOENCODING=utf-8 exported. Exits 127 with a
+# one-line stderr message when no interpreter resolves.
+#
+# The candidate-1 guard requires BOTH -f (regular file) and -x (executable):
+# self-heal phase (a) fix pass item 3 (adversarial review probe 5,
+# "Resolver single point of failure"). `[ -x PATH ]` alone is true for a
+# directory too, and `exec`-ing a directory hard-crashes the whole script
+# (exit 126) instead of falling through to the remaining candidates -- a
+# single bad VAULT_PYTHON value (a stale env var, a typo) would otherwise
+# take down every hook routed through this resolver, Gate-1 guards included.
+
+export PYTHONIOENCODING=utf-8
+
+if [ -n "$VAULT_PYTHON" ] && [ -f "$VAULT_PYTHON" ] && [ -x "$VAULT_PYTHON" ]; then
+  exec "$VAULT_PYTHON" "$@"
+fi
+
+if [ -f "C:/Program Files/Python314/python.exe" ]; then
+  exec "C:/Program Files/Python314/python.exe" "$@"
+fi
+
+if command -v python3 >/dev/null 2>&1; then
+  exec python3 "$@"
+fi
+
+if command -v python >/dev/null 2>&1; then
+  exec python "$@"
+fi
+
+echo "bin/py: no Python interpreter found (checked VAULT_PYTHON, C:/Program Files/Python314/python.exe, python3, python)" >&2
+exit 127

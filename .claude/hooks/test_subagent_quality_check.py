@@ -1,0 +1,477 @@
+"""Smoke tests for subagent-quality-check.py — SubagentStop hook.
+
+Covers the three block checks (empty output, error-refusal short output,
+substantial-output-without-structure), the pass path on a well-structured
+response, and the fail-open path on malformed input.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import io
+import json
+import os
+import sys
+import tempfile
+import unittest
+from contextlib import redirect_stdout
+from pathlib import Path
+from unittest import mock
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+_spec = importlib.util.spec_from_file_location(
+    "subagent_quality_check",
+    str(Path(__file__).parent / "subagent-quality-check.py"),
+)
+sqc = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(sqc)
+
+# Pure detection logic (extracted 2026-06-02) — the boundary tests below exercise
+# it directly (no I/O, no log writes).
+from _subagent_quality_logic import classify_subagent_output  # noqa: E402
+
+
+def _blocked(msg: str) -> bool:
+    return classify_subagent_output(msg)[0]
+
+
+def _run(payload: dict, log_dir: Path) -> tuple[int, str]:
+    """Invoke main() with stdin=payload, log files redirected to log_dir."""
+    payload_str = json.dumps(payload)
+    captured = io.StringIO()
+    exit_code = None
+    # Redirect the hook's own .log file by patching os.path.dirname of __file__.
+    # The governance-log write goes through _event_emit since the C7 migration,
+    # and that helper resolves its own path from its own __file__, so patching
+    # this module's abspath cannot reach it. GOVERNANCE_LOG_PATH is the override
+    # _event_emit provides for exactly this case.
+    with mock.patch.object(sqc.os.path, "abspath", return_value=str(log_dir / "subagent-quality-check.py")), \
+         mock.patch.dict(os.environ, {"GOVERNANCE_LOG_PATH": str(log_dir / "governance-log.jsonl")}), \
+         mock.patch.object(sys, "stdin", io.StringIO(payload_str)), \
+         redirect_stdout(captured):
+        try:
+            sqc.main()
+        except SystemExit as e:
+            exit_code = e.code
+    return (exit_code if exit_code is not None else 0), captured.getvalue()
+
+
+class CheckEmptyOutputTests(unittest.TestCase):
+    def test_empty_output_blocks(self):
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "test-agent",
+                "agent_id": "abc",
+                "last_assistant_message": "",
+                "transcript_path": "/tmp/session-x.jsonl",
+            }, Path(td))
+            self.assertEqual(rc, 0)
+            result = json.loads(out)
+            self.assertEqual(result["decision"], "block")
+            self.assertIn("empty", result["reason"].lower())
+
+    def test_three_char_output_blocks(self):
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "test",
+                "last_assistant_message": "ok",
+                "transcript_path": "",
+            }, Path(td))
+            result = json.loads(out)
+            self.assertEqual(result["decision"], "block")
+
+
+class CheckErrorRefusalTests(unittest.TestCase):
+    def test_short_apology_blocks(self):
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "test",
+                "last_assistant_message": "I apologize but I cannot help with this task.",
+                "transcript_path": "",
+            }, Path(td))
+            result = json.loads(out)
+            self.assertEqual(result["decision"], "block")
+            self.assertIn("error or refusal", result["reason"].lower())
+
+    def test_short_cannot_blocks(self):
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "test",
+                "last_assistant_message": "I cannot complete this.",
+                "transcript_path": "",
+            }, Path(td))
+            result = json.loads(out)
+            self.assertEqual(result["decision"], "block")
+
+    def test_long_response_with_error_word_does_not_block(self):
+        # Error keyword present but message > 100 chars → check 2 skipped, check 3 evaluated
+        msg = "I cannot tell you why this happened. Here is what I found.\n\n" + ("# Section\n\n- bullet\n" * 5)
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "test",
+                "last_assistant_message": msg,
+                "transcript_path": "",
+            }, Path(td))
+            # Should pass — message > 100 chars AND has structure (# header + bullets)
+            self.assertEqual(out, "")
+
+
+class CheckNoStructureTests(unittest.TestCase):
+    def test_long_unstructured_blocks(self):
+        # >500 chars of plain prose, no headers/bullets/tables/code/numbered
+        prose = "This is plain prose. " * 30  # ~570 chars
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "test",
+                "last_assistant_message": prose,
+                "transcript_path": "",
+            }, Path(td))
+            result = json.loads(out)
+            self.assertEqual(result["decision"], "block")
+            self.assertIn("no structure", result["reason"].lower())
+
+    def test_long_with_headers_passes(self):
+        msg = "# Heading\n\nSome text. " + ("blah " * 100) + "\n\n## Sub\n\nMore."
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "test",
+                "last_assistant_message": msg,
+                "transcript_path": "",
+            }, Path(td))
+            self.assertEqual(out, "")
+
+    def test_long_with_bullets_passes(self):
+        msg = "Here is the report:\n\n" + ("- item\n" * 50) + "\n\nEnd."
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "test",
+                "last_assistant_message": msg,
+                "transcript_path": "",
+            }, Path(td))
+            self.assertEqual(out, "")
+
+    def test_long_with_code_block_passes(self):
+        msg = "Here is the code:\n\n```python\n" + ("x = 1\n" * 80) + "```\n\nEnd."
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "test",
+                "last_assistant_message": msg,
+                "transcript_path": "",
+            }, Path(td))
+            self.assertEqual(out, "")
+
+    def test_long_with_table_passes(self):
+        msg = ("Report:\n\n| a | b |\n|---|---|\n" + ("| x | y |\n" * 60) + "\n\nEnd. " + ("text " * 50))
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "test",
+                "last_assistant_message": msg,
+                "transcript_path": "",
+            }, Path(td))
+            self.assertEqual(out, "")
+
+
+class PassThroughTests(unittest.TestCase):
+    def test_short_normal_passes(self):
+        # >5 chars, no error keywords, <500 chars — passes all 3 checks
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "test",
+                "last_assistant_message": "Found 3 files matching the pattern.",
+                "transcript_path": "",
+            }, Path(td))
+            self.assertEqual(out, "")
+
+    def test_stop_hook_active_returns_silently(self):
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "stop_hook_active": True,
+                "last_assistant_message": "anything",
+                "transcript_path": "",
+            }, Path(td))
+            self.assertEqual(out, "")
+
+
+class FailOpenTests(unittest.TestCase):
+    def test_malformed_json_fails_open(self):
+        captured = io.StringIO()
+        with mock.patch.object(sys, "stdin", io.StringIO("not json")), \
+             redirect_stdout(captured):
+            sqc.main()
+        self.assertEqual(captured.getvalue(), "")
+
+    def test_empty_stdin_fails_open(self):
+        captured = io.StringIO()
+        with mock.patch.object(sys, "stdin", io.StringIO("")), \
+             redirect_stdout(captured):
+            sqc.main()
+        self.assertEqual(captured.getvalue(), "")
+
+
+class SubagentQualityBoundaryTests(unittest.TestCase):
+    """Named FP-guards (boundary-test harness sprint 6). Each docstring names its
+    boundary_axis. FP-SQ-04 + FP-SQ-05 were the two over-application bugs the harness
+    found; both FIXED 2026-06-02 and now pass as real assertions (see
+    finding_subagent_quality_check_overfires)."""
+
+    def test_fp_short_valid_answer_silent(self):
+        """FP-SQ-01 boundary_axis: 'short refusal vs short valid answer (no keyword)'."""
+        self.assertFalse(_blocked("Done. 4/4 checks pass; no defects found."))
+
+    def test_fp_exactly_five_chars_silent(self):
+        """FP-SQ-02 boundary_axis: 'len<5 empty vs len==5 minimal valid'."""
+        self.assertFalse(_blocked("Hello"))
+
+    def test_fp_long_keyword_in_prose_silent(self):
+        """FP-SQ-03 boundary_axis: 'refusal keyword in SHORT vs in LONG message'.
+        CHECK 2 only applies <100 chars; a long structured message containing
+        'I cannot' in prose must not be treated as a refusal."""
+        msg = "## Analysis\n\n- I cannot find a simpler form. " + ("detail. " * 30)
+        self.assertFalse(_blocked(msg))
+
+    def test_fp_short_negative_finding_with_keyword_silent(self):
+        """FP-SQ-04 boundary_axis: 'refusal vs valid short NEGATIVE FINDING with refusal keyword'.
+        FIXED 2026-06-02 (finding_subagent_quality_check_overfires): CHECK 2 now skips
+        when a result-signal token ('reproduce', 'works', ...) co-occurs with the refusal
+        keyword — a finding, not a refusal. Real refusals (no result-signal) still block."""
+        self.assertFalse(_blocked("I cannot reproduce the bug; it works on main."))
+
+    def test_fp_long_colon_structured_report_silent(self):
+        """FP-SQ-05 boundary_axis: 'no markup vs label:value report (no markdown)'.
+        FIXED 2026-06-02 (finding_subagent_quality_check_overfires): CHECK 3 now counts
+        >=3 'Label: value' lines OR a known REPORT header as structure — the unfenced
+        QA/PENTEST/PM report format CLAUDE.md mandates. Plain prose (no labels) still blocks.
+        Addresses the format-pushback misfire (reference_subagent_stop_hook_causes_format_pushback)."""
+        report = (
+            "PENTEST REPORT\n"
+            "Target: the boundary harness pure-logic decision function.\n"
+            "Method: fed synthetic inputs through the pure logic and asserted "
+            "block-vs-silent across each adjacent-safe boundary, comparing every "
+            "case against the documented misfire class for this hook family, then "
+            "re-ran every positive case to confirm the designed blocks still fire "
+            "after the narrowing change so no real low-quality output slips through.\n"
+            "Result: designed boundaries behave as specified; two over-application "
+            "bugs surfaced in the subagent-quality checks and were narrowed.\n"
+            "Untested surface: the live wrapper stdin/stdout I/O path is not exercised here.\n"
+            "Conclusion: the harness covers the region it targets and the fix is contained."
+        )
+        self.assertGreater(len(report), 500)
+        self.assertFalse(_blocked(report))
+
+
+class BoldMarkerCheck3RegressionTests(unittest.TestCase):
+    """Regression tests for bold-marker detection added to check_3 (2026-07-10).
+
+    Root cause: workflow-subagent batch-status outputs using **bold** markers as their
+    only structure signal were incorrectly blocked by check_3_no_structure because the
+    original condition only recognised headers, bullets, tables, code blocks, numbered
+    lists, label-value lines, and report headers.  Bold detection was added after
+    `has_report_header` per the governance-mine triage verdict for sig_id 97fe087cb6cb.
+    """
+
+    def test_bold_only_510_char_message_passes_check3(self):
+        """A 510+ char message whose only structure is **bold** markers must not block."""
+        # Mirrors the real violation_excerpts from the triage: "**Batch 31 audit complete**"
+        # style outputs that are substantive but use bold as their primary structure signal.
+        core = "**Analysis notes** processing complete. All items reviewed successfully. "
+        filler = "Item details follow: no anomalies detected in any of the processed records. "
+        msg = core + filler * 6  # ensure > 510 chars, no headers/bullets/tables/code
+        self.assertGreater(len(msg), 510)
+        self.assertNotIn('```', msg)
+        self.assertFalse(_blocked(msg))
+
+    def test_long_no_structure_no_bold_still_blocks(self):
+        """A 510+ char message with NO structure and NO bold markers must still block."""
+        prose = "This is completely unstructured plain prose without any formatting. " * 9
+        self.assertGreater(len(prose), 510)
+        self.assertNotIn('**', prose)
+        self.assertTrue(_blocked(prose))
+
+
+class PassEventEmissionTests(unittest.TestCase):
+    """Step-11 competence gate (2026-07-13): PASS events persist to
+    governance-log.jsonl as a mirror of Shape D minus the block-only fields."""
+
+    # Shape D field set (block entries) — non-regression reference. `environment`
+    # was added 2026-08-01 when this writer moved onto _event_emit under contract
+    # C7: the helper stamps it on every record, and gaining it is the stated
+    # point of convergence. Every other field is unchanged. These sets stay
+    # exact-match rather than subset checks, so any further drift still fails.
+    BLOCK_FIELDS = {
+        "ts", "schema", "event", "hook", "session", "environment", "agent_type",
+        "agent_id", "message_len", "check_failed", "violation_excerpt",
+        "block_reason",
+    }
+    PASS_FIELDS = {
+        "ts", "schema", "event", "hook", "session", "environment", "agent_type",
+        "agent_id", "message_len",
+    }
+
+    def test_pass_input_emits_exactly_one_pass_entry(self):
+        msg = "Found 3 files matching the pattern."
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "fixture-agent",
+                "agent_id": "fix-123",
+                "last_assistant_message": msg,
+                "transcript_path": "/tmp/session-fixture.jsonl",
+            }, Path(td))
+            self.assertEqual(out, "")  # PASS path stays silent on stdout
+            gov_log = Path(td) / "governance-log.jsonl"
+            self.assertTrue(gov_log.exists())
+            lines = gov_log.read_text(encoding="utf-8").strip().splitlines()
+            self.assertEqual(len(lines), 1)
+            entry = json.loads(lines[0])
+            self.assertEqual(entry["event"], "pass")
+            self.assertEqual(entry["hook"], "subagent-quality-check")
+            self.assertEqual(entry["agent_type"], "fixture-agent")
+            self.assertEqual(entry["agent_id"], "fix-123")
+            self.assertEqual(entry["message_len"], len(msg))
+            self.assertEqual(entry["schema"], 2)
+            self.assertEqual(entry["session"], "session-fixture")
+            # No block-only fields on a pass entry
+            self.assertEqual(set(entry.keys()), self.PASS_FIELDS)
+            for f in ("check_failed", "violation_excerpt", "block_reason"):
+                self.assertNotIn(f, entry)
+
+    def test_block_path_shape_d_unchanged(self):
+        """Non-regression: blocking input still emits the identical Shape D
+        entry field-set and the identical stdout block response."""
+        with tempfile.TemporaryDirectory() as td:
+            rc, out = _run({
+                "agent_type": "fixture-agent",
+                "agent_id": "fix-456",
+                "last_assistant_message": "",
+                "transcript_path": "/tmp/session-fixture.jsonl",
+            }, Path(td))
+            result = json.loads(out)
+            self.assertEqual(result["decision"], "block")
+            self.assertEqual(set(result.keys()), {"decision", "reason"})
+            gov_log = Path(td) / "governance-log.jsonl"
+            lines = gov_log.read_text(encoding="utf-8").strip().splitlines()
+            self.assertEqual(len(lines), 1)
+            entry = json.loads(lines[0])
+            self.assertEqual(entry["event"], "block")
+            self.assertEqual(set(entry.keys()), self.BLOCK_FIELDS)
+
+    def test_gov_log_write_failure_fails_silent(self):
+        """Unwritable governance-log path: no raise, stdout unchanged."""
+        with tempfile.TemporaryDirectory() as td:
+            # A directory at the gov-log path makes open(..., 'a') raise.
+            (Path(td) / "governance-log.jsonl").mkdir()
+            rc, out = _run({
+                "agent_type": "fixture-agent",
+                "agent_id": "fix-789",
+                "last_assistant_message": "Found 3 files matching the pattern.",
+                "transcript_path": "",
+            }, Path(td))
+            self.assertEqual(out, "")  # silent PASS despite failed emit
+            # Plain-text log still written (independent try block)
+            qlog = Path(td) / "subagent-quality.log"
+            self.assertTrue(qlog.exists())
+            self.assertIn("result=PASS", qlog.read_text(encoding="utf-8"))
+
+
+class WorkflowIdentityTests(unittest.TestCase):
+    """O9 increment 2 (2026-09-01): workflow-identity plumbing. The dispatch
+    site writes 'WORKFLOW-ID: <name>' as the first prompt line; the hook's
+    _workflow_identity() recovers (workflow, workflow_run) from the transcript
+    head + path, fail-open, workflow subagents only."""
+
+    def _make_transcript(self, base: Path, first_line_content) -> Path:
+        run_dir = base / "subagents" / "workflows" / "wf_test-001"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        t = run_dir / "agent-abc123.jsonl"
+        rec = {"type": "user",
+               "message": {"role": "user", "content": first_line_content}}
+        t.write_text(json.dumps(rec) + "\n", encoding="utf-8")
+        return t
+
+    def test_marker_extracted_from_transcript_head(self):
+        with tempfile.TemporaryDirectory() as td:
+            t = self._make_transcript(
+                Path(td), "WORKFLOW-ID: process-qa\n\nYou are the scope node.")
+            self.assertEqual(sqc._workflow_identity(str(t)),
+                             ("process-qa", "wf_test-001"))
+
+    def test_run_extracted_when_marker_absent(self):
+        with tempfile.TemporaryDirectory() as td:
+            t = self._make_transcript(Path(td), "You are the scope node.")
+            self.assertEqual(sqc._workflow_identity(str(t)),
+                             (None, "wf_test-001"))
+
+    def test_fail_open_missing_empty_and_corrupt_transcript(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td) / "subagents" / "workflows" / "wf_test-001"
+            base.mkdir(parents=True)
+            missing = base / "does-not-exist.jsonl"
+            name, run = sqc._workflow_identity(str(missing))
+            self.assertIsNone(name)
+            self.assertEqual(run, "wf_test-001")
+            empty = base / "empty.jsonl"
+            empty.write_text("", encoding="utf-8")
+            self.assertEqual(sqc._workflow_identity(str(empty))[0], None)
+            corrupt = base / "corrupt.jsonl"
+            corrupt.write_text("{not json at all\n\x00\x01", encoding="utf-8")
+            self.assertEqual(sqc._workflow_identity(str(corrupt))[0], None)
+        self.assertEqual(sqc._workflow_identity(None), (None, None))
+        self.assertEqual(sqc._workflow_identity(""), (None, None))
+
+    def test_no_identity_fields_for_non_workflow_agent_type(self):
+        with tempfile.TemporaryDirectory() as td:
+            t = self._make_transcript(
+                Path(td), "WORKFLOW-ID: process-qa\n\nPrompt.")
+            rc, out = _run({
+                "agent_type": "general-purpose",
+                "agent_id": "gp-1",
+                "last_assistant_message": "Found 3 files matching the pattern.",
+                "agent_transcript_path": str(t),
+                "transcript_path": "/tmp/session-fixture.jsonl",
+            }, Path(td))
+            entry = json.loads((Path(td) / "governance-log.jsonl")
+                               .read_text(encoding="utf-8").strip())
+            self.assertEqual(entry["event"], "pass")
+            self.assertNotIn("workflow", entry)
+            self.assertNotIn("workflow_run", entry)
+
+    def test_pass_record_carries_workflow_identity(self):
+        with tempfile.TemporaryDirectory() as td:
+            t = self._make_transcript(
+                Path(td), "WORKFLOW-ID: process-qa\n\nPrompt.")
+            rc, out = _run({
+                "agent_type": "workflow-subagent",
+                "agent_id": "wf-agent-1",
+                "last_assistant_message": "Found 3 files matching the pattern.",
+                "agent_transcript_path": str(t),
+                "transcript_path": "/tmp/session-fixture.jsonl",
+            }, Path(td))
+            self.assertEqual(out, "")  # PASS path stays silent
+            entry = json.loads((Path(td) / "governance-log.jsonl")
+                               .read_text(encoding="utf-8").strip())
+            self.assertEqual(entry["event"], "pass")
+            self.assertEqual(entry["agent_type"], "workflow-subagent")
+            self.assertEqual(entry["workflow"], "process-qa")
+            self.assertEqual(entry["workflow_run"], "wf_test-001")
+
+    def test_marker_miss_emits_null_not_omitted(self):
+        """A workflow subagent whose prompt lacks the marker (pre-plumbing
+        cache, stale script) emits workflow: null -- visible, never omitted."""
+        with tempfile.TemporaryDirectory() as td:
+            t = self._make_transcript(Path(td), "No marker here.")
+            rc, out = _run({
+                "agent_type": "workflow-subagent",
+                "agent_id": "wf-agent-2",
+                "last_assistant_message": "Found 3 files matching the pattern.",
+                "agent_transcript_path": str(t),
+                "transcript_path": "/tmp/session-fixture.jsonl",
+            }, Path(td))
+            entry = json.loads((Path(td) / "governance-log.jsonl")
+                               .read_text(encoding="utf-8").strip())
+            self.assertIn("workflow", entry)
+            self.assertIsNone(entry["workflow"])
+            self.assertEqual(entry["workflow_run"], "wf_test-001")
+
+
+if __name__ == "__main__":
+    unittest.main()

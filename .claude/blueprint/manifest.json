@@ -1,0 +1,232 @@
+{
+  "bare_data_file": "work-paths.json",
+  "bare_excluded_counts": {
+    "by_content": 134,
+    "by_name": 70,
+    "by_ruling": 9,
+    "content_scanned": true,
+    "regenerated_on_target": 3,
+    "replaced_by_a_twin": 5
+  },
+  "buckets": {
+    ".claude/AGENT_REFACTOR_PLAN.md": "core",
+    ".claude/_archived": "archive",
+    ".claude/agent-memory": "core",
+    ".claude/agents": "core",
+    ".claude/bin": "core",
+    ".claude/blueprint": "core",
+    ".claude/docs": "core",
+    ".claude/forbidden-tokens.json": "overlay",
+    ".claude/git-hooks-archive-2026-05-25": "archive",
+    ".claude/harness-self-model.md": "core",
+    ".claude/hookify.block-emojis-in-output.local.md": "overlay",
+    ".claude/hookify.warn-bash-hook-on-windows.local.md": "overlay",
+    ".claude/hookify.warn-commit-nda-scrub.local.md": "overlay",
+    ".claude/hookify.warn-git-push.local.md": "overlay",
+    ".claude/hookify.warn-unwired-hook.local.md": "overlay",
+    ".claude/hooks": "core",
+    ".claude/loop.md": "core",
+    ".claude/m8b-extract-2026-05-18.txt": "overlay",
+    ".claude/m8b-extract.txt": "overlay",
+    ".claude/mcp-memory-graph.json": "core",
+    ".claude/n8n-working-patterns.md": "core",
+    ".claude/observability-dashboard": "core",
+    ".claude/plain-language-rules.md": "core",
+    ".claude/plugins-snapshot.json": "overlay",
+    ".claude/qmd-config.md": "core",
+    ".claude/ralph-stop-hook.ps1": "core",
+    ".claude/registry.json": "core",
+    ".claude/registry.json.bak-2026-06-07": "archive",
+    ".claude/routines": "core",
+    ".claude/rules": "core",
+    ".claude/scripts": "core",
+    ".claude/self-heal": "overlay",
+    ".claude/settings.json": "core",
+    ".claude/settings.local.json.bak-2026-06-01": "archive",
+    ".claude/settings.local.json.bak-2026-06-02-proseslop": "archive",
+    ".claude/settings.local.json.bak-credhook-20260710": "archive",
+    ".claude/settings.local.json.bak-emdash": "archive",
+    ".claude/settings.local.json.bak-gap1-20260710031657": "archive",
+    ".claude/settings.local.json.bak-gap10-20260710023200": "archive",
+    ".claude/settings.local.json.bak-gap3a-20260710031456": "archive",
+    ".claude/settings.local.json.bak-multiedit": "archive",
+    ".claude/settings.local.json.bak-prereg-verifier": "archive",
+    ".claude/settings.local.json.bak-preunreg": "archive",
+    ".claude/settings.local.json.bak-reposync-20260729": "archive",
+    ".claude/skills": "core",
+    ".claude/skills-archived": "archive",
+    ".claude/structural-exemptions.json": "core",
+    ".claude/tmp": "overlay",
+    ".claude/user-claude-mirror/memory": "instance",
+    ".claude/user-claude-mirror/settings.local.json": "overlay",
+    ".claude/user-claude-mirror/skills": "overlay",
+    ".claude/workflows": "core",
+    ".gitattributes": "schema",
+    ".github": "core",
+    ".gitignore": "schema",
+    ".maintain-cache.json": "instance",
+    ".mcp.json.example": "schema",
+    ".obsidian": "core",
+    "ARCHITECTURE.md": "schema",
+    "Archives": "archive",
+    "Areas": "instance",
+    "CHANGELOG.md": "schema",
+    "CLAUDE.md": "schema",
+    "Clippings": "instance",
+    "Home.md": "schema",
+    "Inbox": "instance",
+    "Notes": "instance",
+    "Projects": "instance",
+    "README.md": "schema",
+    "Resources": "instance",
+    "Resources/KB": "knowledge",
+    "Rules.md": "schema",
+    "Templates": "schema",
+    "log.md": "instance",
+    "ruff.toml": "schema"
+  },
+  "counts": {
+    "archive": 551,
+    "core": 1290,
+    "instance": 5331,
+    "knowledge": 33,
+    "overlay": 489,
+    "schema": 19,
+    "unclassified": 0,
+    "work": 6
+  },
+  "extra_core_paths": [
+    "Projects/Agent-Governance-Research/scripts/shared/",
+    "Projects/Agent-Governance-Research/work/2026-09-02-o17-portability-manifest.md",
+    "Projects/Agent-Governance-Research/work/2026-09-02-o17-substitution-table.md",
+    "Projects/Agent-Governance-Research/work/2026-09-02-o17-portability-build.md"
+  ],
+  "extra_core_paths_bare": [
+    "Projects/Agent-Governance-Research/scripts/shared/"
+  ],
+  "generated_at": "2026-09-23",
+  "generator_version": "1.1.0",
+  "machine_local": [
+    {
+      "name": "hook wiring",
+      "provisioning_step": "A3 converts .claude/settings.local.json to the $CLAUDE_PROJECT_DIR form on a scratch .claude/blueprint/settings.local.portable.json; A4's step_place_hook_wiring places it on the target machine"
+    },
+    {
+      "name": "MCP file",
+      "provisioning_step": "A2 renders mcp.json.tmpl from the live .mcp.json with secret values replaced by {{secret:<file>}} placeholders; A4's step_render_templates writes .mcp.json from the template plus secrets/ on the target machine"
+    },
+    {
+      "name": "user settings and CLAUDE.md",
+      "provisioning_step": "A2 renders user-settings.json.tmpl and user-claude-md.tmpl from ~/.claude/settings.json and ~/.claude/CLAUDE.md; A4's step_render_templates writes them under the target ~/.claude"
+    },
+    {
+      "name": "trust",
+      "provisioning_step": "Phase B step 4: opening the vault in Claude Code once on the target machine writes the ~/.claude.json trust record; not scripted by the runner"
+    },
+    {
+      "name": "plugins",
+      "provisioning_step": "A4 names the 31-plugin install as a later slice (NOT-IN-SLICE-1); Phase B step 4 installs marketplaces and plugins on the target machine"
+    },
+    {
+      "name": "qmd index",
+      "provisioning_step": "A2 renders qmd-index.yml.tmpl with {{vault}}/{{home}} placeholders; A4's step_render_templates writes ~/.config/qmd/index.yml, then Phase B step 4 runs the qmd index build"
+    },
+    {
+      "name": "tasks",
+      "provisioning_step": "A4 names the scheduled-tasks-archive XML replay as a later slice (NOT-IN-SLICE-1); Phase B step 5 opts in per task with the vault path rewritten"
+    },
+    {
+      "name": "interpreters",
+      "provisioning_step": "Phase B step 1: install Python 3.14 at C:\\Program Files\\Python314 and Node (current LTS or 25) on the target machine before running the runner"
+    },
+    {
+      "name": "npm globals",
+      "provisioning_step": "A4 names the npm global installs (the four packages named in .claude/scripts/install-prereqs-manifest.json) as a later slice (NOT-IN-SLICE-1); Phase B step 3 installs them via the runner"
+    },
+    {
+      "name": "core.longpaths",
+      "provisioning_step": "A4's step_longpaths sets git config core.longpaths true on the target clone; Phase B step 1 sets the Windows-wide LongPathsEnabled policy, which needs admin rights"
+    }
+  ],
+  "overrides": {
+    ".claude/_archived": "archive",
+    ".claude/forbidden-tokens.json": "overlay",
+    ".claude/jobs": "overlay",
+    ".claude/logs": "overlay",
+    ".claude/plugins-snapshot.json": "overlay",
+    ".claude/projects": "overlay",
+    ".claude/self-heal": "overlay",
+    ".claude/skills-archived": "archive",
+    ".claude/tmp": "overlay",
+    ".claude/user-claude-mirror/memory": "instance",
+    ".claude/user-claude-mirror/settings.local.json": "overlay",
+    ".claude/user-claude-mirror/skills": "overlay",
+    ".gitattributes": "schema",
+    ".github": "core",
+    ".gitignore": "schema",
+    ".maintain-cache.json": "instance",
+    ".mcp.json.example": "schema",
+    ".obsidian": "core",
+    "ARCHITECTURE.md": "schema",
+    "CHANGELOG.md": "schema",
+    "CLAUDE.md": "schema",
+    "Resources": "instance",
+    "Resources/KB": "knowledge",
+    "ruff.toml": "schema"
+  },
+  "profiles": {
+    "bare": {
+      "buckets": [
+        "core",
+        "overlay",
+        "schema"
+      ],
+      "file_count": 1543,
+      "pattern_count": 264,
+      "patterns_file": "work-paths.json",
+      "patterns_key": "sparse_patterns_bare",
+      "regenerated_paths": [
+        ".claude/hooks/_known_dispatch_names.json",
+        ".claude/registry.json",
+        "Home.md"
+      ],
+      "replaced_paths": [
+        "CLAUDE.md",
+        ".gitignore",
+        ".claude/hooks/control-probes.json",
+        ".claude/scripts/install-prereqs-manifest.json",
+        ".claude/settings.json"
+      ],
+      "templates_subdir": "bare"
+    },
+    "full": {
+      "buckets": [
+        "core",
+        "overlay",
+        "knowledge",
+        "schema",
+        "work"
+      ],
+      "file_count": 1842,
+      "pattern_count": 61,
+      "patterns_file": null,
+      "patterns_key": "sparse_patterns",
+      "regenerated_paths": [],
+      "replaced_paths": [],
+      "templates_subdir": "full"
+    }
+  },
+  "secrets": {
+    "count": 0,
+    "filled_by": "blueprint_render",
+    "items_file": "work-paths.json"
+  },
+  "work_unit_hashes": [
+    "3526d7e0def00b46",
+    "3ab151d9f2266c4c",
+    "886f5d4a81bdbcd4",
+    "99c35ba328f4e4e8",
+    "cfbb7f9529502346",
+    "fbf1e4cb175712ac"
+  ]
+}

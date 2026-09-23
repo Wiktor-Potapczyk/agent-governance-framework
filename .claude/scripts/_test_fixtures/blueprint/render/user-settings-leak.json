@@ -1,0 +1,8 @@
+{
+  "env": {
+    "_GITHUB_PAT_PERSONAL": "ghp_FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE"
+  },
+  "enabledPlugins": [
+    "plugin-one"
+  ]
+}

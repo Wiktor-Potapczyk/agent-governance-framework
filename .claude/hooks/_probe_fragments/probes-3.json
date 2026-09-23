@@ -1,0 +1,130 @@
+{
+  "batch_index": 3,
+  "probes": [
+    {
+      "hook": "deferral-resurface.py",
+      "event": "PostToolUse",
+      "path": ".claude/hooks/deferral-resurface.py",
+      "trip": {
+        "stdin": {
+          "tool_name": "Edit",
+          "tool_input": {
+            "file_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/Projects/Demo/STATE.md",
+            "new_string": "status: done"
+          }
+        },
+        "expect": "warn",
+        "why": "Advisor mode (Mode 2) fires only when BOTH gates pass: _PROJECT_FILE_RE matches projects/<one segment>/(STATE.md|PROJECT.md|task_plan.md), and _STATUS_FLIP_RE finds 'status: done' or 'status: archived' in new_string (or content). That is a project close, which is exactly what Guard B must not let pass unremarked. The hook never checks the path exists on disk, so no fixture file is needed.",
+        "observed": "exit 0. stderr: '[deferral-resurface ADVISE] project closing (STATE.md sets status done/archived); run `python .claude/hooks/deferral-resurface.py --project C:/Users/WiktorPotapczyk/Desktop/Vault/Projects/Demo` before certifying done, so tier-scoped deferrals resurface (Mechanism B guard). (advisory - write was kept.)'. stdout empty. Redirected activity sink got {\"hook\": \"deferral-resurface\", \"decision\": \"warn\", \"detail\": \".../Projects/Demo/STATE.md\"}. Classification: warn."
+      },
+      "pass": {
+        "stdin": {
+          "tool_name": "Edit",
+          "tool_input": {
+            "file_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/Projects/Demo/STATE.md",
+            "new_string": "status: active"
+          }
+        },
+        "must_not": ["deny", "block"],
+        "why": "Same tool, same project-level STATE.md path; only the status value differs. 'status: active' is not a close, so the second gate must miss. This is the discriminating pass: it proves the guard keys on the close, not merely on any STATE.md write.",
+        "observed": "exit 0. Nothing on stdout or stderr, and no sink record at all. Classification: silent."
+      }
+    },
+    {
+      "hook": "wiki-citation-check.py",
+      "event": "PostToolUse",
+      "path": ".claude/hooks/wiki-citation-check.py",
+      "trip": {
+        "stdin": {
+          "tool_name": "Write",
+          "tool_input": {
+            "file_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/Resources/KB/ralph-loop-research-2026-03.md"
+          }
+        },
+        "expect": "warn",
+        "why": "The hook re-reads the written file from disk, so a trip case must point at a real wiki-layer file. Resources/KB/ is an unconditional wiki path and this page is not in EXCLUDE_FILES. Its source[1] pins sha256 a13b384b... for Notes/2026-03-16-ralph-wiggum-technique-deep-dive.md, whose bytes have changed since ingest, so validate_source_entries returns SOURCE_DRIFT and the hook must emit additionalContext. FIXTURE DEPENDENCY, stated plainly: this trip rests on live drift in the vault, not on a fixture the probe controls. If that page is re-ingested the SHA realigns and this probe goes silent, which is a stale probe, not a hook defect. A deterministic fixture would mean leaving a wiki-layer file with a deliberately broken citation in the vault, which this task forbade and which process-lint Pass A would then flag on every sweep.",
+        "observed": "exit 0. stdout: {\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": \"[wiki-citation-check] Resources/KB/ralph-loop-research-2026-03.md\\n  - SOURCE_DRIFT (warning): source[1].sha256 mismatch, committed a13b384b... but file currently e2a5f21d...\"}}. Sink: decision warn, detail 'Resources/KB/ralph-loop-research-2026-03.md 1 finding(s)'. Classification: warn. The stronger gate was verified separately with a throwaway fixture at Resources/KB/_probe_tmp_orphan.md (tags [wiki], source path Clippings/this-file-does-not-exist-probe.md): stdout carried 'ORPHAN_CITATION (error): source[0].path ... does not exist on disk' plus the 'Has blocking-level findings (currently advisory in v1)' line, exit 0; the fixture was deleted immediately after that run."
+      },
+      "pass": {
+        "stdin": {
+          "tool_name": "Write",
+          "tool_input": {
+            "file_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/Resources/KB/cmdb-vault-setup.md"
+          }
+        },
+        "must_not": ["deny", "block"],
+        "why": "Same tool, same wiki-layer directory, a real #wiki page whose source entries all resolve on disk with matching SHA. Proves the check discriminates on citation validity instead of firing on every Resources/KB write. Chosen by sweeping all 33 files in Resources/KB through the hook: 29 silent, 4 warn.",
+        "observed": "exit 0. Nothing on stdout or stderr. Sink: decision 'allow', detail 'Resources/KB/cmdb-vault-setup.md'. Classification: silent."
+      }
+    },
+    {
+      "hook": "routing-table-validation.py",
+      "event": "PreToolUse",
+      "path": ".claude/hooks/routing-table-validation.py",
+      "trip": {
+        "stdin": {
+          "tool_name": "Edit",
+          "tool_input": {
+            "file_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/CLAUDE.md",
+            "new_string": "MUST DISPATCH: nonexistent-fake-agent"
+          }
+        },
+        "expect": "deny",
+        "why": "All four gates pass. (a) target is CLAUDE.md. (b) 'MUST DISPATCH:' is a definitive dispatch position. (c) the token matches AGENT_NAME_RE. (d) it resolves to nothing in registry.json agents or skills and is in neither NON_AGENT_IDENTIFIERS nor DEPRECATED_ALLOWLIST. That is the Delta-5 Tier A condition: a doctrine edit introducing an undispatchable routing target.",
+        "observed": "exit 0. stdout: {\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"ROUTING_BROKEN: The following agent name(s) appear in a dispatch position in 'C:/Users/WiktorPotapczyk/Desktop/Vault/CLAUDE.md' but resolve to nothing in registry.json: \\\"nonexistent-fake-agent\\\". ...\"}}. Sink: decision 'deny', detail 'CLAUDE.md nonexistent-fake-agent'. Classification: deny."
+      },
+      "pass": {
+        "stdin": {
+          "tool_name": "Edit",
+          "tool_input": {
+            "file_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/CLAUDE.md",
+            "new_string": "MUST DISPATCH: pm-orchestrator, process-qa"
+          }
+        },
+        "must_not": ["deny", "block"],
+        "why": "Same file, same dispatch position, same comma-separated shape; only the names differ. Both resolve in registry.json (pm-orchestrator under agents, process-qa under skills), so gate (d) fails and the edit must be allowed. This is the false-positive guard: the hook must not deny every MUST DISPATCH line it sees.",
+        "observed": "exit 0. Nothing on stdout or stderr. Sink: decision 'allow', detail 'CLAUDE.md'. Classification: silent."
+      }
+    },
+    {
+      "hook": "work-verification-check.py",
+      "event": "Stop",
+      "path": ".claude/hooks/work-verification-check.py",
+      "trip": {
+        "stdin": {
+          "transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/probe3-workverify-trip.jsonl",
+          "session_id": "probe-batch-3"
+        },
+        "expect": "block",
+        "why": "CHECK 1b, the H5 hole-closer: a QA REPORT verdict written inline on a non-Quick task with no process-qa or process-pentest invocation in the turn. The transcript fixture is two JSONL lines, a user entry then one assistant text block reading 'TASK TYPE: Analysis' followed by 'QA REPORT:' and 'Verdict: PASS'. That sets is_non_quick and has_qa_report while has_process_qa stays false, which is exactly the bypass this check exists to catch. Fixture lives under _probe_fragments/fixtures/ so it survives with the suite; a Stop hook returns silently on a missing transcript_path, so a vanished fixture would read as a false green.",
+        "observed": "exit 0. stdout: {\"decision\": \"block\", \"reason\": \"WORK VERIFICATION: QA REPORT block produced on a non-Quick task without invoking /process-qa (or /process-pentest). Writing a QA verdict inline bypasses the QA process. ...\"}. Governance sink: {\"event\": \"block\", \"hook\": \"work-verification-check\", \"check\": \"inline-qa-without-skill\"}. TAXONOMY NOTE: the process exit code is 0, not 2. Stop hooks here signal a block through the stdout JSON {\"decision\": \"block\"} protocol, which the harness honours; under the literal rubric (block equals exit 2) this run would classify as warn, but it is a genuine hard block and is recorded as such. A runner asserting exit 2 will red-flag this probe wrongly."
+      },
+      "pass": {
+        "stdin": {
+          "transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/probe3-workverify-pass.jsonl",
+          "session_id": "probe-batch-3"
+        },
+        "must_not": ["deny", "block"],
+        "why": "Same Stop shape, a benign Quick turn: a rename request, one Bash tool_use, one short text block. No TASK TYPE line, no QA REPORT block, no escalation phrasing, no write claim, so CHECK 1, CHECK 1b, CHECK 2 and CHECK 4 all miss. Proves the gate keys on the inline-QA pattern rather than on the Stop event itself.",
+        "observed": "exit 0. Nothing on stdout or stderr. Only the routine session_end heartbeat record reached the redirected governance sink (turn_count 2, approx_tokens 61). Classification: silent."
+      }
+    }
+  ],
+  "waivers": [
+    {
+      "hook": "dark-zone-check.py",
+      "event": "Stop",
+      "reason": "Monitoring-only by construction: the file contains no print() and no write to stdout or stderr anywhere (grep over the whole file returns zero matches), and its module docstring says 'Does NOT block'. Its only output channel is emit_event to the governance sink, so no input can produce a deny, block or warn observable and the rubric has nothing to assert. This waives the OBSERVABLE, not the behaviour: both cases were built and run. TRIP (fixtures/probe3-darkzone-trip.jsonl, one Agent tool_use plus a response with zero citation patterns and zero Write/Edit blocks) produced {\"event\": \"dark-zone\", \"agent_count\": 1, \"citation_count\": 0, \"files_written\": 0, \"ratio\": 0.0, \"severity\": \"high\"}. PASS (fixtures/probe3-darkzone-pass.jsonl, identical dispatch, response text 'Per code-reviewer: the agent found a missing null check at line 42') produced {\"citation_count\": 2, \"ratio\": 2.0, \"severity\": \"low\"}. Both exited 0 with empty stdout and stderr. The hook does discriminate; it discriminates into a log file rather than into the turn. If the suite later gains a sink-assertion mode, this control is probeable there with the two fixtures already in place."
+    }
+  ],
+  "defects_found": [
+    {
+      "hook": "wiki-citation-check.py",
+      "detail": "Doctrine says this gate blocks; the code says it never does. CLAUDE.md 'Wiki Layer Invariants' item 2 states: 'Hook-level (wiki-citation-check.py PostToolUse Write): on every Write to a #wiki-tagged file: verifies source: field present ... Mismatch -> blocks write with SOURCE_DRIFT.' The hook's own docstring contradicts that: '2 = hard block (currently DISABLED, too risky for v1; activate after empirical baseline)'. Confirmed empirically: a fixture citing a source path that does not exist on disk produced an ORPHAN_CITATION finding of severity error, printed as advisory additionalContext, exit 0, write kept. So layer 2 of the three fabrication-mitigation layers named in CLAUDE.md is advisory at runtime while doctrine records it as blocking. The detector fires correctly; the divergence is enforcement strength, constitution versus code, which is the same shape as the audit finding this suite exists for. Resolving it is Wiktor's decision (raise the hook to blocking, or correct CLAUDE.md), not a test change."
+    },
+    {
+      "hook": "work-verification-check.py",
+      "detail": "Not a non-firing defect, a harness hazard worth recording before the merge: this hook signals both HARD blocks (CHECK 1 and CHECK 1b) by printing {\"decision\": \"block\"} to stdout and returning exit code 0. A merged runner that classifies 'block' as 'exit code 2', which is the rubric this batch was handed, will score a correctly-firing hard gate as a warn, or fail it outright if it asserts on the exit code. The same applies to every Stop-event gate in the vault. The merge step needs a Stop-protocol-aware classifier."
+    }
+  ]
+}

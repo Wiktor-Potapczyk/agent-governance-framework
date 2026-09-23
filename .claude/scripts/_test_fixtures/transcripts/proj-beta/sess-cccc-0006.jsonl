@@ -1,0 +1,2 @@
+{"type": "user", "uuid": "p-u1", "timestamp": "2026-08-06T09:00:00Z", "sessionId": "sess-cccc-0006", "message": {"role": "user", "content": "The pangolin ledger in the beta project needs a very long first user message so the browse label truncation to one hundred twenty characters can be proven by the fixture suite beyond doubt"}}
+{"type": "assistant", "uuid": "p-a1", "timestamp": "2026-08-06T09:00:05Z", "sessionId": "sess-cccc-0006", "message": {"role": "assistant", "content": [{"type": "text", "text": "pangolin ledger acknowledged in beta"}]}}

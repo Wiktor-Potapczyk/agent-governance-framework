@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "skill": "process-analysis",
+  "purpose": "Machine-readable dispatch contract for process-analysis. Hooks read this as fallback ground truth when transcript classification is missing or truncated (H11 audit finding 2026-04-18). Prose contract in SKILL.md remains canonical; this file mirrors it for enforcement.",
+  "mandatory_dispatches": [],
+  "conditional_dispatches": [
+    {
+      "name": "research-synthesizer",
+      "condition": "2+ specialist agents dispatched in step 2",
+      "role": "step-3-synthesis",
+      "required_when_condition_true": true,
+      "notes": "Mandatory if multiple specialists contributed. Skipped if single-specialist evaluation."
+    },
+    {
+      "name": "report-generator",
+      "condition": "complex multi-agent evaluation requiring formal report",
+      "role": "step-4-report"
+    }
+  ],
+  "allowed_specialists_via_process_exemption": [
+    "prompt-engineer",
+    "architect-reviewer",
+    "debugger",
+    "api-designer",
+    "data-engineer",
+    "n8n-workflow-architect",
+    "api-security-audit",
+    "adversarial-reviewer"
+  ],
+  "notes": "No hard mandatory dispatch — specialist selection is subject-dependent (see SKILL.md Subject→Agent routing table). Decomposition mode may dispatch downstream process skills (process-build, process-research) as sub-tasks. The deprecated 2026-05-25 orchestrator alias was replaced by n8n-workflow-architect per architecture-v2 Delta-7 (deprecated-routing cleanup). 2026-08-30 content review: confirmed-current against SKILL.md and process-analysis.js (subjects enum, synthesis-if-2+, complex-flag report gate all match), no drift found. 2026-09-15 content review: sibling drift since 2026-08-30 is the O9 WORKFLOW-ID wrapper only (every agent() call became wfAgent(), which prefixes the prompt and changes nothing else); dispatch set unchanged, contract still accurate.",
+  "last_reviewed": "2026-09-15",
+  "linked_skill_md": ".claude/skills/process-analysis/SKILL.md",
+  "review_baseline": {
+    "recorded_at": "2026-09-15",
+    "review_date": "2026-09-15",
+    "siblings": {
+      ".claude/skills/process-analysis/SKILL.md": "sha256:aeacc5e99f5927f201b309400e06f3b4442692975d1007262a9ca541646a38eb",
+      ".claude/workflows/process-analysis.js": "sha256:6a0f09375f9f1ebf9489638323d6549827e7c94a9c0a12a0b03d9b154399c988"
+    }
+  }
+}

@@ -1,0 +1,396 @@
+{
+  "generated_at": "2026-09-04T00:00:00Z",
+  "generator_version": "fixture-1",
+  "twin_summary": {
+    "identical": 1,
+    "divergent": 1,
+    "repo-absent": 5,
+    "ambiguous": 0,
+    "no-path": 1,
+    "not-applicable": 4
+  },
+  "plugin_cache_enumeration": {
+    "row_counts": {
+      "skill": 1,
+      "agent": 1,
+      "hook": 1,
+      "mcp-server": 1,
+      "blk004_unresolved_registry_entries": 1
+    }
+  },
+  "rows": [
+    {
+      "name": "alpha-agent",
+      "kind": "agent",
+      "path": ".claude/agents/alpha-agent.md",
+      "provenance": "authored-in-harness",
+      "reachability": [
+        {
+          "type": "EVD-004",
+          "source_file": ".claude/registry.json",
+          "detail": "present in registry.json agents['alpha-agent']"
+        }
+      ],
+      "blocked_reason": [],
+      "usage": {
+        "total_count": 42,
+        "first_seen": "2026-05-01T10:00:00",
+        "last_seen": "2026-09-01T10:00:00",
+        "source": "governance-log.jsonl:agent_dispatched.agent_type",
+        "skipped_records_in_join": 3,
+        "days_since_last_use": 3,
+        "dormant": false
+      },
+      "edges": [
+        {
+          "direction": "outbound",
+          "counterpart": "process-build",
+          "relation": "dispatched_by",
+          "source": "EVD-004",
+          "status": "resolved"
+        },
+        {
+          "direction": "inbound",
+          "counterpart": "CLAUDE.md",
+          "relation": "mentioned_in",
+          "source": "EVD-011",
+          "status": "unresolved_prose_only"
+        }
+      ],
+      "twin": "repo/agents/alpha-agent.md",
+      "twin_state": "divergent"
+    },
+    {
+      "name": "beta-hook@px@px",
+      "kind": "hook",
+      "path": "C:/plugins/cache/px/px/1.0.0/hooks/beta-hook.py",
+      "provenance": "plugin:px/px",
+      "reachability": [
+        {
+          "type": "EVD-006",
+          "source_file": "C:/plugins/cache/px/px/1.0.0/hooks/beta-hook.py",
+          "detail": "hook file present under installed, enabled plugin 'px'"
+        }
+      ],
+      "blocked_reason": [],
+      "usage": {
+        "total_count": 0,
+        "first_seen": null,
+        "last_seen": null,
+        "source": "NO_SOURCE_FOR_PLUGIN_HOOK",
+        "skipped_records_in_join": 0
+      },
+      "edges": [
+        {
+          "direction": "inbound",
+          "counterpart": "plugin:px/px",
+          "relation": "declared_by_plugin",
+          "source": "EVD-006",
+          "status": "resolved"
+        }
+      ],
+      "twin": null,
+      "twin_state": "not-applicable"
+    },
+    {
+      "name": "gamma-server",
+      "kind": "mcp-server",
+      "path": ".mcp.json",
+      "provenance": "authored-in-harness",
+      "reachability": [
+        {
+          "type": "EVD-009",
+          "source_file": ".mcp.json",
+          "detail": "server='gamma-server'; command='cmd'"
+        }
+      ],
+      "blocked_reason": [],
+      "usage": {
+        "total_count": 0,
+        "first_seen": null,
+        "last_seen": null,
+        "source": "governance-log.jsonl:mcp-gate-events; gated-events-only",
+        "skipped_records_in_join": 0
+      },
+      "edges": [
+        {
+          "direction": "inbound",
+          "counterpart": ".mcp.json",
+          "relation": "declared_in",
+          "source": "EVD-009",
+          "status": "resolved"
+        }
+      ],
+      "twin": null,
+      "twin_state": "repo-absent"
+    },
+    {
+      "name": "settings.json:PostToolUse[0.0]",
+      "kind": "settings-registration",
+      "path": ".claude/settings.json",
+      "provenance": "authored-in-harness",
+      "reachability": [
+        {
+          "type": "EVD-001",
+          "source_file": ".claude/settings.json",
+          "detail": "resolves to hook 'check'"
+        },
+        {
+          "type": "EVD-009",
+          "source_file": ".claude/settings.json",
+          "detail": "event=PostToolUse matcher=Write command='python check.py'"
+        }
+      ],
+      "blocked_reason": [],
+      "usage": {
+        "total_count": 0,
+        "first_seen": null,
+        "last_seen": null,
+        "source": "hook-activity.jsonl:hook_fire.hook",
+        "skipped_records_in_join": 0
+      },
+      "edges": [
+        {
+          "direction": "outbound",
+          "counterpart": "check",
+          "relation": "registers",
+          "source": "EVD-001",
+          "status": "resolved"
+        }
+      ],
+      "twin": null,
+      "twin_state": "repo-absent"
+    },
+    {
+      "name": "toolkit-code-review",
+      "kind": "skill",
+      "path": "C:/somewhere/toolkit-code-review",
+      "provenance": "junction:C:/somewhere/toolkit-code-review",
+      "reachability": [
+        {
+          "type": "EVD-005",
+          "source_file": ".claude/skills/toolkit-code-review",
+          "detail": "junction into external repo"
+        }
+      ],
+      "blocked_reason": [],
+      "usage": {
+        "total_count": 5,
+        "first_seen": "2026-06-01T09:00:00",
+        "last_seen": "2026-08-20T18:00:00",
+        "source": "governance-log.jsonl:skill_invoked.skill",
+        "skipped_records_in_join": 0
+      },
+      "edges": [
+        {
+          "direction": "inbound",
+          "counterpart": "registry.json",
+          "relation": "cataloged_in",
+          "source": "EVD-004",
+          "status": "resolved"
+        }
+      ],
+      "twin": null,
+      "twin_state": "repo-absent"
+    },
+    {
+      "name": "2.11.2",
+      "kind": "skill",
+      "path": null,
+      "provenance": "plugin:px",
+      "reachability": [],
+      "blocked_reason": ["BLK-004"],
+      "usage": {
+        "total_count": 0,
+        "first_seen": null,
+        "last_seen": null,
+        "source": "NO_SOURCE_FOR_UNRESOLVED_PLUGIN_COMPONENT",
+        "skipped_records_in_join": 0
+      },
+      "edges": [],
+      "twin": null,
+      "twin_state": null
+    },
+    {
+      "name": "delta-skill@px@px",
+      "kind": "skill",
+      "path": "C:/plugins/cache/px/px/1.0.0/skills/delta-skill/SKILL.md",
+      "provenance": "plugin:px/px",
+      "reachability": [
+        {
+          "type": "EVD-006",
+          "source_file": "C:/plugins/cache/px/px/1.0.0/skills/delta-skill/SKILL.md",
+          "detail": "skill file present under installed, enabled plugin 'px'"
+        }
+      ],
+      "blocked_reason": [],
+      "usage": {
+        "total_count": 0,
+        "first_seen": null,
+        "last_seen": null,
+        "source": "NO_SOURCE_FOR_PLUGIN_SKILL",
+        "skipped_records_in_join": 0
+      },
+      "edges": [
+        {
+          "direction": "inbound",
+          "counterpart": "plugin:px/px",
+          "relation": "declared_by_plugin",
+          "source": "EVD-006",
+          "status": "resolved"
+        }
+      ],
+      "twin": null,
+      "twin_state": "not-applicable"
+    },
+    {
+      "name": "omega-log.jsonl",
+      "kind": "telemetry-sink",
+      "path": ".claude/hooks/omega-log.jsonl",
+      "provenance": "authored-in-harness",
+      "reachability": [],
+      "blocked_reason": [],
+      "usage": {
+        "total_count": 653,
+        "first_seen": null,
+        "last_seen": null,
+        "source": "self:total_lines (sink line count, this run's own stream)",
+        "skipped_records_in_join": 0,
+        "writer_fire_count_sum": 7,
+        "writer_fire_count_source": "hook-activity.jsonl:hook_fire.hook summed over this sink's EVD-010 writer stems"
+      },
+      "edges": [],
+      "twin": "repo/hooks/omega-log.jsonl",
+      "twin_state": "identical"
+    },
+    {
+      "name": "epsilon-flow",
+      "kind": "workflow",
+      "path": ".claude/workflows/epsilon-flow.md",
+      "provenance": "authored-in-harness",
+      "reachability": [
+        {
+          "type": "EVD-007",
+          "source_file": ".claude/workflows/epsilon-flow.md",
+          "detail": "workflow script present"
+        }
+      ],
+      "blocked_reason": [],
+      "usage": {
+        "total_count": 0,
+        "first_seen": null,
+        "last_seen": null,
+        "source": "AWAITING_FIRST_OBSERVATION",
+        "skipped_records_in_join": 17,
+        "note": "workflow-identity plumbing landed 2026-09-01: zero means no identified completion observed since the plumbing, never idle"
+      },
+      "edges": [
+        {
+          "direction": "inbound",
+          "counterpart": "process-build",
+          "relation": "mentioned_in",
+          "source": "EVD-011",
+          "status": "unresolved_prose_only"
+        }
+      ],
+      "twin": null,
+      "twin_state": "repo-absent"
+    },
+    {
+      "name": "mcp:zeta",
+      "kind": "settings-registration",
+      "path": ".mcp.json",
+      "provenance": "authored-in-harness",
+      "reachability": [
+        {
+          "type": "EVD-009",
+          "source_file": ".mcp.json",
+          "detail": "server='zeta'; command='node zeta.js'"
+        }
+      ],
+      "blocked_reason": [],
+      "usage": {
+        "total_count": 0,
+        "first_seen": null,
+        "last_seen": null,
+        "source": "UNRESOLVED_REGISTRATION",
+        "skipped_records_in_join": 0
+      },
+      "edges": [
+        {
+          "direction": "inbound",
+          "counterpart": ".mcp.json",
+          "relation": "declared_in",
+          "source": "EVD-009",
+          "status": "resolved"
+        }
+      ],
+      "twin": null,
+      "twin_state": "repo-absent"
+    },
+    {
+      "name": "eta-agent@px@px",
+      "kind": "agent",
+      "path": "C:/plugins/cache/px/px/1.0.0/agents/eta-agent.md",
+      "provenance": "plugin:px/px",
+      "reachability": [
+        {
+          "type": "EVD-006",
+          "source_file": "C:/plugins/cache/px/px/1.0.0/agents/eta-agent.md",
+          "detail": "agent file present under installed, enabled plugin 'px'"
+        }
+      ],
+      "blocked_reason": [],
+      "usage": {
+        "total_count": 0,
+        "first_seen": null,
+        "last_seen": null,
+        "source": "governance-log.jsonl:agent_dispatched.agent_type",
+        "skipped_records_in_join": 3
+      },
+      "edges": [
+        {
+          "direction": "inbound",
+          "counterpart": "plugin:px/px",
+          "relation": "declared_by_plugin",
+          "source": "EVD-006",
+          "status": "resolved"
+        }
+      ],
+      "twin": null,
+      "twin_state": "not-applicable"
+    },
+    {
+      "name": "theta@px",
+      "kind": "mcp-server",
+      "path": "C:/plugins/cache/px/px/1.0.0/.mcp.json",
+      "provenance": "plugin:px/px",
+      "reachability": [
+        {
+          "type": "EVD-006",
+          "source_file": "C:/plugins/cache/px/px/1.0.0/.mcp.json",
+          "detail": "mcp server declared by installed, enabled plugin 'px'"
+        }
+      ],
+      "blocked_reason": [],
+      "usage": {
+        "total_count": 0,
+        "first_seen": null,
+        "last_seen": null,
+        "source": "governance-log.jsonl:mcp-gate-events; gated-events-only",
+        "skipped_records_in_join": 0
+      },
+      "edges": [
+        {
+          "direction": "inbound",
+          "counterpart": "plugin:px/px",
+          "relation": "declared_by_plugin",
+          "source": "EVD-006",
+          "status": "resolved"
+        }
+      ],
+      "twin": null,
+      "twin_state": "not-applicable"
+    }
+  ]
+}

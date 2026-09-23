@@ -1,0 +1,201 @@
+{
+  "generated_at": "2026-08-30T00:00:00",
+  "notes": "Two-section shape since O10 (2026-09-02, 2026-08-31-harness-takeover-objectives.md): 'entries' holds the hand-registered rows (the irreducibly bespoke entries plus the advisory governing-artifact entries); 'generated_block' holds the auto-derivable rows and is owned by .claude/scripts/staleness_manifest_generate.py (regenerate after an inventory refresh; --check probes drift). staleness_check.py (O4, 2026-08-30-harness-spec-objectives.md) merges both sections at load and refuses duplicate ids. max_age_days follows the vault's established 7-day cadence convention (lint-cadence-trigger.py, registry-staleness-check.py) where an age check applies.",
+  "entries": [
+    {
+      "id": "cc-config-reference",
+      "artifact_path": "Resources/cc-config-reference.md",
+      "max_age_days": 90,
+      "rederive_command": "rerun the O3 investigation per Projects/Agent-Governance-Research/work/2026-08-30-harness-spec-objectives.md",
+      "age_source": "embedded_comment",
+      "age_regex": "date:\\s*([0-9\\-]+)",
+      "citations_probe": {
+        "path_regex": "`((?:[A-Za-z]:\\\\[^`]+)|(?:(?!cc-config/|cc-home/)[\\w.-]+(?:/[\\w.-]+)+\\.(?:md|json)))(?::\\d+(?:-\\d+)?)?`"
+      },
+      "scope_note": "citations_probe covers fully-qualified citations only (absolute Windows paths and multi-segment vault-relative paths ending .md/.json). Bare single-segment names like task_plan.md and PROJECT.md are excluded on purpose: in this doc they cite Projects/Agent-Governance-Research/ files by authorial shorthand, no such file exists at vault root, and resolving them there would raise false BROKEN_CITATION verdicts. Recorded 2026-08-30 per the re-review note."
+    },
+    {
+      "id": "harness-process-path-map",
+      "artifact_path": "Projects/Agent-Governance-Research/work/2026-08-19-harness-process-path-map.md",
+      "max_age_days": 30,
+      "rederive_command": "\"C:\\Program Files\\Python314\\python.exe\" .claude/scripts/process_path_map.py --as-of <today>",
+      "age_source": "embedded_comment",
+      "age_regex": "date:\\s*([0-9\\-]+)"
+    },
+    {
+      "id": "install-prereqs-manifest",
+      "artifact_path": ".claude/scripts/install-prereqs-manifest.json",
+      "max_age_days": 30,
+      "rederive_command": "\"C:\\Program Files\\Python314\\python.exe\" .claude/scripts/install_prereqs.py",
+      "age_source": "embedded_comment",
+      "age_regex": "\"generated_at\":\\s*\"([0-9T:\\-]+)"
+    },
+    {
+      "id": "coverage-ledger-consistency",
+      "artifact_path": "Projects/Agent-Governance-Research/work/2026-08-19-harness-audit-coverage-ledger.md",
+      "rederive_command": "hand-reconcile the .md AMENDED line against the .json scope_total field after any future scope-gap close; no max_age_days is set on this entry because a cross-file agreement check has no artifact age of its own to compare against (O7 Finding 3)",
+      "consistency_probe": {
+        "file_a": "Projects/Agent-Governance-Research/work/2026-08-19-harness-audit-coverage-ledger.md",
+        "regex_a": "scope_total is (\\d+)",
+        "file_b": "Projects/Agent-Governance-Research/work/2026-08-19-harness-audit-coverage-ledger.json",
+        "key_path_b": [
+          "scope_total"
+        ]
+      }
+    },
+    {
+      "id": "governing-claude-md-size",
+      "artifact_path": "CLAUDE.md",
+      "rederive_command": "re-rule the bound with the owner before any further trim or growth; the 300-line bound encodes the post-O16 ruled state (294 lines at close, 2026-09-03)",
+      "advisory": true,
+      "line_count_probe": {
+        "max_lines": 300
+      },
+      "note": "RULED CHANGE at O16 close (2026-09-03, O12-window risk-flag-3 compliant, ruling line in 2026-09-02-o16-execution-record.md): the sub-200 target is re-ruled to a 300-line bound; the as-executed rulings preserved more content than the target assumed (landing 294 vs the ~251 projection). Stays advisory: WARN is excluded from the O12 window FAIL set."
+    },
+    {
+      "id": "governing-settings-split",
+      "artifact_path": "Projects/Agent-Governance-Research/work/2026-09-02-o17-portability-manifest.md",
+      "max_age_days": 30,
+      "rederive_command": "\"C:\\Program Files\\Python314\\python.exe\" .claude/scripts/o17_portability_manifest.py check ; on drift or after any settings edit, rerun with generate",
+      "age_source": "embedded_comment",
+      "age_regex": "Generated ([0-9-]+) by",
+      "advisory": true,
+      "note": "O10 D8: watches the O17 portability manifest per its own O10 freshness hookup section (generation date plus a clean checker run). Recorded limitation: a settings edit inside the 30-day window is caught by running the named checker, not by this age probe alone; a subprocess-executing probe was rejected (reentrancy risk in SessionStart hook mode)."
+    },
+    {
+      "id": "governing-rules-directory",
+      "artifact_path": ".claude/rules",
+      "rederive_command": "populate .claude/rules per O16's migration steps (Projects/Agent-Governance-Research/work/2026-08-31-harness-takeover-objectives.md, O16); advisory until O16 lands",
+      "advisory": true,
+      "dir_count_probe": {
+        "dir": ".claude/rules",
+        "glob": "*.md",
+        "min_count": 2
+      },
+      "note": "RULED CHANGE at O16 close (2026-09-03, same ruling line): threshold no longer provisional; O16 landed and .claude/rules now holds plain-language.md, inbox-processing.md, wiki-architecture.md. min_count 2 stands as the floor."
+    },
+    {
+      "id": "docs-harness-components",
+      "artifact_path": ".claude/docs/harness/_generated.json",
+      "max_age_days": 30,
+      "rederive_command": "\"C:\\Program Files\\Python314\\python.exe\" .claude/scripts/docs_stub_generate.py ; O19 generator, lands with O19 per Projects/Agent-Governance-Research/work/2026-09-03-docs-program-plan.md section 7; not yet built at O18 registration",
+      "age_source": "embedded_comment",
+      "age_regex": "\"generated_at\"\\s*:\\s*\"([0-9T:\\-]+)Z?\"",
+      "advisory": true,
+      "note": "RULING LINE (O18, per O12 risk flag 3): the `docs-harness-components` manifest entry is a ruled governing change. Any WARN it produces on the live board during the O12 observation window (live through 2026-09-16) is a real ruled change, not an incident, and must not be ledger-classified as the board asserting something false. Advisory until O24 (flip to enforcing on or after 2026-09-17, after the O12 window closes, per plan section 5). 2026-09-15: repointed at the generator stamp by owner ruling on SOTA idea 3; the directory mtime was blind to subfolder writes."
+    }
+  ],
+  "generated_block": {
+    "do_not_edit": "GENERATED BLOCK - DO NOT HAND-EDIT. Emitted by .claude/scripts/staleness_manifest_generate.py from asset-inventory.json; a hand edit is flagged as drift by 'staleness_manifest_generate.py --check' (exit 2) and overwritten by the next generate run. Change the generator, not this block.",
+    "source_inventory_generated_at": "2026-09-23T07:59:53Z",
+    "entries": [
+      {
+        "id": "dispatches-pm",
+        "artifact_path": ".claude/skills/pm/DISPATCHES.json",
+        "max_age_days": 90,
+        "rederive_command": "\"C:\\Program Files\\Python314\\python.exe\" .claude/scripts/dispatches_freshness_check.py ; if STALE, hand content-review the named file against SKILL.md and the workflow script, bump last_reviewed with a note, then re-run with --bootstrap (O11, 2026-08-31-harness-takeover-objectives.md)",
+        "age_source": "embedded_comment",
+        "age_regex": "\"last_reviewed\"\\s*:\\s*\"([0-9\\-]+)\""
+      },
+      {
+        "id": "dispatches-process-analysis",
+        "artifact_path": ".claude/skills/process-analysis/DISPATCHES.json",
+        "max_age_days": 90,
+        "rederive_command": "\"C:\\Program Files\\Python314\\python.exe\" .claude/scripts/dispatches_freshness_check.py ; if STALE, hand content-review the named file against SKILL.md and the workflow script, bump last_reviewed with a note, then re-run with --bootstrap (O11, 2026-08-31-harness-takeover-objectives.md)",
+        "age_source": "embedded_comment",
+        "age_regex": "\"last_reviewed\"\\s*:\\s*\"([0-9\\-]+)\""
+      },
+      {
+        "id": "dispatches-process-build",
+        "artifact_path": ".claude/skills/process-build/DISPATCHES.json",
+        "max_age_days": 90,
+        "rederive_command": "\"C:\\Program Files\\Python314\\python.exe\" .claude/scripts/dispatches_freshness_check.py ; if STALE, hand content-review the named file against SKILL.md and the workflow script, bump last_reviewed with a note, then re-run with --bootstrap (O11, 2026-08-31-harness-takeover-objectives.md)",
+        "age_source": "embedded_comment",
+        "age_regex": "\"last_reviewed\"\\s*:\\s*\"([0-9\\-]+)\""
+      },
+      {
+        "id": "dispatches-process-pentest",
+        "artifact_path": ".claude/skills/process-pentest/DISPATCHES.json",
+        "max_age_days": 90,
+        "rederive_command": "\"C:\\Program Files\\Python314\\python.exe\" .claude/scripts/dispatches_freshness_check.py ; if STALE, hand content-review the named file against SKILL.md and the workflow script, bump last_reviewed with a note, then re-run with --bootstrap (O11, 2026-08-31-harness-takeover-objectives.md)",
+        "age_source": "embedded_comment",
+        "age_regex": "\"last_reviewed\"\\s*:\\s*\"([0-9\\-]+)\""
+      },
+      {
+        "id": "dispatches-process-planning",
+        "artifact_path": ".claude/skills/process-planning/DISPATCHES.json",
+        "max_age_days": 90,
+        "rederive_command": "\"C:\\Program Files\\Python314\\python.exe\" .claude/scripts/dispatches_freshness_check.py ; if STALE, hand content-review the named file against SKILL.md and the workflow script, bump last_reviewed with a note, then re-run with --bootstrap (O11, 2026-08-31-harness-takeover-objectives.md)",
+        "age_source": "embedded_comment",
+        "age_regex": "\"last_reviewed\"\\s*:\\s*\"([0-9\\-]+)\""
+      },
+      {
+        "id": "dispatches-process-qa",
+        "artifact_path": ".claude/skills/process-qa/DISPATCHES.json",
+        "max_age_days": 90,
+        "rederive_command": "\"C:\\Program Files\\Python314\\python.exe\" .claude/scripts/dispatches_freshness_check.py ; if STALE, hand content-review the named file against SKILL.md and the workflow script, bump last_reviewed with a note, then re-run with --bootstrap (O11, 2026-08-31-harness-takeover-objectives.md)",
+        "age_source": "embedded_comment",
+        "age_regex": "\"last_reviewed\"\\s*:\\s*\"([0-9\\-]+)\""
+      },
+      {
+        "id": "dispatches-process-research",
+        "artifact_path": ".claude/skills/process-research/DISPATCHES.json",
+        "max_age_days": 90,
+        "rederive_command": "\"C:\\Program Files\\Python314\\python.exe\" .claude/scripts/dispatches_freshness_check.py ; if STALE, hand content-review the named file against SKILL.md and the workflow script, bump last_reviewed with a note, then re-run with --bootstrap (O11, 2026-08-31-harness-takeover-objectives.md)",
+        "age_source": "embedded_comment",
+        "age_regex": "\"last_reviewed\"\\s*:\\s*\"([0-9\\-]+)\""
+      },
+      {
+        "id": "harness-self-model",
+        "artifact_path": ".claude/harness-self-model.md",
+        "max_age_days": 7,
+        "rederive_command": "\"C:\\Program Files\\Python314\\python.exe\" .claude/scripts/generate_harness_self_model.py",
+        "age_source": "embedded_comment",
+        "age_regex": "generated-at:\\s*([0-9T:\\-]+)",
+        "live_count_probe": {
+          "source_file": ".claude/registry.json",
+          "source_key_path": [
+            "counts"
+          ],
+          "table_metric_map": {
+            "Agents": "agents",
+            "Skills": "skills",
+            "Plugins (total)": "plugins_total",
+            "Plugins (enabled)": "plugins_enabled"
+          }
+        }
+      },
+      {
+        "id": "cmdb-vault-setup",
+        "artifact_path": "Resources/KB/cmdb-vault-setup.md",
+        "max_age_days": 90,
+        "rederive_command": "python .claude/scripts/cmdb_refresh.py (regenerates the marked block from asset-inventory.json; --check probes drift)",
+        "age_source": "embedded_comment",
+        "age_regex": "asset-inventory\\.json generated_at ([0-9T:\\-]+)Z",
+        "note": "Generator added 2026-08-31 (owner-ruled generator-first refresh); age now reads the generated block stamp, which tracks the inventory generation, not the page creation date."
+      },
+      {
+        "id": "rationale-index",
+        "artifact_path": ".claude/hooks/aggregates/rationale-index.json",
+        "max_age_days": 7,
+        "rederive_command": "\"C:\\Program Files\\Python314\\python.exe\" .claude/scripts/rationale_extract.py",
+        "age_source": "embedded_comment",
+        "age_regex": "\"generated_at\"\\s*:\\s*\"([0-9T:\\-]+)",
+        "provenance_count_probe": {
+          "source_file": ".claude/hooks/aggregates/asset-inventory.json",
+          "exact": [
+            "authored-in-harness"
+          ],
+          "prefixes": [
+            "junction:"
+          ],
+          "expected_key_path": [
+            "row_count"
+          ]
+        },
+        "note": "O10 D6: the provenance_count_probe mirrors the index's own population_definition (exact 'authored-in-harness', prefix 'junction:'); max_age_days stays as the age backstop per the spec's 'instead of age alone'."
+      }
+    ]
+  }
+}

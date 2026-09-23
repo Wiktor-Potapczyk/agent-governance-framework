@@ -1,0 +1,44 @@
+{
+  "env": {
+    "WORKFLOW_TOKEN": "FIXTURE-SECRET-VALUE-BBB222"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/Users/FixtureUser/Desktop/FixtureVault/.claude/hooks/a.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/Users/FixtureUser/Desktop/FixtureVault/.claude/hooks/b.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:\\Users\\FixtureUser\\Desktop\\FixtureVault\\.claude\\hooks\\c.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

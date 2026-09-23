@@ -1,0 +1,101 @@
+{
+ "batch_index": 7,
+ "probes": [
+  {
+   "hook": "memory-schema-check.py",
+   "event": "PostToolUse",
+   "path": ".claude/hooks/memory-schema-check.py",
+   "trip": {
+    "stdin": {
+     "tool_name": "Write",
+     "tool_input": {
+      "file_path": "C:/Users/WiktorPotapczyk/.claude/projects/C--Users-WiktorPotapczyk-Desktop-Vault/memory/decision_autonomy_two_gates_reversibility_floor_detectability_expander.md"
+     },
+     "session_id": "probe-b7"
+    },
+    "expect": "warn",
+    "why": "is_memory_file() passes (path contains '.claude/projects/' and '/memory/' and ends .md and is not MEMORY.md), so the hook reads the file OFF DISK and runs check_schema. That real vault memory file has valid YAML frontmatter but no 'expires' key, and REQUIRED_FIELDS includes expires, so check_schema returns a 'Missing fields' warning which main() emits as additionalContext. Trigger is the FILE CONTENT at file_path, not the payload: the payload only selects which file is read. Chosen deliberately over a temp fixture so the probe needs no setup; 313 of the 844 files in that memory folder currently violate this schema (measured 2026-08-23), so the target is representative, not a lucky pick. If it ever goes silent the file was fixed, and the replacement target is any other missing-expires file in the same folder.",
+    "observed": "stdout: {\"additionalContext\": \"[MEMORY SCHEMA] decision_autonomy_two_gates_reversibility_floor_detectability_expander.md: Missing fields: expires\"}, exit code 0. One hook-activity record went to the redirected HOOK_ACTIVITY_LOG_PATH (decision=warn). I separately confirmed the multi-field branch by pointing the same stdin shape at a temp file carrying only 'title:' in its frontmatter: 'Missing fields: confidence, description, expires, last_verified, name, type', exit 0."
+   },
+   "pass": {
+    "stdin": {
+     "tool_name": "Write",
+     "tool_input": {
+      "file_path": "C:/Users/WiktorPotapczyk/.claude/projects/C--Users-WiktorPotapczyk-Desktop-Vault/memory/feedback_no_push_without_asking.md"
+     },
+     "session_id": "probe-b7"
+    },
+    "must_not": ["deny", "block"],
+    "why": "Same memory-folder path shape, so the hook does NOT take its silent non-memory exit: it reads the file and runs the full schema check. This one carries all six required fields (name, description, type, expires, confidence, last_verified) with a valid type, valid confidence and a well-formed last_verified date, so check_schema returns no warnings. This is the discriminating benign case: it proves the hook is reading content rather than warning on every memory-folder write.",
+    "observed": "stdout was exactly {} with no additionalContext, exit code 0; the activity record was decision=ok. I also ran the non-memory path (file_path = Vault/log.md) and got {} with exit 0 via the is_memory_file early return, confirming the scope guard."
+   }
+  },
+  {
+   "hook": "bash-safety-guard.py",
+   "event": "PreToolUse",
+   "path": ".claude/hooks/bash-safety-guard.py",
+   "trip": {
+    "stdin": {
+     "tool_name": "Bash",
+     "tool_input": {"command": "git push --force origin main"},
+     "session_id": "probe-b7"
+    },
+    "expect": "deny",
+    "why": "Matches the BLOCKED_PATTERNS row 'git force-push' (git, optional global options, push, .*--force). Force-push is the one git operation the 2026-08-05 Wiktor ruling explicitly kept as a hard deny when normal push was demoted to a warning, so this row is the Gate-1 reversibility floor itself. The command survives strip_inert_contexts (no quoted body, no -m message, no heredoc), so the deny loop sees it verbatim.",
+    "observed": "stdout: hookSpecificOutput.permissionDecision = \"deny\", reason \"BASH SAFETY: Blocked 'git force-push'. Command: git push --force origin main...\", exit code 0. A deny record went to the redirected GOVERNANCE_LOG_PATH with pattern=git force-push. No gate1_surface_degraded alarm appeared in the redirected GATE1_ALARM_LOG_PATH, so _irreversible_surface imported cleanly and the deny came from the canonical surface, not the frozen fallback snapshot."
+   },
+   "pass": {
+    "stdin": {
+     "tool_name": "Bash",
+     "tool_input": {"command": "git status --short"},
+     "session_id": "probe-b7"
+    },
+    "must_not": ["deny", "block"],
+    "why": "A read-only git invocation. It is deliberately a git command rather than an unrelated one, so it proves the guard discriminates within the git surface instead of denying anything containing 'git'. It matches no BLOCKED_PATTERNS row, no WARN_PATTERNS row, no curl-write predicate, and no Windows reserved redirect target.",
+    "observed": "No stdout, no stderr, exit code 0 (the allow-silently path). Nothing was appended to the redirected governance log."
+   }
+  },
+  {
+   "hook": "subagent-quality-check.py",
+   "event": "SubagentStop",
+   "path": ".claude/hooks/subagent-quality-check.py",
+   "trip": {
+    "stdin": {
+     "hook_event_name": "SubagentStop",
+     "agent_type": "general-purpose",
+     "agent_id": "probe-b7",
+     "last_assistant_message": "ok",
+     "session_id": "probe-b7"
+    },
+    "expect": "block",
+    "why": "classify_subagent_output CHECK 1: len(message) < 5 returns check_1_empty. The tool-call escape hatch does not apply because it only engages when last_assistant_message is blank after strip(), and 'ok' is not; there is also no agent_transcript_path in the payload, and _final_turn_used_tool fails closed on a missing path. NOTE ON MECHANISM, do not read this as a mismatch: a SubagentStop hook blocks by printing {\"decision\": \"block\"} on stdout and exiting 0, NOT by exit code 2. If a classifier keys on exit code alone it will label this 'warn'; the semantic class is block, and the regression it guards against is the hook falling silent.",
+    "observed": "stdout: {\"decision\": \"block\", \"reason\": \"Agent output is empty (2 chars). Produce a substantive response.\"}, exit code 0. A block record went to the redirected GOVERNANCE_LOG_PATH with check_failed=check_1_empty. I also ran CHECK 2 with last_assistant_message = \"I cannot do that.\": {\"decision\": \"block\", ...matched: 'i cannot'...}, exit 0."
+   },
+   "pass": {
+    "stdin": {
+     "hook_event_name": "SubagentStop",
+     "agent_type": "general-purpose",
+     "agent_id": "probe-b7",
+     "last_assistant_message": "- Checked 3 files\n- No defects found",
+     "session_id": "probe-b7"
+    },
+    "must_not": ["deny", "block"],
+    "why": "36 chars, so CHECK 1 (len < 5) and CHECK 3 (len > 500) do not apply, and CHECK 2 does not fire because the message carries no refusal keyword. It is also the shape the 2026-06-02 overfire fix was written for: a short bulleted NEGATIVE finding. A hook that blocked this would be over-firing on valid work.",
+    "observed": "No stdout, exit code 0. A pass record went to the redirected GOVERNANCE_LOG_PATH with message_len=36."
+   }
+  }
+ ],
+ "waivers": [
+  {
+   "hook": "lint-cadence-trigger.py",
+   "event": "SessionStart",
+   "reason": "Not probeable through stdin, and its output envelope cannot discriminate a trip from a pass. Every fire decision comes from the age of five state files whose paths are computed from the hook's own location (.claude/hooks/_state/{lint,governance-mine,setup-audit,work-triage,telemetry-check}-cadence.json) with NO env override, so no stdin field can move it; the payload is used only to stamp a session id on the activity record. Worse for probe purposes, main() ALWAYS prints the SessionStart envelope and exits 0 whether or not any suggestion fired, so both a trip and a pass classify as 'warn' and a pass assertion of must_not deny/block would be satisfied by any input at all: a control that fires on everything. There is also no reachable benign input on this machine today, since two builders are permanently overdue. NOT a defect: I verified the cadence logic really fires by importing the module and calling each builder directly, which returned [SETUP-AUDIT CADENCE] (76 days) and [WORK-TRIAGE CADENCE: OVERDUE] (44 days) with the other four correctly empty, and by running the hook end to end on {\"hook_event_name\":\"SessionStart\",\"source\":\"startup\"}, whose stdout carried both strings plus the KNOWN-DISPATCH-NAMES REGEN line at exit 0. A real gate for this hook needs a state-file precondition the runner writes, which means writing live vault state, so it is out of scope here."
+  },
+  {
+   "hook": "memory-nudge.py",
+   "event": "Stop",
+   "reason": "The Stop registration has no deny, block or warn path in its code at all, by design. _handle_stop increments turns_since_memory_write in the state file and returns; the module docstring states 'Prints nothing, ever' for Stop, and the nudge text is only ever emitted by the SessionStart registration (a different control, batch 9). So the only classification a Stop probe can ever produce is 'silent', and an expect of deny/block/warn would be a knowingly false expectation. Its actual enforcement IS observable as a state side effect, and I verified it rather than assuming: with MEMORY_NUDGE_STATE_PATH redirected to a scratch file, two successive {\"hook_event_name\":\"Stop\"} payloads moved turns_since_memory_write 0 -> 1 -> 2 (exit 0, no stdout both times), and a third payload carrying stop_hook_active: true correctly left it at 2, so the Stop-chain double-count guard works. If this suite later grows a state-delta assertion type, this control belongs in it."
+  }
+ ],
+ "defects_found": []
+}

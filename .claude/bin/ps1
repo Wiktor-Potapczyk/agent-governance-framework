@@ -1,0 +1,46 @@
+#!/bin/sh
+# POSIX sh resolver for the PowerShell binary (self-healing loop phase (a),
+# spec TASK-002). Makes the Stop hook's powershell invocation a clean no-op
+# on a host where no PowerShell binary exists, instead of a hard failure.
+#
+# Windows-only by design (self-heal phase (a) fix pass item 12, architect
+# review Finding 5): the Ralph Stop hook this resolves for is a
+# laptop-only mechanism. On a non-Windows host (uname not
+# MINGW*/MSYS*/CYGWIN*, and no powershell.exe on PATH -- the two independent
+# Windows signals), this exits 0 silently and never tries pwsh: GitHub's
+# hosted Linux/macOS runners carry pwsh by default, so falling back to it
+# there would make the "no PowerShell, exit 0" branch untested against the
+# real target environment. On a Windows host, pwsh remains a legitimate
+# final fallback after powershell.exe and powershell.
+#
+# Resolution order on a Windows host: powershell.exe, then powershell, then
+# pwsh. Execs the resolved binary with every argument passed through
+# unchanged. Exits 0 with no output when none of the three exist on a
+# Windows host, or immediately when the host is not Windows.
+
+_uname="$(uname 2>/dev/null)"
+_is_windows=0
+case "$_uname" in
+  MINGW*|MSYS*|CYGWIN*) _is_windows=1 ;;
+esac
+if [ "$_is_windows" -eq 0 ] && command -v powershell.exe >/dev/null 2>&1; then
+  _is_windows=1
+fi
+
+if [ "$_is_windows" -eq 0 ]; then
+  exit 0
+fi
+
+if command -v powershell.exe >/dev/null 2>&1; then
+  exec powershell.exe "$@"
+fi
+
+if command -v powershell >/dev/null 2>&1; then
+  exec powershell "$@"
+fi
+
+if command -v pwsh >/dev/null 2>&1; then
+  exec pwsh "$@"
+fi
+
+exit 0

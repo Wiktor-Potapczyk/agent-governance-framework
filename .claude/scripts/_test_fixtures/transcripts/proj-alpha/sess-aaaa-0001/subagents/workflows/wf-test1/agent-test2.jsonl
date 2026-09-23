@@ -1,0 +1,2 @@
+{"type": "user", "uuid": "w1-u1", "timestamp": "2026-08-01T10:03:00Z", "sessionId": "sess-aaaa-0001", "agentId": "agent-test2", "promptId": "prompt-2", "slug": "wf-worker", "message": {"role": "user", "content": "Workflow worker task: axolotl fanout"}}
+{"type": "assistant", "uuid": "w1-a1", "timestamp": "2026-08-01T10:03:30Z", "sessionId": "sess-aaaa-0001", "agentId": "agent-test2", "promptId": "prompt-2", "slug": "wf-worker", "message": {"role": "assistant", "content": [{"type": "text", "text": "The axolotl worker completed the fanout task"}]}}

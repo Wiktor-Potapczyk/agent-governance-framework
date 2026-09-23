@@ -1,0 +1,532 @@
+{
+  "env": {
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "600000"
+  },
+  "permissions": {
+    "allow": [
+      "mcp__scheduled-tasks__list_scheduled_tasks",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(claude plugin:*)",
+      "Bash(npx skills:*)",
+      "Bash(node:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(\"{{python:bs4}}\":*)",
+      "Bash(jq:*)",
+      "Bash(xargs grep:*)",
+      "Bash(bash --version)",
+      "Bash(jq --version)",
+      "Skill(ralph-loop:ralph-loop)",
+      "Skill(ralph-loop:ralph-loop:*)",
+      "Skill(ralph-loop:cancel-ralph)",
+      "Skill(ralph-loop:cancel-ralph:*)",
+      "Read({{home:msys2}}/**)",
+      "Read({{home:msys2}}/.claude/skills/**)",
+      "Read({{home:msys2}}/AppData/Local/Programs/**)",
+      "Read({{home:msys2}}/AppData/Local/Microsoft/WindowsApps/**)",
+      "Bash(find {{home:msys}}/AppData -name *.js -path *claude*)",
+      "Bash(xargs ls:*)",
+      "Bash(grep -v ':1$\\\\|:2$\\\\|:3$\\\\|:4$\\\\|:5$')",
+      "Bash(powershell -NonInteractive -Command \":*)",
+      "Bash(mv \"work/2026-03-16-hermes-drafting-roadmap.md\" archive/)",
+      "Bash(mv \"work/2026-03-16-roadmap-research-loop.md\" archive/)",
+      "Bash(mv \"work/2026-03-16-s2a-final-spec.md\" archive/)",
+      "Bash(mv \"work/2026-03-16-s2a-system-prompt-v3.md\" archive/)",
+      "Bash(mv \"work/2026-03-16-s2a-v3-grounding-report.md\" archive/)",
+      "Bash(mv \"work/2026-03-16-s2a-v3-verification-report.md\" archive/)",
+      "Bash(mv \"work/2026-03-16-temperature-research.md\" archive/)",
+      "Bash(mv \"work/S1 interpreter tests HERMES.csv\" archive/)",
+      "Bash(mv \"work/S1 tests - FULL.csv\" archive/)",
+      "Bash(mv \"work/hermes 2026 entry\" archive/)",
+      "Bash(powershell -File:*)",
+      "Bash(find {{home}}/AppData/Roaming -name *.json -path *claude*)",
+      "Bash(find {{home}}/.claude -name apify-*.md)",
+      "Bash(find {{home}}/.claude -path */skills/apify*)",
+      "Bash(find {{home}}/.claude/plugins/cache -name stop-hook* -o -name *stop*hook*)",
+      "Bash(find {{home}}/.claude/plugins/cache -name plugin.json -not -path */node_modules/*)",
+      "Bash(while read:*)",
+      "Bash(do grep:*)",
+      "Bash(done)",
+      "Bash(powershell -NonInteractive -ExecutionPolicy Bypass -Command \"Get-ChildItem ''{{home:bs4}}\\\\.claude\\\\plugins\\\\cache'' -Recurse -Filter ''plugin.json'' | Where-Object { $_.FullName -notmatch ''node_modules'' } | Select-String -Pattern ''Stop'' | Select-Object -ExpandProperty Path | Sort-Object -Unique\")",
+      "Bash(powershell -NonInteractive -ExecutionPolicy Bypass -Command \":*)",
+      "Bash(__NEW_LINE_82d2933326ccacc7__ mv:*)",
+      "Bash(mv \"$WORK/2026-03-17-data-library-validation-loop.md\" \"$ARCHIVE/\")",
+      "Bash(mv \"$WORK/2026-03-17-data-library-validation-report.md\" \"$ARCHIVE/\")",
+      "Bash(mv \"$WORK/2026-03-17-data-library-deep-verification-loop.md\" \"$ARCHIVE/\")",
+      "Bash(mv \"$WORK/2026-03-17-data-library-deep-verification-report.md\" \"$ARCHIVE/\")",
+      "Bash(mv \"$WORK/2026-03-17-s2b-system-prompt-v2.md\" \"$ARCHIVE/\")",
+      "Bash(__NEW_LINE_82d2933326ccacc7__ rm:*)",
+      "Bash(__NEW_LINE_82d2933326ccacc7__ echo:*)",
+      "Bash(powershell -NonInteractive -ExecutionPolicy Bypass -File /tmp/extract_s2b.ps1)",
+      "Bash(powershell -NonInteractive:*)",
+      "Bash(powershell -Command \":*)",
+      "Bash(npx promptfoo@latest --version)",
+      "Bash(npm cache:*)",
+      "Bash(npm install:*)",
+      "Bash(promptfoo --version)",
+      "Bash(npm prefix:*)",
+      "Bash(ls {{npm:msys}}/promptfoo*)",
+      "Bash(export PATH=\"{{npm:msys}}:$PATH\")",
+      "Bash(mv \"{{vault}}/.claude/scripts/scripts\"/* \"{{vault}}/.claude/scripts/\")",
+      "Bash(rmdir \"{{vault}}/.claude/scripts/scripts\")",
+      "Bash(cat)",
+      "Bash('{{python:msys}}' -c ' *)",
+      "Edit({{vault:bs4}}\\\\.obsidian\\\\**\\) + Write\\({{vault:bs4}}\\\\.obsidian\\\\**)",
+      "Bash(mkdir -p \"{{vault:msys}}/Projects/Claude-Code-Workshop/samples/pr-review-automator/finished_example\")",
+      "Read(//tmp/**)",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(echo \"--- STDERR ---\")",
+      "Read({{home:msys2}}/AppData/Local/Temp/claude/{{project_key}}/88bd1321-0a90-4d69-bfef-737b74df8617/scratchpad/**)",
+      "Bash({{python:msys}} *)",
+      "Bash(cd *)",
+      "Bash(PYTHONIOENCODING=utf-8 {{python:msys}} *)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "codegraph",
+    "memory",
+    "qmd"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-orientation.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-work-orientation.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-log.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/registry-staleness-check.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/mcp-qmd-health-probe.py\"",
+            "timeout": 45
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-credential-scope-check.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/repo-sync-cadence-trigger.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/memory-nudge.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-orientation.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-work-orientation.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-log.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/registry-staleness-check.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/mcp-qmd-health-probe.py\"",
+            "timeout": 45
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-credential-scope-check.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/repo-sync-cadence-trigger.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/memory-nudge.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/scripts/staleness_check.py\" --hook"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/user-prompt-submit.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/user-prompt-state-inject.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-routing-check.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/bash-safety-guard.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/agent-dispatch-check.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/memory-dedup-check.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/scripts/check_forbidden_tokens.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/routing-table-validation.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/transition-gate-check.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/reviewer-scope-violation-check.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/mcp-circuit-breaker.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/mcp-irreversible-guard.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__qmd__query",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/qmd-rerank-default-guard.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/aggregate-write-guard.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/memory-context-guard.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/write-style-guard.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-step-reminder.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/memory-schema-check.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/wiki-citation-check.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/inbox-auto-ingest.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/prose-slop-check.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/plain-language-guard.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/claude-md-provenance-check.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/deferral-resurface.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/unicode-hygiene-check.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/raw-frontmatter-check.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/mcp-circuit-breaker-record.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/hook-write-regression-gate.py\"",
+            "timeout": 90
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/state-reconcile-check.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/subagent-governance.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/subagent-scope-check.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/subagent-quality-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/subagent-scope-check.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/classifier-field-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch-compliance-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/verifier-gate-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/governance-log.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/process-step-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/task-plan-auto-sync.py\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/dark-zone-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/work-verification-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/proactivity-check.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/token-breakdown.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/read-before-edit-check.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/em-dash-guard.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/memory-nudge.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/bin/py\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/reply-style-guard.py\""
+          }
+        ]
+      }
+    ]
+  },
+  "prefersReducedMotion": false,
+  "enableAllProjectMcpServers": true
+}

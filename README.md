@@ -1,5 +1,14 @@
 # Agent Governance Framework for Claude Code
 
+> **Layout change (2026-09-23).** This repository is now generated from the maintainer's
+> vault by the blueprint runner's `bare` profile: the harness lives under `.claude/`
+> (hooks, skills, agents, scripts, workflows, blueprint), the vault skeleton sits beside
+> it, and the tree carries no credential, no instance URL and no company material (the
+> generator scans every file; see `.claude/blueprint/README.md`). To reproduce the setup
+> on a fresh machine follow `Resources/setup-recreation-runbook.md`. The curated
+> `agents/`, `skills/`, `hooks/` layout described in older `docs/` pages is superseded by
+> this tree; those pages are kept for their concepts and will be revised.
+
 A deterministic, hook-driven governance framework for Claude Code (Anthropic's official CLI). It wraps the AI agent in four enforcement layers via Python hooks, raising complex task compliance from approximately 25% on prompt-only baselines to approximately 90%.
 
 The framework operationalizes three research-backed principles: classify before acting, delegate specialist work to agents, and falsify rather than confirm. These principles are not left to the model's judgment -- they are enforced at runtime through hooks that can block, redirect, or inject context on every tool call and session boundary.

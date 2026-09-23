@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "svc-a": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "fixture-svc-a"],
+      "env": {
+        "MCP_MODE": "stdio",
+        "API_TOKEN": "FIXTURE-SECRET-VALUE-AAA111",
+        "N8N_API_URL": "https://fixture-n8n.example.com/webhook-path"
+      }
+    }
+  }
+}

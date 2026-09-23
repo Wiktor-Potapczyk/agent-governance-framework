@@ -1,0 +1,79 @@
+{
+  "_comment": "Pytest NODE IDS whose failure on a mechanism-only clone is a content gap, not a defect. bootstrap_machine._hooks_suite_verdict passes the hooks_suite step only when the set of failing node ids is a SUBSET of node_ids below, and reports any other id by name. Keying on the file name instead let any failure inside a listed file pass, and that mask was measured hiding a real regression (adversarial review finding 3). Regenerate by running the suite on a freshly applied target: pytest .claude/hooks -q -p no:cacheprovider -rfE from the target root, then collect every FAILED/ERROR node id.",
+  "_controls_high_water_bare_note": "The registered (hook, event) control-pair count a freshly applied bare target must not fall below. bootstrap_machine.step_seed_coverage_ratchet writes it to .claude/hooks/aggregates/controls-high-water.json on the target BEFORE the first check, so the first run compares against a shipped number instead of initialising one from whatever the scrub left. Measured 2026-09-23 on a freshly applied bare target: 65 registered pairs with one stale registration still present, 64 after the registration scrub drops it.",
+  "controls_high_water_bare": 64,
+  "count": 39,
+  "count_bare": 2,
+  "counts_per_file": {
+    "test_agent_definition_paths.py": 1,
+    "test_controls_fire.py": 12,
+    "test_mine_governance.py": 23,
+    "test_work_verification_check.py": 3
+  },
+  "measured_command": "pytest .claude/hooks -q -p no:cacheprovider -rfE",
+  "measured_on": "2026-09-22",
+  "measured_on_bare": "2026-09-22",
+  "measured_on_bare_target_state": "--apply --profile bare into a scratch target and a scratch home, the slice-1 end state: the bare sparse set checked out, nine files placed including four scrubbed twins, three generated inventories rebuilt on the target, and the control high-water baseline seeded from this file.",
+  "measured_on_commit": "4f3052f7",
+  "measured_on_target_state": "sparse clone plus place_hook_wiring, the slice-1 end state: settings.local.json and .mcp.json placed in the target, the three user-level files placed under --home. A clone that has NOT been through place_hook_wiring additionally fails the ids in pre_wiring_extra below; those are deliberately absent from node_ids, because an unwired target should report them.",
+  "measured_suite_totals": "39 failed, 2126 passed, 14 skipped",
+  "node_ids": [
+    "test_agent_definition_paths.py::test_no_agent_definition_points_at_a_missing_path",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[PostToolUse:raw-frontmatter-check.py]",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[PostToolUse:state-reconcile-check.py]",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[PostToolUse:tag-variant-check.py]",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[PostToolUse:vault-structure-check.py]",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[PreToolUse:aggregate-write-guard.py]",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[PreToolUse:skill-routing-check.py]",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[Stop:classifier-field-check.py]",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[Stop:dispatch-compliance-check.py]",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[Stop:proactivity-check.py]",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[Stop:process-step-check.py]",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[Stop:verifier-gate-check.py]",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[Stop:work-verification-check.py]",
+    "test_mine_governance.py::SyntheticFixtureTests::test_d1_darkzone_high_records_produce_high_severity_sig",
+    "test_mine_governance.py::SyntheticFixtureTests::test_d1_darkzone_low_records_produce_normal_severity_sig",
+    "test_mine_governance.py::SyntheticFixtureTests::test_d2_agent_dispatched_label_is_no_classification",
+    "test_mine_governance.py::SyntheticFixtureTests::test_d2_two_no_classification_sigs_still_distinct",
+    "test_mine_governance.py::SyntheticFixtureTests::test_fixture_file_exists",
+    "test_mine_governance.py::SyntheticFixtureTests::test_fixture_ledger_exists",
+    "test_mine_governance.py::SyntheticFixtureTests::test_normalization_collapses_digit_variants",
+    "test_mine_governance.py::SyntheticFixtureTests::test_recurring_failure_flagged",
+    "test_mine_governance.py::SyntheticFixtureTests::test_regression_resurfaces",
+    "test_mine_governance.py::SyntheticFixtureTests::test_rev1_distinct_agent_types_produce_distinct_sig_ids",
+    "test_mine_governance.py::SyntheticFixtureTests::test_rev3_high_severity_flagged_at_low_count",
+    "test_mine_governance.py::SyntheticFixtureTests::test_sig_record_has_required_fields",
+    "test_mine_governance.py::WarnMinerFailClosedTests::test_intact_derivation_exactly_one_candidate",
+    "test_mine_governance.py::WarnMinerTests::test_acceptance_proxy_accepted_count",
+    "test_mine_governance.py::WarnMinerTests::test_candidate_field_schema",
+    "test_mine_governance.py::WarnMinerTests::test_curl_pair_classification",
+    "test_mine_governance.py::WarnMinerTests::test_ledger_regression_resurfaces",
+    "test_mine_governance.py::WarnMinerTests::test_mine_failure_pass_regression_unchanged",
+    "test_mine_governance.py::WarnMinerTests::test_negative_deny_tier_cluster_yields_nothing_at_any_count",
+    "test_mine_governance.py::WarnMinerTests::test_patternless_family_counted_not_proposed",
+    "test_mine_governance.py::WarnMinerTests::test_push_cluster_promotes",
+    "test_mine_governance.py::WarnMinerTests::test_session_floor_boundary_both_sides",
+    "test_mine_governance.py::WarnMinerTests::test_synthetic_sessions_excluded_from_candidacy",
+    "test_work_verification_check.py::Check4FileExistenceTests::test_existing_real_path_not_fabrication",
+    "test_work_verification_check.py::Check4FileExistenceTests::test_r18_bare_state_md_claim_silent",
+    "test_work_verification_check.py::Check4FileExistenceTests::test_r18_project_nested_relative_claim_silent"
+  ],
+  "node_ids_bare": [
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[PostToolUse:wiki-citation-check.py]",
+    "test_work_verification_check.py::Check4FileExistenceTests::test_r18_markdown_link_capture_silent"
+  ],
+  "pre_wiring_extra": [
+    "test_hooks_survive_malformed_payload.py::test_the_population_is_not_silently_empty",
+    "test_controls_fire.py::test_no_probe_targets_an_unregistered_control"
+  ],
+  "reasons": {
+    "test_agent_definition_paths.py": "test_no_agent_definition_points_at_a_missing_path checks every backticked Projects/ or Resources/ path inside .claude/agents/*.md against disk, and at least one agent definition points at real project content absent from the clone.",
+    "test_controls_fire.py": "Two distinct causes, both content absence. (a) Probes that read live vault content a mechanism-only clone does not carry: raw-frontmatter, state-reconcile, tag-variant, vault-structure, aggregate-write-guard, proactivity. (b) Probes whose transcript fixture lives in .claude/hooks/_probe_fragments/fixtures/*.jsonl, which the same blanket .gitignore rule excludes from every clone: skill-routing, classifier-field, dispatch-compliance, process-step, verifier-gate, work-verification. Group (b) only became visible once the probe loader started rehoming paths onto the running checkout; before that these six passed on a target by reading the SOURCE machine's fixture files, which is a false green, not coverage.",
+    "test_mine_governance.py": "Reads .claude/hooks/_test_fixtures/governance-log-sample.jsonl and miner-resolved-fixture.jsonl. Both are caught by the blanket .gitignore rule .claude/hooks/**/*.jsonl (line 66), so neither ships on any clone, and the WarnMiner cases derive from the same fixtures.",
+    "test_work_verification_check.py": "Check4FileExistenceTests resolves a claimed path such as a project STATE.md or a project's work/qa-log.md against real Projects/ content that a mechanism-only clone does not carry."
+  },
+  "reasons_bare": {
+    "test_controls_fire.py": "One id, one cause, and it is the bare profile working. The wiki-citation probe reads a live knowledge-base page and a note to produce SOURCE_DRIFT; bare carries neither, so the hook is correctly silent and the probe's trip case cannot fire. The two tracker-guard ids and the global stray-probe invariant left this list on 2026-09-22: the bare control-probes twin now drops every row whose hook is not in the bare tree, so those probes are not there to fail and the invariant passes for real rather than by excuse.",
+    "test_work_verification_check.py": "test_r18_markdown_link_capture_silent resolves a knowledge-base index page against disk. That path is TRACKED, so the scaffold refuses to stub it (stubbing a tracked file stages a content deletion), and it is knowledge-bucket, so the bare pattern set does not check it out. Its two siblings in node_ids fail the same way on a full target."
+  }
+}

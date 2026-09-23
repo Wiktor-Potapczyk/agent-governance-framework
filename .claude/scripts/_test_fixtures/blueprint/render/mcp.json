@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "svc-a": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "fixture-svc-a"],
+      "env": {
+        "MCP_MODE": "stdio",
+        "API_TOKEN": "FIXTURE-SECRET-VALUE-AAA111"
+      }
+    },
+    "svc-b": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "fixture-svc-b"],
+      "env": {
+        "MCP_MODE": "stdio",
+        "API_TOKEN": "FIXTURE-SECRET-VALUE-NOMATCH999"
+      }
+    }
+  }
+}

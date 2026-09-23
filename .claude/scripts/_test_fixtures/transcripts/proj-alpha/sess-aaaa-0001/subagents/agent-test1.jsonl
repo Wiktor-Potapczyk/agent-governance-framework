@@ -1,0 +1,2 @@
+{"type": "user", "uuid": "s1-u1", "timestamp": "2026-08-01T10:02:00Z", "sessionId": "sess-aaaa-0001", "agentId": "agent-test1", "promptId": "prompt-1", "isSidechain": true, "message": {"role": "user", "content": "Delegated task: inspect the marmoset delegation"}}
+{"type": "assistant", "uuid": "s1-a1", "timestamp": "2026-08-01T10:02:30Z", "sessionId": "sess-aaaa-0001", "agentId": "agent-test1", "promptId": "prompt-1", "message": {"role": "assistant", "content": [{"type": "text", "text": "The marmoset delegation returned findings"}]}}

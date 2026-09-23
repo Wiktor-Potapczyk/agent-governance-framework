@@ -1,0 +1,47 @@
+# Ruff configuration for the vault.
+#
+# Why this file exists (2026-08-21): `governance-hooks-ci.yml` installed ruff
+# unpinned, so every run resolved whatever version was current that day. Ruff
+# 0.16 changed which rules are on by default (it added import sorting and
+# dropped E402), which turned the workflow red with no vault commit behind it
+# and, worse, made the local check and the CI check disagree: the `# noqa: E402`
+# markers in the hook test files are load-bearing under 0.15 defaults and dead
+# under 0.16 defaults.
+#
+# Stating the rule set here removes the calendar from the pipeline. The version
+# is also pinned in the workflow, so a new release cannot add rules inside these
+# groups either. Changing this list is a deliberate act with a diff to review.
+
+target-version = "py312"
+
+# Scope. This repo is not a single Python tree: six directories under it are
+# independent git clones the vault does not own, and one is a worktree. Ruff is
+# built on the same directory walker as ripgrep, which stops honouring the
+# PARENT .gitignore once it crosses into a directory that has its own .git, so
+# these are NOT excluded by the vault's .gitignore alone. Measured 2026-08-21:
+# `ruff check .` from the root reported 852 findings inside them.
+#
+# The CI job passes an explicit five-file list, so this made no difference to
+# it. The exclude is here so the config's real footprint matches its stated one
+# whoever invokes it, including a future `ruff check .` by a human or an agent.
+extend-exclude = [
+    "Projects/Agent-Governance-Research/framework-repo/",
+    "Projects/Agent-Governance-Research/repo/",
+    "Projects/*/repo/",
+    "Projects/*/*-work/",
+    "Archives/Claude-Code-Workshop/work/pr-review-playground-local/",
+    ".claude/worktrees/",
+]
+
+[lint]
+select = [
+    "E4",       # imports, incl. E402 module-level import not at top of file
+    "E7",       # statement-level pycodestyle
+    "E9",       # syntax / IO errors
+    "F",        # pyflakes
+    "I",        # import sorting
+    "PIE810",   # single startswith/endswith call with a tuple
+    "FURB188",  # str.removeprefix / str.removesuffix
+    "UP045",    # X | None instead of Optional[X]
+    "RUF100",   # noqa directives that no longer suppress anything
+]

@@ -1,0 +1,76 @@
+{
+ "batch_index": 11,
+ "probes": [
+  {
+   "hook": "skill-step-reminder.py",
+   "event": "PostToolUse",
+   "path": ".claude/hooks/skill-step-reminder.py",
+   "trip": {
+    "stdin": {"tool_name": "Skill", "tool_input": {"skill": "process-qa"}, "session_id": "probe11", "cwd": "C:/Users/WiktorPotapczyk/Desktop/Vault"},
+    "expect": "warn",
+    "why": "tool_input.skill lowercases to 'process-qa', a key in PROCESS_REMINDERS (line 49), so the hook passes the process-skill filter at line 93 and prints a hookSpecificOutput additionalContext reminder.",
+    "observed": "exit 0, stdout = {\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"PROCESS REMINDER: You MUST follow these steps in order. Step 1: List every verifiable claim (QA SCOPE block). ... Step 5: Escalate failures, do NOT fix them, report them.\"}}; one record appended to the redirected hook-activity sink: hook=skill-step-reminder decision=remind detail=process-qa session=probe11. Classified warn."
+   },
+   "pass": {
+    "stdin": {"tool_name": "Skill", "tool_input": {"skill": "pm"}, "session_id": "probe11", "cwd": "C:/Users/WiktorPotapczyk/Desktop/Vault"},
+    "must_not": ["deny", "block"],
+    "why": "Same event shape and a real installed skill, but 'pm' is not a process-* skill, so PROCESS_REMINDERS.get returns None and line 94 returns before any output. This isolates the process-skill filter rather than the event shape.",
+    "observed": "exit 0, no stdout, no stderr, no record appended to the activity sink. Classified silent."
+   }
+  },
+  {
+   "hook": "memory-context-guard.py",
+   "event": "PreToolUse",
+   "path": ".claude/hooks/memory-context-guard.py",
+   "trip": {
+    "stdin": {"tool_name": "Write", "tool_input": {"file_path": "C:/Users/WiktorPotapczyk/.claude/projects/C--Users-WiktorPotapczyk-Desktop-Vault/memory/probe_trip_never_created.md"}, "agent_type": "general-purpose", "session_id": "probe11"},
+    "expect": "warn",
+    "why": "Both trigger conditions are met at once: is_memory_target() is true because the path sits inside the DEFAULT memory folder (so no env override is needed to trip it), and classify_context() returns context='subagent' off the payload agent_type tier, giving decision='warn' and _emit_warn(). This hook is WARN-tier by design (allow plus caution) and never emits deny; the deny tier for the three singleton files is aggregate-write-guard.py, so 'warn' is the correct ceiling here, not deny.",
+    "observed": "exit 0, stdout = permissionDecision 'allow' with permissionDecisionReason 'MEMORY CONTEXT GUARD (advisory warning, not a block): this write targets the memory folder from inside a dispatched subagent (general-purpose, detected via the payload tier). The memory folder is main-session-owned...'. One JSONL record written with context=subagent, agent_type=general-purpose, detection_tier=payload, decision=warn. Classified warn. As a PreToolUse hook it only inspects the path string, so nothing was created: confirmed the named path does not exist on disk after the run. RUNNER NOTE: set MEMORY_CONTEXT_GUARD_LOG_PATH and MEMORY_NUDGE_STATE_PATH to temp files before running this probe, otherwise it appends to the live memory-context-warnings.jsonl and zeroes the live memory-nudge counter. Do NOT set MEMORY_CONTEXT_GUARD_DIR: the trip path is deliberately the real default folder so the probe still trips under default env. A first attempt using backslash-escaped Windows paths went silent because bash echo collapsed the doubled backslashes into invalid JSON escapes; forward slashes normalize identically via os.path.normpath and trip correctly."
+   },
+   "pass": {
+    "stdin": {"tool_name": "Write", "tool_input": {"file_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/Inbox/benign-note.md"}, "agent_type": "general-purpose", "session_id": "probe11"},
+    "must_not": ["deny", "block"],
+    "why": "Deliberately KEEPS the subagent signal (agent_type still set) and changes only the target, so it isolates the memory-folder scope gate rather than the context gate. An ordinary Inbox write from a subagent is normal work and must stay silent; a hook that warned here would fire on everything.",
+    "observed": "exit 0, no stdout, no stderr, no JSONL record appended (the line 273 fast path returns before any file input or output). Classified silent."
+   }
+  },
+  {
+   "hook": "read-before-edit-check.py",
+   "event": "Stop",
+   "path": ".claude/hooks/read-before-edit-check.py",
+   "trip": {
+    "stdin": {"transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/rbe-trip.jsonl", "session_id": "probe11", "stop_hook_active": false},
+    "expect": "warn",
+    "why": "The fixture transcript holds one user entry followed by an assistant entry whose only tool_use is an Edit on C:/probe/target.md with no preceding Read of that path in the same turn, which is exactly the edits_without_read condition at line 120. The hook is instrumentation by design (its own docstring states it does not block, because the built-in tool layer is the behavioral gate), so warn is the correct ceiling, not block.",
+    "observed": "exit 0, stderr = 'WARN: Edit on C:/probe/target.md without prior Read in this turn. Built-in tool spec requires Read first; this hook logged the event as instrumentation (governance-log).' One governance record written to the redirected sink: schema=2, event=edit_without_read, hook=read-before-edit-check, tool=Edit, file_path=C:/probe/target.md, session=probe11. Classified warn."
+   },
+   "pass": {
+    "stdin": {"transcript_path": "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/rbe-pass.jsonl", "session_id": "probe11", "stop_hook_active": false},
+    "must_not": ["deny", "block"],
+    "why": "Identical transcript shape carrying the same Edit on the same path, with one difference: a Read of C:/probe/target.md appears earlier in the same turn, so the path is in read_paths and the Edit is not collected. This isolates the read-before-edit rule itself rather than the transcript parsing.",
+    "observed": "exit 0, no stdout, no stderr, no new governance record. Classified silent."
+   },
+   "fixtures": {
+    "note": "Both stdin objects point at fixture transcripts this batch created; they must exist for the probe to mean anything, since a missing transcript_path makes the hook return silently at line 57 and would read as a false pass.",
+    "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/rbe-trip.jsonl": [
+     {"type": "user", "message": {"role": "user", "content": "fix the config"}},
+     {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "name": "Edit", "input": {"file_path": "C:/probe/target.md", "old_string": "a", "new_string": "b"}}]}}
+    ],
+    "C:/Users/WiktorPotapczyk/Desktop/Vault/.claude/hooks/_probe_fragments/fixtures/rbe-pass.jsonl": [
+     {"type": "user", "message": {"role": "user", "content": "fix the config"}},
+     {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "name": "Read", "input": {"file_path": "C:/probe/target.md"}}]}},
+     {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "name": "Edit", "input": {"file_path": "C:/probe/target.md", "old_string": "a", "new_string": "b"}}]}}
+    ]
+   }
+  }
+ ],
+ "waivers": [
+  {
+   "hook": "repo-sync-cadence-trigger.py",
+   "event": "SessionStart",
+   "reason": "Not reachable from stdin. main() reads stdin ONLY to derive session_id for logging (line 178); the branch taken is decided by throttled(), which reads .claude/hooks/_state/repo-sync-cadence.json, and by build_message(), which shells out to git log and git rev-list inside two clone paths hardcoded off __file__ (Projects/Agent-Governance-Research/framework-repo and /repo). No stdin field can change either, and the hook exposes no env override for the state file or the repo paths, unlike memory-context-guard.py. This is NOT a 'could not work out the input' waiver and I did not tune the expectation down to silent: I loaded the module and called build_message() against synthetic REPOS, which produced '[REPO-SYNC: CLONE UNREADABLE] AGF (agent-governance-framework)...' for a directory with no .git, and '[REPO-SYNC CADENCE: OVERDUE] AGR last commit 234d ago (cadence 14d)...' for a real temp git repo committed with GIT_COMMITTER_DATE=2026-01-01. The detector genuinely fires; its trip is simply unprobeable by the stdin method this suite uses. Against live state it is currently silent for two independent reasons: throttled() is True (last_reminder 2026-08-23T14:13:49Z, inside the 20h window) and build_message() returns '' (AGF last commit 0d ago, AGR 4d ago, both 0 unpushed, against a 14d cadence). An end-to-end stdin run confirmed exit 0, no stdout, an activity record with decision='throttled', and the live state file byte-identical (md5) before and after. SEPARATE COVERAGE GAP for a human: the sibling test_repo_sync_cadence_trigger.py has three tests and all three mock.patch.object(rsc, 'throttled', return_value=True), so the existing suite never once executes build_message(). Its enforcement path is green-but-unexercised, which is the pattern this audit exists to catch, even though the path does work when called directly."
+  }
+ ],
+ "defects_found": []
+}

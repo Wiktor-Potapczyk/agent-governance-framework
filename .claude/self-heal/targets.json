@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "allowed_classes": [
+    {"class": "generated-docs", "paths": [".claude/docs/harness/**", ".claude/harness-self-model.md", ".claude/scripts/staleness-manifest.json", "Resources/KB/cmdb-vault-setup.md"], "promotable": true, "protected_prose_check": true},
+    {"class": "tests", "paths": [".claude/scripts/test_*.py", ".claude/hooks/test_*.py"], "promotable": true},
+    {"class": "scripts", "paths": [".claude/scripts/*.py"], "excludes": ["*_logic.py"], "promotable": true},
+    {"class": "hook-logic-with-tests", "paths": [".claude/hooks/_*_logic.py", ".claude/hooks/test_*.py"], "requires_sibling_test": true, "promotable": false},
+    {"class": "skill-prose", "paths": [".claude/skills/*/SKILL.md"], "promotable": false},
+    {"class": "registry", "paths": [".claude/registry.json", ".claude/hooks/_known_dispatch_names.json"], "promotable": true},
+    {"class": "work-curation", "paths": ["Projects/*/work/**", "Projects/*/archive/**"], "excludes": ["Projects/*/work/backups/**"], "promotable": true, "wikilink_integrity_check": true}
+  ],
+  "forbidden_paths": [
+    ".claude/hooks/bash-safety-guard.py",
+    ".claude/hooks/_irreversible_surface.py",
+    ".claude/hooks/mcp-irreversible-guard.py",
+    "CLAUDE.md",
+    ".claude/rules/**",
+    ".claude/settings.json",
+    ".claude/self-heal/ci-settings.json",
+    ".github/**",
+    ".claude/self-heal/**",
+    ".claude/scripts/trust_contract_verify.py",
+    ".claude/scripts/test_trust_contract_verify.py",
+    ".claude/user-claude-mirror/**",
+    ".claude/hooks/_state/self-heal-promotion-state.json"
+  ],
+  "ranking": [
+    {"rank": 1, "source": "watchdog-issue", "detail": "open alert lines in the pinned vault-watchdog issue, oldest first"},
+    {"rank": 2, "source": "experience-hook-repeat-14d", "detail": "most repeated hook deny/block signature across the last 14 experience files"},
+    {"rank": 3, "source": "owner-correction", "detail": "most recent owner-correction-shaped quote in experience, unaddressed"},
+    {"rank": 4, "source": "curation-debt", "detail": "oldest project whose STATE.md status is done or archived but work/ file count exceeds its retention.json cap"}
+  ],
+  "signal_map": [
+    {"match": "^trust-contract-ledger", "class": "work-curation", "path": "Projects/"},
+    {"match": "^lint (sweep|verifier)", "class": "work-curation", "path": "Projects/"},
+    {"match": "^backup", "class": null, "path": null},
+    {"match": "^observability digest", "class": null, "path": null},
+    {"match": "^docs stamp", "class": null, "path": null},
+    {"match": "^owner digest", "class": null, "path": null},
+    {"match": "^self-heal (round|OAuth token age|PAT age)", "class": null, "path": null},
+    {"match": "^needs-owner PR age", "class": null, "path": null},
+    {"match": "^retention cap breach", "class": null, "path": null},
+    {"match": "^subagent-quality-check$", "class": "hook-logic-with-tests", "path": ".claude/hooks/_subagent_quality_logic.py"},
+    {"match": "^actions-minutes", "class": null, "path": null}
+  ],
+  "merge_subject_prefix": "self-heal: "
+}

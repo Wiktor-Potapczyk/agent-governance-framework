@@ -1,0 +1,13 @@
+{
+  "last_iso": "2026-09-06T11:24:52Z",
+  "report_path": "Projects/Agent-Governance-Research/work/2026-09-06-lint-report.md",
+  "errors": 5,
+  "warnings": 39,
+  "advisories": 228,
+  "citation_resolve_rate": 0.733,
+  "total_wiki_pages": 33,
+  "total_moc_pages": 11,
+  "broken_wikilinks": 171,
+  "doctrine_drift": 0,
+  "memory_folder_resolved": true
+}

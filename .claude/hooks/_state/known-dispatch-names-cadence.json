@@ -1,0 +1,6 @@
+{
+  "fingerprint": "330b7e528b842a45615b76309992650e524acb314f01db83d5c91397a52d268e",
+  "last_iso": "2026-09-22T16:50:25.467679+00:00",
+  "registry_summary": "  Hook liveness: 40 logging fires, 2 truly-silent, 25 log-elsewhere (of 65 registered). Full: python .claude/scripts/hook_activity_report.py",
+  "names_summary": "  sources: {'registry_agents': 92, 'registry_skills': 180, 'local_agent_files': 33, 'local_skill_dirs': 33, 'legacy_compat_names': 1, 'false_positive_guard_excluded': 7, 'raw_union_before_guard': 273}"
+}

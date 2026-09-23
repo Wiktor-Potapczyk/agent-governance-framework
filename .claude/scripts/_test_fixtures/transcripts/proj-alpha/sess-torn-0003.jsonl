@@ -1,0 +1,3 @@
+{"type": "user", "uuid": "t-u1", "timestamp": "2026-08-03T09:00:00Z", "sessionId": "sess-torn-0003", "message": {"role": "user", "content": "The ibex ledger opens here"}}
+{"type": "assistant", "uuid": "t-a1", "timestamp": "2026-08-03T09:00:05Z", "sessionId": "sess-torn-0003", "message": {"role": "assistant", "content": [{"type": "text", "text": "ibex ledger acknowledged"}]}}
+{"type":"user","uuid":"t-u2","timestamp":"2026-08-03T09:00:10Z","sessionId":"sess-torn-0003","message":{"role":"user","content":"tornfinal

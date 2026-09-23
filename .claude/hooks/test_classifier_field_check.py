@@ -1,0 +1,397 @@
+"""
+Tests for classifier-field-check.py — Stop hook that verifies classifier fields.
+Step 3.1 (2026-04-13): JUSTIFICATION enforcement for Quick.
+"""
+
+import re
+import unittest
+
+
+def check_quick_justification(classifier_text):
+    """Simulate the Quick JUSTIFICATION check from classifier-field-check.py."""
+    is_quick = bool(re.search(
+        r'(?:TASK TYPE|CLASSIFICATION):\s*Quick', classifier_text, re.IGNORECASE
+    ))
+    if not is_quick:
+        return True  # Non-Quick doesn't need JUSTIFICATION
+    has_justification = bool(re.search(r'JUSTIFICATION:', classifier_text, re.IGNORECASE))
+    return has_justification
+
+
+class TestQuickJustification(unittest.TestCase):
+    """S1 fix (2026-04-13): Quick must have JUSTIFICATION field."""
+
+    def test_quick_without_justification_blocked(self):
+        """Quick classification without JUSTIFICATION should fail."""
+        text = (
+            "IMPLIES: Simple file move\n"
+            "TASK TYPE: Quick\n"
+        )
+        self.assertFalse(check_quick_justification(text))
+
+    def test_quick_with_justification_passes(self):
+        """Quick classification with JUSTIFICATION should pass."""
+        text = (
+            "IMPLIES: Simple file move\n"
+            "TASK TYPE: Quick\n"
+            "JUSTIFICATION: Single file move, no judgment needed\n"
+        )
+        self.assertTrue(check_quick_justification(text))
+
+    def test_non_quick_without_justification_passes(self):
+        """Non-Quick classification should not require JUSTIFICATION."""
+        text = (
+            "IMPLIES: Complex analysis\n"
+            "TASK TYPE: Analysis\n"
+            "APPROACH: inline\n"
+            "MISSED: nothing\n"
+            "MUST DISPATCH: process-qa, pm\n"
+        )
+        self.assertTrue(check_quick_justification(text))
+
+    def test_justification_case_insensitive(self):
+        """JUSTIFICATION check should be case-insensitive."""
+        text = (
+            "IMPLIES: test\n"
+            "TASK TYPE: Quick\n"
+            "justification: it's simple\n"
+        )
+        self.assertTrue(check_quick_justification(text))
+
+
+class TestMultilinePmCheck(unittest.TestCase):
+    """B4 fix regression: multiline PM enforcement in classifier-field-check."""
+
+    def test_pm_on_line2_not_blocked(self):
+        """PM on second line of multiline MUST DISPATCH should pass."""
+        FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
+        text = (
+            "IMPLIES: test\n"
+            "TASK TYPE: Build\n"
+            "APPROACH: build\n"
+            "MUST DISPATCH:\n"
+            "  process-build,\n"
+            "  pm,\n"
+            "  process-qa\n"
+            "MISSED: nothing"
+        )
+        dispatch_match = re.search(
+            r'MUST DISPATCH:\s*(.*?)(?=\n\s*' + FIELD_LABELS + r'\s*:|\Z)',
+            text, re.DOTALL | re.IGNORECASE
+        )
+        self.assertIsNotNone(dispatch_match)
+        dispatch_text = re.sub(r'\s+', ' ', dispatch_match.group(1).strip()).lower()
+        self.assertTrue(re.search(r'\bpm\b', dispatch_text))
+
+
+import importlib.util  # noqa: E402
+import os  # noqa: E402
+
+_cfc_spec = importlib.util.spec_from_file_location(
+    "classifier_field_check",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "classifier-field-check.py"),
+)
+cfc = importlib.util.module_from_spec(_cfc_spec)
+_cfc_spec.loader.exec_module(cfc)
+
+_FIELD_LABELS = r'(?:IMPLIES|TASK TYPE|CLASSIFICATION|DOMAIN|APPROACH|MISSED)'
+
+
+def _eval_missing(text):
+    """Mirror classifier-field-check.main() field logic exactly (lines ~95-124).
+
+    Kept as a faithful copy (the file's existing 'simulate' convention) — the
+    field detection is inline in main() and the hook writes to governance-log on
+    block, so running it end-to-end would pollute the log."""
+    is_quick = bool(re.search(r'(?:TASK TYPE|CLASSIFICATION):\s*Quick', text, re.IGNORECASE))
+    has_implies = bool(re.search(r'IMPLIES:', text, re.IGNORECASE))
+    has_type = bool(re.search(r'(?:TASK TYPE|CLASSIFICATION):', text, re.IGNORECASE))
+    has_approach = bool(re.search(r'APPROACH:', text, re.IGNORECASE))
+    has_missed = bool(re.search(r'MISSED:', text, re.IGNORECASE))
+    has_md = bool(re.search(r'MUST DISPATCH:', text, re.IGNORECASE))
+    missing = []
+    if not has_implies:
+        missing.append("IMPLIES")
+    if not has_type:
+        missing.append("TASK TYPE")
+    if not is_quick:
+        if not has_approach:
+            missing.append("APPROACH")
+        if not has_missed:
+            missing.append("MISSED")
+        if not has_md:
+            missing.append("MUST DISPATCH")
+    # Reads the hook's OWN flag rather than hardcoding the answer. A mirror that
+    # hardcodes it keeps passing while the real hook changes underneath, which is
+    # a test that cannot fail. Flipping PM_MANDATE_SUSPENDED in the source moves
+    # this branch and the hook together.
+    if (not cfc.PM_MANDATE_SUSPENDED
+            and not is_quick and has_md and not missing):
+        dm = re.search(r'MUST DISPATCH:\s*(.+)', text, re.IGNORECASE)
+        if dm and not re.search(r'\bpm\b', dm.group(1).lower()):
+            missing.append("pm in MUST DISPATCH")
+    # QA mandate (2026-09-21), mirrored from the hook; the end-to-end test in
+    # QAMandateTests runs the real hook so this mirror cannot drift silently.
+    if not is_quick and has_md and not missing:
+        if not cfc.names_qa(cfc.must_dispatch_items(text)):
+            missing.append("process-qa in MUST DISPATCH")
+    return missing
+
+
+class ClassifierFieldBoundaryTests(unittest.TestCase):
+    """Named FP-guards (boundary-test harness sprint 9). Each docstring names its
+    boundary_axis."""
+
+    def test_fp_quick_minimal_fields_silent(self):
+        """FP-CF-01 boundary_axis: 'Quick field set (IMPLIES+TYPE+JUSTIFICATION) vs non-Quick set'.
+        A Quick task must NOT be blocked for missing APPROACH/MISSED/MUST DISPATCH."""
+        text = "IMPLIES: trivial rename\nTASK TYPE: Quick\nJUSTIFICATION: one-field edit"
+        self.assertEqual(_eval_missing(text), [])
+
+    def test_fp_fenced_classification_not_detected_silent(self):
+        """FP-CF-02 boundary_axis: 'fenced example classification vs live classification'.
+        A classification block inside ``` (quoting the template) is stripped by the real
+        strip_fences, so it is not treated as a live classification."""
+        fenced = "Example:\n```\nTASK TYPE: Build\nMUST DISPATCH: process-qa, pm\n```\n"
+        cleaned = cfc.strip_fences(fenced)
+        self.assertNotRegex(
+            cleaned,
+            r'(?:TASK TYPE|CLASSIFICATION):\s*(?:Quick|Research|Analysis|Content|Build|Planning|Compound)',
+        )
+
+    def test_fp_pm_orchestrator_satisfies_pm_silent(self):
+        """FP-CF-03 boundary_axis: 'literal pm / pm-orchestrator satisfies the PM requirement'.
+        origin: regression (SA-2 finding — \\bpm\\b matches 'pm-orchestrator'). A non-Quick
+        task declaring 'pm-orchestrator' (not bare 'pm') must NOT be flagged 'pm missing'."""
+        text = ("IMPLIES: x\nTASK TYPE: Analysis\nAPPROACH: a\nMISSED: none\n"
+                "MUST DISPATCH: process-qa, pm-orchestrator")
+        self.assertEqual(_eval_missing(text), [])
+
+    def test_tp_nonquick_missing_missed_blocks(self):
+        """TP-CF-01: a non-Quick classification missing MISSED is flagged."""
+        text = "IMPLIES: x\nTASK TYPE: Build\nAPPROACH: a\nMUST DISPATCH: process-qa, pm"
+        self.assertIn("MISSED", _eval_missing(text))
+
+
+class QAMandateTests(unittest.TestCase):
+    """2026-09-21: CLAUDE.md has said "QA mandatory for all non-Quick,
+    process-qa in MUST DISPATCH" since April, and nothing enforced it: the
+    only MUST DISPATCH content check was the (suspended) PM one. The
+    governance log held 635 QA reports filed without the skill and an unknown
+    number of non-Quick turns with no QA at all (adversarial review of the QA
+    contract, finding 7). The mandate now lives here, next to the PM switch,
+    without a suspension flag."""
+
+    def test_non_quick_without_process_qa_is_flagged(self):
+        text = ("IMPLIES: x\nTASK TYPE: Build\nAPPROACH: a\nMISSED: m\n"
+                "MUST DISPATCH: implementation-plan, architect-reviewer")
+        self.assertIn("process-qa in MUST DISPATCH", " ".join(_eval_missing(text)))
+
+    def test_non_quick_with_process_qa_is_not_flagged(self):
+        text = ("IMPLIES: x\nTASK TYPE: Build\nAPPROACH: a\nMISSED: m\n"
+                "MUST DISPATCH: implementation-plan, process-qa")
+        self.assertEqual(_eval_missing(text), [])
+
+    def test_process_pentest_satisfies_the_mandate(self):
+        text = ("IMPLIES: x\nTASK TYPE: Build\nAPPROACH: a\nMISSED: m\n"
+                "MUST DISPATCH: process-pentest")
+        self.assertEqual(_eval_missing(text), [])
+
+    def test_quick_is_not_subject_to_the_mandate(self):
+        text = ("IMPLIES: x\nTASK TYPE: Quick\nREVERSIBILITY: reversible\n"
+                "JUSTIFICATION: one field")
+        self.assertNotIn("process-qa", " ".join(_eval_missing(text)))
+
+    def test_must_dispatch_none_on_non_quick_is_flagged(self):
+        text = ("IMPLIES: x\nTASK TYPE: Analysis\nAPPROACH: a\nMISSED: m\n"
+                "MUST DISPATCH: none")
+        self.assertIn("process-qa in MUST DISPATCH", " ".join(_eval_missing(text)))
+
+    def test_the_word_inside_a_sentence_does_not_satisfy_the_mandate(self):
+        """Build review N7: 'skip process-qa this time' matched the regex."""
+        for line in ("skip process-qa this time",
+                     "implementation-plan (process-qa not applicable, nothing verifiable)",
+                     "preprocess-qa-thing"):
+            text = f"IMPLIES: x\nTASK TYPE: Build\nAPPROACH: a\nMISSED: m\nMUST DISPATCH: {line}"
+            self.assertIn("process-qa in MUST DISPATCH", " ".join(_eval_missing(text)), line)
+
+    def test_a_multi_line_bulleted_list_is_read_whole(self):
+        """Build review N11: the regex stopped at the first newline, so a bulleted
+        list with process-qa on the second line was a false block."""
+        text = "IMPLIES: x\nTASK TYPE: Build\nAPPROACH: a\nMISSED: m\nMUST DISPATCH:\n- implementation-plan\n- process-qa\n\nDispatching: process-build"
+        self.assertEqual(_eval_missing(text), [])
+        self.assertEqual(cfc.must_dispatch_items(text), ["implementation-plan", "process-qa"])
+
+    def test_items_are_split_on_commas_and_and(self):
+        self.assertEqual(cfc.must_dispatch_items("MUST DISPATCH: `process-build`, architect-reviewer and process-qa"),
+                         ["process-build", "architect-reviewer", "process-qa"])
+
+    def test_the_real_hook_blocks_a_non_quick_turn_that_names_no_qa(self):
+        """Runs the hook itself on an isolated copy, not the mirror."""
+        import json as _json, tempfile, pathlib
+        from _hooktest import run_isolated
+        for dispatch, expect_block in (("implementation-plan, architect-reviewer", True),
+                                       ("implementation-plan, process-qa", False)):
+            tmp = pathlib.Path(tempfile.mkdtemp(prefix="cfc-e2e-"))
+            text = (f"IMPLIES: x\nTASK TYPE: Build\nDOMAIN: general\nAPPROACH: a\nMISSED: m\n"
+                    f"MUST DISPATCH: {dispatch}")
+            lines = [_json.dumps({"type": "user", "message": {"role": "user", "content": "go"}}),
+                     _json.dumps({"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}})]
+            tp = tmp / "t.jsonl"
+            tp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            proc, _ = run_isolated("classifier-field-check.py", {"transcript_path": str(tp)}, tmp)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertEqual('"block"' in proc.stdout, expect_block, f"{dispatch}: {proc.stdout}")
+
+    def test_the_enforcement_switch_has_both_polarities(self):
+        """Mutation check on QA_MANDATE_ENFORCED, both directions, on the real hook."""
+        import json as _json, tempfile, pathlib
+        from _hooktest import isolate, run_isolated
+        text = ("IMPLIES: x\nTASK TYPE: Build\nDOMAIN: general\nAPPROACH: a\nMISSED: m\n"
+                "MUST DISPATCH: implementation-plan")
+        for on, expect_block in ((True, True), (False, False)):
+            tmp = pathlib.Path(tempfile.mkdtemp(prefix="cfc-switch-"))
+            hook = isolate("classifier-field-check.py", tmp)
+            src = hook.read_text(encoding="utf-8")
+            self.assertIn("QA_MANDATE_ENFORCED = True", src)
+            hook.write_text(src.replace("QA_MANDATE_ENFORCED = True", f"QA_MANDATE_ENFORCED = {on}"), encoding="utf-8")
+            lines = [_json.dumps({"type": "user", "message": {"role": "user", "content": "go"}}),
+                     _json.dumps({"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}})]
+            tp = tmp / "t.jsonl"
+            tp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            import subprocess, sys as _sys, os as _os
+            env = dict(_os.environ, PYTHONIOENCODING="utf-8",
+                       GOVERNANCE_LOG_PATH=str(hook.parent / "governance-log.jsonl"),
+                       HOOK_ACTIVITY_LOG_PATH=str(hook.parent / "hook-activity.jsonl"))
+            r = subprocess.run([_sys.executable, str(hook)], input=_json.dumps({"transcript_path": str(tp)}),
+                               capture_output=True, text=True, timeout=60, env=env)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual('"block"' in r.stdout, expect_block, f"on={on}: {r.stdout}")
+            if not on:
+                self.assertIn("process-qa", r.stderr)
+
+
+class PMMandateSuspensionTests(unittest.TestCase):
+    """Owner ruling 2026-09-09: "lift the PM mandate in the hooks and doctrine".
+
+    These bind to the REAL module constant, not to a hardcoded expectation, so
+    a silent change to the hook turns them red. Note for whoever runs the PM
+    investigation: before this suspension the mandate had ZERO positive
+    coverage. No test ever asserted that it fires. It was enforced in
+    production and untested, so the suite could not have caught its removal."""
+
+    def test_flag_exists_and_is_suspended(self):
+        self.assertTrue(hasattr(cfc, "PM_MANDATE_SUSPENDED"))
+        self.assertTrue(cfc.PM_MANDATE_SUSPENDED)
+
+    def test_non_quick_without_pm_is_not_flagged(self):
+        """The point of the ruling: a non-Quick task need not name pm."""
+        text = ("IMPLIES: x\nTASK TYPE: Planning\nAPPROACH: a\nMISSED: m\n"
+                "MUST DISPATCH: process-qa")
+        self.assertNotIn("pm in MUST DISPATCH", _eval_missing(text))
+
+    def test_suspending_pm_does_not_disarm_the_rest(self):
+        """Guards the real risk: lifting one rule quietly lifting the others."""
+        text = ("IMPLIES: x\nTASK TYPE: Planning\nAPPROACH: a\n"
+                "MUST DISPATCH: process-qa")
+        self.assertIn("MISSED", _eval_missing(text))
+        self.assertIn("IMPLIES", _eval_missing("TASK TYPE: Planning"))
+
+    def test_reinstating_the_flag_restores_the_mandate(self):
+        """Mutation proof: the suspension is the only thing switching it off."""
+        original = cfc.PM_MANDATE_SUSPENDED
+        try:
+            cfc.PM_MANDATE_SUSPENDED = False
+            text = ("IMPLIES: x\nTASK TYPE: Planning\nAPPROACH: a\nMISSED: m\n"
+                    "MUST DISPATCH: process-qa")
+            self.assertIn("pm in MUST DISPATCH", _eval_missing(text))
+        finally:
+            cfc.PM_MANDATE_SUSPENDED = original
+
+
+# B6 (2026-06-16, two-gate): REVERSIBILITY / DETECTABILITY are ACCEPTED (captured),
+# never REQUIRED. These tests guard against (a) accidentally making them mandatory and
+# (b) a Quick task being blocked because it declares irreversible-surface.
+_REVERSIBILITY_RX = re.compile(r'REVERSIBILITY:\s*([^\n]+)', re.IGNORECASE)
+_DETECTABILITY_RX = re.compile(r'DETECTABILITY:\s*([^\n]+)', re.IGNORECASE)
+
+
+class TestTwoGateFields(unittest.TestCase):
+    """B6: the two new advisory autonomy fields are accept-not-require + captured."""
+
+    def test_classification_with_both_fields_not_blocked(self):
+        """A classification carrying both new fields is NOT blocked (fields accepted)."""
+        text = (
+            "IMPLIES: edit helper then test\nTASK TYPE: Quick\n"
+            "JUSTIFICATION: single edit\n"
+            "REVERSIBILITY: reversible\nDETECTABILITY: self-detectable"
+        )
+        self.assertEqual(_eval_missing(text), [])
+
+    def test_classification_without_fields_not_blocked(self):
+        """Absence of the new fields never blocks (they are not required)."""
+        text = "IMPLIES: trivial rename\nTASK TYPE: Quick\nJUSTIFICATION: one-field edit"
+        self.assertEqual(_eval_missing(text), [])
+
+    def test_quick_irreversible_surface_not_blocked(self):
+        """A Quick task declaring REVERSIBILITY: irreversible-surface stays Quick (no block).
+        The hard stop is the Gate-1 PreToolUse deny, never this Stop hook."""
+        text = (
+            "IMPLIES: delete the unused helper\nTASK TYPE: Quick\n"
+            "JUSTIFICATION: explicit imperative\n"
+            "REVERSIBILITY: irreversible-surface"
+        )
+        self.assertEqual(_eval_missing(text), [])
+
+    def test_fields_extracted_for_emit(self):
+        """The capture regexes (mirror of the hook's emit block) extract both values."""
+        text = (
+            "TASK TYPE: Build\nREVERSIBILITY: irreversible-surface\n"
+            "DETECTABILITY: needs-detector\n"
+        )
+        rev = _REVERSIBILITY_RX.search(text)
+        det = _DETECTABILITY_RX.search(text)
+        self.assertIsNotNone(rev)
+        self.assertIsNotNone(det)
+        self.assertEqual(rev.group(1).strip(), "irreversible-surface")
+        self.assertEqual(det.group(1).strip(), "needs-detector")
+
+
+class SessionWiringTests(unittest.TestCase):
+    """Defect 2 (2026-08-07): the entry-point log_fire() call fired before
+    session was ever wired in, always logging session=None even though
+    `payload` (with session_id) was already in scope. Reproduces the broken
+    shape first (a synthetic Stop-hook invocation with a populated
+    session_id and no transcript, isolated via HOOK_ACTIVITY_LOG_PATH so it
+    cannot pollute the live log), then asserts session populates."""
+
+    def test_session_populates_from_payload(self):
+        import io
+        import json as _json
+        import sys as _sys
+        import tempfile as _tempfile
+        from contextlib import redirect_stdout
+        from pathlib import Path as _Path
+        from unittest import mock
+
+        with _tempfile.TemporaryDirectory() as td:
+            activity_log = str(_Path(td) / "hook-activity.jsonl")
+            payload = {
+                "session_id": "test-classfield-1",
+                "transcript_path": str(_Path(td) / "no-such-transcript.jsonl"),
+            }
+            captured = io.StringIO()
+            with mock.patch.dict(os.environ, {"HOOK_ACTIVITY_LOG_PATH": activity_log}), \
+                 mock.patch.object(_sys, "stdin", io.StringIO(_json.dumps(payload))), \
+                 redirect_stdout(captured):
+                cfc.main()
+            self.assertTrue(os.path.exists(activity_log))
+            with open(activity_log, encoding="utf-8") as f:
+                records = [_json.loads(l) for l in f if l.strip()]
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["hook"], "classifier-field-check")
+        self.assertEqual(records[0]["session"], "test-classfield-1")
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

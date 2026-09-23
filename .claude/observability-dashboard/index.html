@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Governance Observability Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Governance Observability</h1>
+    <div id="stats-strip" class="stats-strip">
+      <!-- Populated by app.js -->
+    </div>
+  </header>
+
+  <nav class="tab-bar" id="tab-bar">
+    <button class="tab-btn active" data-tab="events">Events</button>
+    <button class="tab-btn" data-tab="investigation">Investigation</button>
+    <button class="tab-btn" data-tab="analytics">Analytics</button>
+    <button class="tab-btn" data-tab="enforcement">Enforcement</button>
+  </nav>
+
+  <!-- ============================================================
+       TAB: Events
+       ============================================================ -->
+  <div id="tab-events" class="tab-panel">
+
+    <div class="toolbar">
+      <div class="toolbar-row">
+        <div class="filter-group">
+          <label for="session-filter">Session</label>
+          <input id="session-filter" type="text" placeholder="session UUID prefix…" autocomplete="off">
+        </div>
+        <div class="filter-group">
+          <label for="hook-filter">Hook</label>
+          <input id="hook-filter" type="text" placeholder="hook name…" autocomplete="off">
+        </div>
+        <div class="filter-group">
+          <label for="env-filter">Environment</label>
+          <select id="env-filter">
+            <option value="">All</option>
+            <option value="prod">prod</option>
+            <option value="test">test</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="ts-from">From</label>
+          <input id="ts-from" type="text" placeholder="YYYY-MM-DD" autocomplete="off">
+        </div>
+        <div class="filter-group">
+          <label for="ts-to">To</label>
+          <input id="ts-to" type="text" placeholder="YYYY-MM-DD" autocomplete="off">
+        </div>
+        <button id="btn-refresh" class="btn-primary">Refresh</button>
+      </div>
+
+      <div class="toolbar-row event-type-filters">
+        <span class="filter-label">Event types:</span>
+        <div id="event-type-checkboxes">
+          <!-- Populated dynamically by app.js -->
+        </div>
+        <label class="et-checkbox-label" id="show-analyses-label">
+          <input type="checkbox" id="show-analyses-inline">
+          <span class="ev-badge telemetry">show analyses inline</span>
+        </label>
+      </div>
+    </div>
+
+    <div id="analyze-bar" class="analyze-bar hidden">
+      <span class="analyze-explainer">Runs Haiku on the session's failure events to produce plain-English summaries.</span>
+      <span id="analyze-session-label"></span>
+      <button id="btn-analyze" class="btn-secondary">Analyze with Haiku</button>
+      <span id="analyze-status"></span>
+      <button id="btn-analyze-close" class="btn-ghost">&#x2715;</button>
+    </div>
+
+    <main>
+      <div id="table-container">
+        <table id="events-table">
+          <thead>
+            <tr>
+              <th class="col-ts">Timestamp</th>
+              <th class="col-event">Event</th>
+              <th class="col-hook">Hook</th>
+              <th class="col-session">Session</th>
+              <th class="col-env">Env</th>
+              <th class="col-detail">Detail</th>
+            </tr>
+          </thead>
+          <tbody id="events-tbody">
+            <!-- Rows injected by app.js -->
+          </tbody>
+        </table>
+      </div>
+
+      <div id="pagination" class="pagination">
+        <!-- Prev / page-numbers / Next injected by app.js -->
+      </div>
+    </main>
+
+  </div><!-- /tab-events -->
+
+  <!-- ============================================================
+       TAB: Investigation
+       ============================================================ -->
+  <div id="tab-investigation" class="tab-panel hidden">
+
+    <div class="toolbar">
+      <div class="toolbar-row">
+        <div class="filter-group">
+          <label for="inv-session-filter">Session prefix</label>
+          <input id="inv-session-filter" type="text" placeholder="session UUID prefix…" autocomplete="off">
+        </div>
+        <div class="filter-group">
+          <label for="inv-model-filter">Model contains</label>
+          <input id="inv-model-filter" type="text" placeholder="haiku, sonnet…" autocomplete="off">
+        </div>
+        <div class="filter-group">
+          <label for="inv-date-from">From</label>
+          <input id="inv-date-from" type="text" placeholder="YYYY-MM-DD" autocomplete="off">
+        </div>
+        <div class="filter-group">
+          <label for="inv-date-to">To</label>
+          <input id="inv-date-to" type="text" placeholder="YYYY-MM-DD" autocomplete="off">
+        </div>
+      </div>
+      <div class="toolbar-row">
+        <span class="filter-label">Source event type:</span>
+        <div id="inv-source-type-checkboxes">
+          <!-- Populated by app.js -->
+        </div>
+      </div>
+    </div>
+
+    <main>
+      <div id="investigation-cards">
+        <!-- Cards injected by app.js -->
+      </div>
+    </main>
+
+  </div><!-- /tab-investigation -->
+
+  <!-- ============================================================
+       TAB: Analytics
+       ============================================================ -->
+  <div id="tab-analytics" class="tab-panel hidden">
+
+    <div class="toolbar">
+      <div class="toolbar-row">
+        <span class="filter-label">Time window:</span>
+        <div id="analytics-window-btns" class="window-btn-group">
+          <button class="window-btn active" data-window="all">All time</button>
+          <button class="window-btn" data-window="7d">Last 7 days</button>
+          <button class="window-btn" data-window="today">Today</button>
+        </div>
+        <span class="filter-label hidden" id="session-filter-badge">
+          Filtered to session: <span id="active-session-filter-label"></span>
+          <button id="btn-clear-session-filter" class="btn-ghost">&#x2715; clear</button>
+        </span>
+      </div>
+    </div>
+
+    <main class="analytics-main">
+
+      <!-- KPI strip -->
+      <section class="analytics-section" id="section-kpis">
+        <h2 class="section-heading">Top Stats</h2>
+        <div id="kpi-cards" class="kpi-strip">
+          <!-- Injected by app.js -->
+        </div>
+      </section>
+
+      <!-- Tool-Call Breakdown -->
+      <section class="analytics-section" id="section-toolcalls">
+        <h2 class="section-heading">Tool-Call Breakdown</h2>
+        <div class="chart-container">
+          <canvas id="chart-tool-calls"></canvas>
+        </div>
+      </section>
+
+      <!-- Hook Activity -->
+      <section class="analytics-section" id="section-hook-activity">
+        <h2 class="section-heading">Hook Activity</h2>
+        <div class="chart-row">
+          <div class="chart-container">
+            <h3 class="chart-subheading">Run Count by Hook</h3>
+            <canvas id="chart-hook-runs"></canvas>
+          </div>
+          <div class="chart-container">
+            <h3 class="chart-subheading">Block/Deny Count by Hook</h3>
+            <canvas id="chart-hook-blocks"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Agent Activity -->
+      <section class="analytics-section" id="section-agent-activity">
+        <h2 class="section-heading">Agent Activity</h2>
+        <div class="chart-row">
+          <div class="chart-container">
+            <h3 class="chart-subheading">Dispatches by Agent Type</h3>
+            <canvas id="chart-agent-dispatches"></canvas>
+          </div>
+          <div class="chart-container">
+            <h3 class="chart-subheading">Outcome Distribution</h3>
+            <canvas id="chart-agent-outcomes"></canvas>
+          </div>
+        </div>
+        <div class="chart-container">
+          <h3 class="chart-subheading">Token Burn by Agent <span class="approx-label">&#x26A0; sparse attribution (13/78 rows)</span></h3>
+          <canvas id="chart-agent-tokens"></canvas>
+        </div>
+      </section>
+
+      <!-- Session Ledger -->
+      <section class="analytics-section" id="section-session-ledger">
+        <h2 class="section-heading">Session Ledger</h2>
+        <p class="section-note">Click a row to filter all panels to that session.</p>
+        <div id="session-ledger-container" class="table-scroll">
+          <table id="session-ledger-table" class="data-table sortable-table">
+            <thead>
+              <tr>
+                <th data-sort-col="session">Session</th>
+                <th data-sort-col="duration_sec">Duration (s)</th>
+                <th data-sort-col="turn_count">Turns</th>
+                <th data-sort-col="total_tokens">Tokens</th>
+                <th data-sort-col="block_count">Blocks</th>
+                <th data-sort-col="dark_zone_count">Dark Zones</th>
+                <th data-sort-col="classification_complete_pct">Class. Complete %</th>
+              </tr>
+            </thead>
+            <tbody id="session-ledger-tbody">
+              <!-- Injected by app.js -->
+            </tbody>
+          </table>
+        </div>
+        <p id="session-ledger-zombie-note" class="section-note">Sessions &gt;86,400s excluded by default (zombie filter).</p>
+      </section>
+
+      <!-- Governance Health -->
+      <section class="analytics-section" id="section-governance-health">
+        <h2 class="section-heading">Governance Health</h2>
+        <div class="chart-row">
+          <div class="chart-container">
+            <h3 class="chart-subheading">Dark-Zone Ratio Distribution</h3>
+            <canvas id="chart-darkzone-hist"></canvas>
+          </div>
+          <div class="chart-container">
+            <h3 class="chart-subheading">Severity Counts</h3>
+            <canvas id="chart-severity"></canvas>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div><!-- /tab-analytics -->
+
+  <!-- ============================================================
+       TAB: Enforcement
+       ============================================================ -->
+  <div id="tab-enforcement" class="tab-panel hidden">
+
+    <div class="toolbar">
+      <div class="toolbar-row">
+        <span class="filter-label">Time window:</span>
+        <div id="enforcement-window-btns" class="window-btn-group">
+          <button class="window-btn active" data-window="all">All time</button>
+          <button class="window-btn" data-window="7d">Last 7 days</button>
+          <button class="window-btn" data-window="today">Today</button>
+        </div>
+      </div>
+    </div>
+
+    <main class="analytics-main">
+
+      <section class="analytics-section">
+        <h2 class="section-heading">Enforcement Trigger Rate</h2>
+        <div class="chart-container">
+          <canvas id="chart-enforcement-rate"></canvas>
+        </div>
+      </section>
+
+      <section class="analytics-section">
+        <h2 class="section-heading">Top Blocked/Denied Hooks</h2>
+        <div id="top-blocked-hooks-container" class="table-scroll">
+          <table id="top-blocked-hooks-table" class="data-table">
+            <thead>
+              <tr>
+                <th>Hook</th>
+                <th>Block+Deny Count</th>
+              </tr>
+            </thead>
+            <tbody id="top-blocked-hooks-tbody">
+              <!-- Injected by app.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Wired-Combination Matrix -->
+      <section class="analytics-section">
+        <h2 class="section-heading">Wired-Combination Matrix</h2>
+        <p class="section-note">Supported /api/query group_by × metric combinations. &#x2713; = supported, &#x26A0; = approximate, &#x2014; = unsupported (returns 400).</p>
+        <div id="combination-matrix-container">
+          <!-- Injected by app.js -->
+        </div>
+      </section>
+
+    </main>
+  </div><!-- /tab-enforcement -->
+
+  <!-- Shared modal -->
+  <div id="detail-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <span id="modal-title">Event Detail</span>
+        <button id="modal-close" class="btn-ghost">&#x2715;</button>
+      </div>
+      <pre id="modal-body"></pre>
+    </div>
+  </div>
+
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

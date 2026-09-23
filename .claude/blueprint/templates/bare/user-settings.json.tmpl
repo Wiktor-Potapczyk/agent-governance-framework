@@ -1,0 +1,186 @@
+{
+  "env": {},
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash({{home:bs2}}\\.claude\\plugins\\cache\\claude-plugins-official\\ralph-loop\\**)",
+      "mcp__scheduled-tasks__list_scheduled_tasks",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(claude plugin:*)",
+      "Bash(npx skills:*)",
+      "Bash(node:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(\"{{python:bs4}}\":*)",
+      "Bash(jq:*)",
+      "Bash(xargs grep:*)",
+      "Bash(bash --version)",
+      "Bash(jq --version)",
+      "Skill(ralph-loop:ralph-loop)",
+      "Skill(ralph-loop:ralph-loop:*)",
+      "Skill(ralph-loop:cancel-ralph)",
+      "Skill(ralph-loop:cancel-ralph:*)",
+      "Read({{home:msys2}}/**)",
+      "Read({{home:msys2}}/.claude/skills/**)",
+      "Read({{home:msys2}}/AppData/Local/Programs/**)",
+      "Read({{home:msys2}}/AppData/Local/Microsoft/WindowsApps/**)",
+      "Bash(find {{home:msys}}/AppData -name *.js -path *claude*)",
+      "Bash(xargs ls:*)",
+      "Bash(grep -v ':1$\\\\|:2$\\\\|:3$\\\\|:4$\\\\|:5$')",
+      "Bash(powershell -NonInteractive -Command \":*)",
+      "Bash(mv \"work/2026-03-16-hermes-drafting-roadmap.md\" archive/)",
+      "Bash(mv \"work/2026-03-16-roadmap-research-loop.md\" archive/)",
+      "Bash(mv \"work/2026-03-16-s2a-final-spec.md\" archive/)",
+      "Bash(mv \"work/2026-03-16-s2a-system-prompt-v3.md\" archive/)",
+      "Bash(mv \"work/2026-03-16-s2a-v3-grounding-report.md\" archive/)",
+      "Bash(mv \"work/2026-03-16-s2a-v3-verification-report.md\" archive/)",
+      "Bash(mv \"work/2026-03-16-temperature-research.md\" archive/)",
+      "Bash(mv \"work/S1 interpreter tests HERMES.csv\" archive/)",
+      "Bash(mv \"work/S1 tests - FULL.csv\" archive/)",
+      "Bash(mv \"work/hermes 2026 entry\" archive/)",
+      "Bash(powershell -File:*)",
+      "Bash(find {{home}}/AppData/Roaming -name *.json -path *claude*)",
+      "Bash(find {{home}}/.claude -name apify-*.md)",
+      "Bash(find {{home}}/.claude -path */skills/apify*)",
+      "Bash(find {{home}}/.claude/plugins/cache -name stop-hook* -o -name *stop*hook*)",
+      "Bash(find {{home}}/.claude/plugins/cache -name plugin.json -not -path */node_modules/*)",
+      "Bash(while read:*)",
+      "Bash(do grep:*)",
+      "Bash(done)",
+      "Bash(powershell -NonInteractive -ExecutionPolicy Bypass -Command \"Get-ChildItem ''{{home:bs4}}\\\\.claude\\\\plugins\\\\cache'' -Recurse -Filter ''plugin.json'' | Where-Object { $_.FullName -notmatch ''node_modules'' } | Select-String -Pattern ''Stop'' | Select-Object -ExpandProperty Path | Sort-Object -Unique\")",
+      "Bash(powershell -NonInteractive -ExecutionPolicy Bypass -Command \":*)",
+      "Bash(__NEW_LINE_82d2933326ccacc7__ mv:*)",
+      "Bash(mv \"$WORK/2026-03-17-data-library-validation-loop.md\" \"$ARCHIVE/\")",
+      "Bash(mv \"$WORK/2026-03-17-data-library-validation-report.md\" \"$ARCHIVE/\")",
+      "Bash(mv \"$WORK/2026-03-17-data-library-deep-verification-loop.md\" \"$ARCHIVE/\")",
+      "Bash(mv \"$WORK/2026-03-17-data-library-deep-verification-report.md\" \"$ARCHIVE/\")",
+      "Bash(mv \"$WORK/2026-03-17-s2b-system-prompt-v2.md\" \"$ARCHIVE/\")",
+      "Bash(__NEW_LINE_82d2933326ccacc7__ rm:*)",
+      "Bash(__NEW_LINE_82d2933326ccacc7__ echo:*)",
+      "Bash(powershell -NonInteractive -ExecutionPolicy Bypass -File /tmp/extract_s2b.ps1)",
+      "Bash(powershell -NonInteractive:*)",
+      "Bash(powershell -Command \":*)",
+      "Bash(npx promptfoo@latest --version)",
+      "Bash(npm cache:*)",
+      "Bash(npm install:*)",
+      "Bash(promptfoo --version)",
+      "Bash(npm prefix:*)",
+      "Bash(ls {{npm:msys}}/promptfoo*)",
+      "Bash(export PATH=\"{{npm:msys}}:$PATH\")",
+      "Edit({{vault:bs4}}\\\\.obsidian\\\\**\\) + Write\\({{vault:bs4}}\\\\.obsidian\\\\**)"
+    ],
+    "deny": [],
+    "defaultMode": "auto"
+  },
+  "model": "opus[1m]",
+  "hooks": {},
+  "statusLine": {
+    "type": "command",
+    "command": "\"{{python:bs2}}\" {{home}}/.claude/statusline.py",
+    "padding": 1
+  },
+  "enabledPlugins": {
+    "agent-sdk-dev@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "claude-code-setup@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true,
+    "plugin-dev@claude-plugins-official": true,
+    "atomic-agents@claude-plugins-official": true,
+    "academic-research-skills@academic-research-skills": true,
+    "hookify@claude-plugins-official": true,
+    "pm-product-discovery@pm-skills": true,
+    "pm-product-strategy@pm-skills": true,
+    "pm-execution@pm-skills": true,
+    "pm-market-research@pm-skills": true,
+    "pm-data-analytics@pm-skills": true,
+    "pm-go-to-market@pm-skills": true,
+    "pm-marketing-growth@pm-skills": true,
+    "pm-toolkit@pm-skills": true,
+    "pm-ai-shipping@pm-skills": true,
+    "humanizer@humanizer": true,
+    "figma@claude-plugins-official": true,
+    "career-ops@career-ops": true,
+    "ralph-loop@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    },
+    "academic-research-skills": {
+      "source": {
+        "source": "github",
+        "repo": "Imbad0202/academic-research-skills"
+      }
+    },
+    "pm-skills": {
+      "source": {
+        "source": "github",
+        "repo": "phuryn/pm-skills"
+      }
+    },
+    "humanizer": {
+      "source": {
+        "source": "github",
+        "repo": "blader/humanizer"
+      }
+    },
+    "career-ops": {
+      "source": {
+        "source": "directory",
+        "path": "{{vault:bs2}}\\Projects\\Personal\\Career"
+      }
+    }
+  },
+  "effortLevel": "xhigh",
+  "modelSettings": {
+    "claude-fable-5-1": {
+      "effortLevel": "high"
+    }
+  },
+  "tui": "default",
+  "autoDreamEnabled": true,
+  "skipDangerousModePermissionPrompt": true,
+  "verbose": false,
+  "remoteControlAtStartup": false,
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true,
+  "autoMode": {
+    "soft_deny": [
+      "$defaults",
+      "Writes/edits to deploy/terraform/backend/*.tf and deploy/docker/compose.prod.yaml",
+      "Edits to .github/workflows/deploy_on_prod.yaml"
+    ],
+    "environment": [
+      "### Org-wide",
+      "**Cloud provider(s)**: AWS (Secrets Manager, referenced throughout CLAUDE.md and .env.example)",
+      "**Repository visibility**: not queryable here \u2014 assuming private per shipped default; treat as private repo unless contradicted",
+      "**Internal sharing / snippet hosting**: None configured \u2014 treat public paste/gist services as outside the trust boundary",
+      "**Default / protected branches**: main (default branch); protection status not queryable here \u2014 treat main as protected out of caution",
+      "**CI/CD deploy targets**: GitHub Actions workflow `deploy_on_prod.yaml`; Docker compose `deploy/docker/compose.prod.yaml`; Terraform backend under `deploy/terraform/backend/`",
+      "**Network posture**: VPN required to reach the database (per CLAUDE.md/README)",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: n8n workflow engine (webhook + API key integration); AWS Secrets Manager",
+      "**Internal package registry**: None configured",
+      "**Data retention / declassification**: None configured",
+      "**Protected deployment namespaces / environments**: prod/production environment as referenced by `deploy_on_prod.yaml`, `compose.prod.yaml`, and the `prod` value of `ENV_VARIABLE`/AWS secret env segment",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, node-pool resources; `deploy/terraform/backend/` (backend.tf, main.tf, outputs.tf) and any resource tagged/named prod or production",
+      "### User-specific",
+      "**Org-specific CLIs**: None configured"
+    ]
+  }
+}

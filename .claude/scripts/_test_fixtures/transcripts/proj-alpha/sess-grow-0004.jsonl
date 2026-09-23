@@ -1,0 +1,4 @@
+{"type": "user", "uuid": "g-u1", "timestamp": "2026-08-04T09:00:00Z", "sessionId": "sess-grow-0004", "message": {"role": "user", "content": "The heliotrope baseline message one"}}
+{"type": "assistant", "uuid": "g-a1", "timestamp": "2026-08-04T09:00:01Z", "sessionId": "sess-grow-0004", "message": {"role": "assistant", "content": [{"type": "text", "text": "heliotrope baseline reply one"}]}}
+{"type": "user", "uuid": "g-u2", "timestamp": "2026-08-04T09:00:02Z", "sessionId": "sess-grow-0004", "message": {"role": "user", "content": "heliotrope baseline message two"}}
+{"type": "assistant", "uuid": "g-a2", "timestamp": "2026-08-04T09:00:03Z", "sessionId": "sess-grow-0004", "message": {"role": "assistant", "content": [{"type": "text", "text": "heliotrope baseline reply two"}]}}

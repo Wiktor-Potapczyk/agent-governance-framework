@@ -1,0 +1,7 @@
+fwd=C:/Users/FixtureUser/Desktop/FixtureVault
+bs=C:\Users\FixtureUser\Desktop\FixtureVault
+bs2=C:\\Users\\FixtureUser\\Desktop\\FixtureVault
+bs4=C:\\\\Users\\\\FixtureUser\\\\Desktop\\\\FixtureVault
+msys=/c/Users/FixtureUser/Desktop/FixtureVault
+msys2=//c/Users/FixtureUser/Desktop/FixtureVault
+short=//c/Users/FIXTUR~1/Desktop/FixtureVault

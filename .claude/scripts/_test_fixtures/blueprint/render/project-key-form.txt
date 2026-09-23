@@ -1,0 +1,1 @@
+memory=.claude/projects/C--Users-FixtureUser-Desktop-FixtureVault/memory
