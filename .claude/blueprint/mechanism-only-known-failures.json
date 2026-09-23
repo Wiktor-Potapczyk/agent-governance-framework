@@ -75,5 +75,38 @@
   "reasons_bare": {
     "test_controls_fire.py": "One id, one cause, and it is the bare profile working. The wiki-citation probe reads a live knowledge-base page and a note to produce SOURCE_DRIFT; bare carries neither, so the hook is correctly silent and the probe's trip case cannot fire. The two tracker-guard ids and the global stray-probe invariant left this list on 2026-09-22: the bare control-probes twin now drops every row whose hook is not in the bare tree, so those probes are not there to fail and the invariant passes for real rather than by excuse.",
     "test_work_verification_check.py": "test_r18_markdown_link_capture_silent resolves a knowledge-base index page against disk. That path is TRACKED, so the scaffold refuses to stub it (stubbing a tracked file stages a content deletion), and it is knowledge-bucket, so the bare pattern set does not check it out. Its two siblings in node_ids fail the same way on a full target."
+  },
+  "node_ids_ci_fresh_checkout": [
+    "test_agent_dispatch_check.py::TestPluginDispatchNames::test_plain_plugin_agent_name_recognized",
+    "test_agent_dispatch_check.py::TestPluginDispatchNames::test_synthetic_dispatch_record_naming_plugin_agent_recognized",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[PostToolUse:claude-md-provenance-check.py]",
+    "test_controls_fire.py::test_control_trips_on_input_that_must_trip[PreToolUse:reviewer-scope-violation-check.py]",
+    "test_controls_fire.py::test_every_registered_control_has_a_probe",
+    "test_controls_fire.py::test_no_probe_targets_an_unregistered_control",
+    "test_dispatch_compliance_check.py::PluginDispatchEndToEndTests::test_declared_but_never_dispatched_blocks",
+    "test_dispatch_compliance_check.py::PluginDispatchEndToEndTests::test_namespaced_declared_and_dispatched_passes",
+    "test_dispatch_compliance_check.py::PluginDispatchEndToEndTests::test_pruned_word_in_prose_does_not_satisfy_declared_obligation",
+    "test_dispatch_compliance_check.py::PluginDispatchEndToEndTests::test_short_declared_matches_namespaced_dispatch",
+    "test_dispatch_compliance_check.py::PluginDispatchNameTests::test_plain_plugin_agent_name_recognized",
+    "test_dispatch_compliance_check.py::PluginDispatchNameTests::test_synthetic_dispatch_record_naming_plugin_agent_recognized",
+    "test_dispatch_compliance_check.py::PrunedGenericWordTests::test_real_declaration_survives_pruned_word_in_trailing_prose",
+    "test_governance_log.py::TestPluginDispatchNames::test_plain_plugin_agent_name_recognized",
+    "test_governance_log.py::TestPluginDispatchNames::test_plugin_agent_mixed_with_local_names",
+    "test_governance_log.py::TestPluginDispatchNames::test_synthetic_dispatch_record_naming_plugin_agent_recognized",
+    "test_hooks_survive_malformed_payload.py::test_the_population_is_not_silently_empty",
+    "test_mine_governance.py::WarnMinerFailClosedTests::test_curl_predicate_false_none_fails_closed",
+    "test_mine_governance.py::WarnMinerFailClosedTests::test_curl_predicate_raises_fails_closed",
+    "test_mine_governance.py::WarnMinerTests::test_monkeypatch_call_derivation",
+    "test_mine_governance.py::WarnMinerTests::test_return_contract_keys",
+    "test_work_verification_check.py::Check4FileExistenceTests::test_r18_tilde_path_existing_silent"
+  ],
+  "count_ci_fresh_checkout": 22,
+  "measured_on_ci_fresh_checkout": "2026-09-23",
+  "measured_on_ci_fresh_checkout_state": "a fresh git clone of the generated bare tree (no ignored files, so no settings.local.json wiring), HOME/USERPROFILE/CLAUDE_CONFIG_DIR pointed at an empty scratch directory, no plugins installed, no CLAUDE_PROJECT_DIR; pytest .claude/hooks -q -p no:cacheprovider -rfE with node_ids and node_ids_bare already deselected. Measured on Windows; the public repo's CI job is the ubuntu measurement and any id it adds goes here on evidence, not by guess.",
+  "reasons_ci_fresh_checkout": {
+    "plugin dispatch names (12 ids in test_agent_dispatch_check, test_dispatch_compliance_check, test_governance_log)": "_known_dispatch_names.json is regenerated on the target from registry.json plus the installed plugins; with no plugin installed the plugin agent names (silent-failure-hunter and the other pr-review-toolkit agents) are absent, so every test that expects them fails until the plugin install of Phase B.",
+    "test_controls_fire (4 ids) and test_hooks_survive_malformed_payload::test_the_population_is_not_silently_empty": "a clean checkout carries no hook wiring: settings.local.json is placed by the bootstrap runner and is ignored by git, so the registered-control population is empty or partial and the probe registry no longer matches it. The two probes named read the running home and the vault memory folder, neither of which exists under an empty home.",
+    "test_mine_governance WarnMiner (4 ids)": "they load .claude/hooks/_irreversible_surface.py by path, and the bare profile leaves that module out (work-paths.json excludes it for one comment line naming a work-bound server). Open defect, owner-gated file: the Gate-1 canonical surface should ship as a scrubbed twin, not be dropped.",
+    "test_work_verification_check::Check4FileExistenceTests::test_r18_tilde_path_existing_silent": "resolves a ~ path against the running home, which is empty in this measurement."
   }
 }

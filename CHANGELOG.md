@@ -415,7 +415,7 @@ Refactor + diagnostic-label clarification bundle. No behavioral change on the re
 - **Outcome labels:** `outcome="error"` now indicates non-zero subprocess exit (was `miss`); `outcome="interrupted"` now indicates user Ctrl-C during subprocess (was `miss`). Full enum: `hit | miss | error | timeout | invalid_output | cli_absent | interrupted`.
 - **Write-path refactor:** the dedup → undo → apply → verify → record SYNCED sequence (previously duplicated across Haiku and regex branches in `main()`) is now a single helper `_execute_sync(match, assistant_text, source_label)`. Both call sites collapse to one line. SYNCED log lines now emit `SYNCED (regex)` / `SYNCED (haiku)` for attribution.
 - **HAIKU_SINK rotation (LOW-1):** sink at `.claude/hooks/aggregates/h4-haiku-fallback.jsonl` rotates at 1 MB OR 30 days mtime age. Rotated archive name: `h4-haiku-fallback.jsonl.YYYY-MM-DD.<pid>` (PID suffix prevents same-date parallel-rotation collisions). Best-effort: any rotation exception is logged and swallowed; append never fails due to rotation.
-- **QA-block-aware excerpt slicing (LOW-2):** Haiku fallback excerpt previously took `assistant_text[:EXCERPT_MAX]` (head 1500 chars), which could miss the QA REPORT block if it appeared past char 1500. Now prefers `extract_qa_block(assistant_text)` and falls back to head-slice only if no QA REPORT marker is found.
+- **QA-block-aware excerpt slicing (LOW-2):** Haiku fallback excerpt previously took `assistant_text:EXCERPT_MAX` (head 1500 chars), which could miss the QA REPORT block if it appeared past char 1500. Now prefers `extract_qa_block(assistant_text)` and falls back to head-slice only if no QA REPORT marker is found.
 - **Selftest production-JSONL isolation (MED-4):** all `T-SM-HAIKU-MOCK-*` sub-tests run inside `_mock.patch(f"{__name__}._write_haiku_sink")` so no selftest entry can leak to the production JSONL sink. The `T-SM-HAIKU-MOCK-ISOLATION` sub-test asserts pre/post HAIKU_SINK byte count equality.
 
 Selftest grew 15 → 19 cases (new: `T-SM-HAIKU-MOCK-E` for error outcome, `T-SM-HAIKU-MOCK-ISOLATION`, `T-SM-HAIKU-ROTATE`, `T-SM-HAIKU-EXCERPT-QA`). All 19 PASS.
@@ -572,7 +572,7 @@ The 2026-04-18 sidecar POC (`sidecar_loader.py` + `process-build/DISPATCHES.json
 **Sidecar files added:**
 
 - `hooks/sidecar_loader.py`: POC shipped 2026-04-18 but never synced to this repo. Now present.
-- `skills/core/{process-build,process-planning,process-research,process-analysis,process-qa,process-pentest}/DISPATCHES.json`: machine-readable dispatch contracts for all 6 process skills. Mandatory lists: process-planning `[implementation-plan, architect-reviewer, adversarial-reviewer]`; process-build `[implementation-plan, blueprint-mode, architect-reviewer]`; process-research `[report-generator]`; process-analysis / process-qa / process-pentest have empty mandatory lists (analysis is subject-dependent; qa/pentest are terminal).
+- `skills/core/{process-build,process-planning,process-research,process-analysis,process-qa,process-pentest}/DISPATCHES.json`: machine-readable dispatch contracts for all 6 process skills. Mandatory lists: process-planning `implementation-plan, architect-reviewer, adversarial-reviewer`; process-build `implementation-plan, blueprint-mode, architect-reviewer`; process-research `report-generator`; process-analysis / process-qa / process-pentest have empty mandatory lists (analysis is subject-dependent; qa/pentest are terminal).
 
 **Verification:**
 
@@ -600,7 +600,7 @@ Comprehensive infrastructure audit across 5 surfaces (hooks, agents, skills, CLA
 - **H7: `epistemic-check.py`:** PATH robustness via `shutil.which("claude")` with fallback paths. Silent failures now log to `epistemic-check.log`.
 - **H1: `architect-review` → `architect-reviewer` consolidation:** Canonical name used across all skills + `KNOWN_DISPATCH_NAMES` in 3 hooks. Deprecated alias kept as backward-compat safety net. DAR pass-log alias-expanded.
 - **O1: `KNOWN_DISPATCH_NAMES` additions** (caught by adversarial review): `architect-reviewer` was missing from all 3 hooks' known-names sets after the H1 rename. `extract_dispatch_names()` silently dropped the token. Fixed by adding it.
-- **O2: `has_qa_report` regex tightened** (caught by adversarial review): Was matching narrative mentions like "as mentioned in the QA REPORT, all tests pass." Now requires structural block: `^\s*QA REPORT\s*[\n:].{0,500}?\b(?:PASS|FAIL)\b`. Same fix applied to PENTEST REPORT detection.
+- **O2: `has_qa_report` regex tightened** (caught by adversarial review): Was matching narrative mentions like "as mentioned in the QA REPORT, all tests pass." Now requires structural block: `^\s*QA REPORT\s*\n:.{0,500}?\b(?:PASS|FAIL)\b`. Same fix applied to PENTEST REPORT detection.
 - **O4: PM rubber-stamp gap** (caught by adversarial review): `check_pm_checkpoint_report` only verified report text presence, not that `pm-orchestrator` Agent was actually dispatched after `/pm`. Now tracks dispatches; BLOCKS when report present without orchestrator invocation. Closes a silent bypass documented by a failing test since 2026-04-13 but never implemented.
 
 ### Architectural findings (deferred as design decisions)

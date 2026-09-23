@@ -74,10 +74,10 @@ for md in glob.glob('**/*.md', recursive=True):
     with open(md, encoding='utf-8') as fh:
         txt = fh.read()
     txt = re.sub(r'```.*?```', '', txt, flags=re.S)
-    txt = re.sub(r'`[^`\n]*`', '', txt)
+    txt = re.sub(r'`^`\n*`', '', txt)
     base = os.path.dirname(md)
-    for link in re.findall(r'\]\((?!https?://|#|mailto:)([^)]+?)\)', txt):
-        target = link.split('#')[0].strip()
+    for link in re.findall(r'\]\((?!https?://|#|mailto:)(^)+?)\)', txt):
+        target = link.split('#')0.strip()
         if not target:
             continue
         resolved = os.path.normpath(os.path.join(base, target))

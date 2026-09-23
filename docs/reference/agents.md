@@ -229,7 +229,7 @@
 | Dispatched by | `process-research` (mandatory final step, DISPATCHES.json mandatory binding); `process-analysis` (advisory for complex multi-agent evaluations) |
 | Model | sonnet |
 | Inputs | Synthesized research findings; optional: target audience, format type (technical/policy/comparison/academic/executive), length/depth requirements |
-| Output contract | Markdown report with: Executive Summary (for reports >1000 words), Introduction, Key Findings (with citations [1][2]), Analysis and Synthesis, Contradictions and Debates, Conclusion, References; followed by AGENT OUTPUT METADATA YAML block |
+| Output contract | Markdown report with: Executive Summary (for reports >1000 words), Introduction, Key Findings (with citations 12), Analysis and Synthesis, Contradictions and Debates, Conclusion, References; followed by AGENT OUTPUT METADATA YAML block |
 | Known failure modes | All claims require supporting citations; no unsupported opinions permitted |
 
 ---
@@ -400,7 +400,7 @@
 | Model | sonnet |
 | Inputs | Pre-gathered research data (researcher output, vault notes, briefing docs); analysis goal |
 | Output contract | Framework-applied analysis with confidence levels (High/Medium/Low); 3-5 ranked strategic recommendations; gap report if data insufficient; saved to `Projects/<name>/work/YYYY-MM-DD-competitive-analysis-<topic>.md` |
-| Known failure modes | Agent body states: never fill data gaps by invention: marks gaps as `[NO DATA: needs research: description]`; returns gap report over weak analysis when critical data is missing |
+| Known failure modes | Agent body states: never fill data gaps by invention: marks gaps as `NO DATA: needs research: description`; returns gap report over weak analysis when critical data is missing |
 
 ---
 
@@ -413,8 +413,8 @@
 | Dispatched by | direct dispatch from research-orchestrator pipeline (task-classifier Content path: research-orchestrator → content-marketer); `process-build` DISPATCHES.json note explicitly deprecates dispatching content-marketer from inside process-build |
 | Model | sonnet |
 | Inputs | Source material (research notes, briefs, data, brand guidelines); target audience; format; word/character limits; scoring rubric (for award submissions) |
-| Output contract | Draft content file saved to `Projects/<name>/work/YYYY-MM-DD-<content-type>-<topic>.md`; `[DATA NEEDED: description]` markers where data is missing; never fabricated metrics |
-| Known failure modes | Agent body documents: fabrication prohibition enforced by `[DATA NEEDED]` markers; banned clichés list (synergy, leverage, unlock, game-changer, holistic, seamlessly, best-in-class) |
+| Output contract | Draft content file saved to `Projects/<name>/work/YYYY-MM-DD-<content-type>-<topic>.md`; `DATA NEEDED: description` markers where data is missing; never fabricated metrics |
+| Known failure modes | Agent body documents: fabrication prohibition enforced by `DATA NEEDED` markers; banned clichés list (synergy, leverage, unlock, game-changer, holistic, seamlessly, best-in-class) |
 
 ---
 

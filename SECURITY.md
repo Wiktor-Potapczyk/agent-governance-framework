@@ -33,7 +33,7 @@ The following are enforcement conveniences, not security guarantees.
 
 - **Regex and pattern matching.** Every Gate-1 hook matches shell command text or tool names against a fixed pattern list ([docs/reference/hooks.md](docs/reference/hooks.md)). A pattern list has edges, and the wrapper incident above is the documented proof.
 - **Prompt text (`CLAUDE.md`, `SKILL.md` files).** Instructions read by a cooperative model. [ADR-0002](docs/adr/0002-hooks-enforce-process-not-prompts.md) measured roughly 25% compliance from prompts alone, which is the reason hooks exist at all. Prompt text stops nothing by itself.
-- **Advisory warnings.** Most hooks in this repository fail open and warn rather than block: see the Failure mode row for each entry in [hooks/README.md](hooks/README.md). A warning is a log line, not a control.
+- **Advisory warnings.** Most hooks in this repository fail open and warn rather than block: see the Failure mode row for each entry in hooks/README.md. A warning is a log line, not a control.
 
 ## Related documentation
 

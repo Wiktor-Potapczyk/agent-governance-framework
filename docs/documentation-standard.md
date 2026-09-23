@@ -128,7 +128,7 @@ Every significant, costly, or hard-to-reverse choice → one MADR file in `docs/
 ## 5. CHANGELOG
 
 `CHANGELOG.md` follows Keep a Changelog 1.1.0:
-- An `## [Unreleased]` block at the top accumulates changes as they land.
+- An `## Unreleased` block at the top accumulates changes as they land.
 - Categories, only these, in this order: **Added / Changed / Deprecated / Removed / Fixed / Security**.
 - Latest entry first; every entry **dated**; written for humans.
 
@@ -168,29 +168,29 @@ The honest picture: completeness rests on the DoD being run, which is process di
 ## 8. The followable checklist (use this every time)
 
 **When you ADD an artifact** (hook/skill/agent/workflow):
-- [ ] Create its Reference entry from §3 (all fields; logical-paths row cites the test)
-- [ ] If it embodies a non-obvious choice → write an ADR (§4)
-- [ ] Add a CHANGELOG `Added` line (§5)
-- [ ] Update the INDEX with a one-line pointer
-- [ ] If it changes execution order → update `docs/concepts/execution-model.md`
-- [ ] Run doc-consistency → 0 mismatch
+-   Create its Reference entry from §3 (all fields; logical-paths row cites the test)
+-   If it embodies a non-obvious choice → write an ADR (§4)
+-   Add a CHANGELOG `Added` line (§5)
+-   Update the INDEX with a one-line pointer
+-   If it changes execution order → update `docs/concepts/execution-model.md`
+-   Run doc-consistency → 0 mismatch
 
 **When you CHANGE an artifact:**
-- [ ] Update its Reference entry in the SAME commit (esp. logical-paths)
-- [ ] CHANGELOG `Changed`/`Fixed`/`Deprecated` line
-- [ ] If it reverses a prior decision → new superseding ADR
-- [ ] doc-consistency → 0
+-   Update its Reference entry in the SAME commit (esp. logical-paths)
+-   CHANGELOG `Changed`/`Fixed`/`Deprecated` line
+-   If it reverses a prior decision → new superseding ADR
+-   doc-consistency → 0
 
 **When you REMOVE an artifact:**
-- [ ] Delete its Reference entry; CHANGELOG `Removed` line
-- [ ] Fix or remove inbound links (no orphans)
-- [ ] doc-consistency → 0
+-   Delete its Reference entry; CHANGELOG `Removed` line
+-   Fix or remove inbound links (no orphans)
+-   doc-consistency → 0
 
 **When you write a NEW doc:**
-- [ ] Decide the Diátaxis mode FIRST (§2); put it in the right folder
-- [ ] One mode only: no mixing
-- [ ] Name its audience in the first lines
-- [ ] Link, don't restate, any fact owned elsewhere
+-   Decide the Diátaxis mode FIRST (§2); put it in the right folder
+-   One mode only: no mixing
+-   Name its audience in the first lines
+-   Link, don't restate, any fact owned elsewhere
 
 ---
 

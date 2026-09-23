@@ -15,7 +15,7 @@ status: active
 ## Vault Navigation
 
 - **Inbox** — dump zone ([Inbox/](Inbox/))
-- **Daily Notes** — auto-generated daily logs ([Daily Notes/](Daily%20Notes/))
+- **Daily Notes** — auto-generated daily logs (Daily Notes/)
 - **Resources** — reference material and KB ([Resources/](Resources/))
 - **Templates** — note templates ([Templates/](Templates/))
 - **Archives** — closed projects ([Archives/](Archives/))

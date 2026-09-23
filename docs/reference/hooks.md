@@ -529,10 +529,10 @@ Every hook file in `hooks/` is listed below, whether or not it is registered by 
 | **Event** | PostToolUse |
 | **Matcher** | none (all tool uses) |
 | **Registered in** | `settings/settings.json.template` |
-| **Action** | Tracks time since last fire via `~/.claude/last-checkpoint`. At ≥60 seconds injects a KNOWLEDGE_REMINDER; at ≥300 seconds prepends a [CHECKPOINT] 5-minute save notice. |
+| **Action** | Tracks time since last fire via `~/.claude/last-checkpoint`. At ≥60 seconds injects a KNOWLEDGE_REMINDER; at ≥300 seconds prepends a CHECKPOINT 5-minute save notice. |
 | **Inputs** | stdin JSON payload (any PostToolUse payload). Reads/writes `{{HOME}}/.claude/last-checkpoint` timestamp file. |
 | **Outputs / Side-effects** | stdout: `hookSpecificOutput` → `additionalContext` (only when time thresholds met). Writes updated checkpoint timestamp. |
-| **Logical paths** | Read last-checkpoint timestamp. Missing file → treat as epoch 0. Now - last < 60s → emit nothing (silent). 60s ≤ now - last < 300s → inject KNOWLEDGE_REMINDER. now - last ≥ 300s → inject [CHECKPOINT] save notice + KNOWLEDGE_REMINDER. Update last-checkpoint to now. |
+| **Logical paths** | Read last-checkpoint timestamp. Missing file → treat as epoch 0. Now - last < 60s → emit nothing (silent). 60s ≤ now - last < 300s → inject KNOWLEDGE_REMINDER. now - last ≥ 300s → inject CHECKPOINT save notice + KNOWLEDGE_REMINDER. Update last-checkpoint to now. |
 | **Failure mode** | Fail-open: timestamp parse error or write error → continue without blocking. |
 | **Rationale** | Provides a low-noise periodic reminder to save state during long sessions, reducing the risk of losing context or work across compaction. |
 
@@ -873,10 +873,10 @@ Note: `subagent-scope-check.py` also fires at SubagentStop: documented in the Su
 | **Event** | Stop |
 | **Matcher** | none |
 | **Registered in** | `settings/settings.json.template` |
-| **Action** | When a QA PASS is detected in the last assistant response, finds the matching `task_plan.md` entry by TASK-ID and marks it `[x]` with a summary. |
+| **Action** | When a QA PASS is detected in the last assistant response, finds the matching `task_plan.md` entry by TASK-ID and marks it `x` with a summary. |
 | **Inputs** | stdin JSON payload: `transcript_path`, `stop_hook_active`. Reads last assistant text for `QA REPORT` block. Reads/writes `task_plan.md` in active project. Reads/writes dedup window state and undo log. Reads `DRY_RUN`, `H4_ENABLE_HAIKU` env vars. |
-| **Outputs / Side-effects** | Writes updated `task_plan.md` (marks `[ ]` → `[x]`, appends summary). Writes undo log entry. Writes dedup window state. On `DRY_RUN=1`: no file writes, logs action instead. |
-| **Logical paths** | `stop_hook_active=True` → return. Scan last assistant text for structural QA REPORT with PASS verdict (structural detection, not naive substring). No PASS → exit. Extract TASK-ID from SCOPE field (primary) then full QA REPORT text. TASK-ID found in dedup window (within 72h) → skip (already synced). Find matching `[ ]` entry in task_plan.md by TASK-ID. Match found → rewrite line as `[x]` with summary → post-write verification → mismatch → revert from undo log. Optional Haiku fallback (`H4_ENABLE_HAIKU=1`): if no TASK-ID found, call Haiku to extract it. Self-test: `--selftest` flag runs internal boundary test. |
+| **Outputs / Side-effects** | Writes updated `task_plan.md` (marks ` ` → `x`, appends summary). Writes undo log entry. Writes dedup window state. On `DRY_RUN=1`: no file writes, logs action instead. |
+| **Logical paths** | `stop_hook_active=True` → return. Scan last assistant text for structural QA REPORT with PASS verdict (structural detection, not naive substring). No PASS → exit. Extract TASK-ID from SCOPE field (primary) then full QA REPORT text. TASK-ID found in dedup window (within 72h) → skip (already synced). Find matching ` ` entry in task_plan.md by TASK-ID. Match found → rewrite line as `x` with summary → post-write verification → mismatch → revert from undo log. Optional Haiku fallback (`H4_ENABLE_HAIKU=1`): if no TASK-ID found, call Haiku to extract it. Self-test: `--selftest` flag runs internal boundary test. |
 | **Failure mode** | Fail-open: task_plan.md not found, TASK-ID not found, write failure → log and exit 0. Revert-on-failure ensures partial writes are not left behind. |
 | **Rationale** | Automates the task-plan sync requirement from CLAUDE.md ("CRITICAL RULE: Task Plan Sync"), removing the need to manually update task_plan.md after each QA PASS. |
 

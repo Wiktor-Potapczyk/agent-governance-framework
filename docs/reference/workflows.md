@@ -47,7 +47,7 @@ For setup instructions, see `INSTALL.md §Workflows`. For the design rationale, 
 | **Skill** | `process-analysis` |
 | **Invocation** | `Workflow({scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-analysis.js", args: {project, subject, mode?, rubric?, constraints?}})` |
 | **Phases** | 1. Scope (mode detection: evaluation / diagnosis / decomposition / synthesis) → 2. Analyze (specialists in parallel via `parallel()`) → 3. Synthesis → 4. Report (conditional on `scope.complex`) → 5. Quality |
-| **HALT: decomposition-hand-back** | When scope returns `mode: "decomposition"`: script returns `{status: "decomposition-hand-back", decomposition_subtasks: [...]}` and stops. Caller decomposes the task list manually. |
+| **HALT: decomposition-hand-back** | When scope returns `mode: "decomposition"`: script returns `{status: "decomposition-hand-back", decomposition_subtasks: ...}` and stops. Caller decomposes the task list manually. |
 | **HALT: halted-malformed-args** | When `args.project` or `args.subject` is missing. |
 | **Evaluation mode guard** | When `mode === "evaluation"`, script hard-fails if `args.rubric` is empty: prevents unanchored evaluation. |
 | **Typed schemas** | SCOPE_SCHEMA, ANALYSIS_SCHEMA, SYNTHESIS_SCHEMA, REPORT_SCHEMA, QUALITY_SCHEMA |
@@ -80,7 +80,7 @@ For setup instructions, see `INSTALL.md §Workflows`. For the design rationale, 
 | **Script** | `workflows/process-planning.js` |
 | **Skill** | `process-planning` |
 | **Invocation** | `Workflow({scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-planning.js", args: {project, task_brief, classification_block?}})` |
-| **Phases** | 1. Scope → 2. Research (optional, only when scope indicates unknowns) → 3. Plan (implementation-plan) → 4. Review (mandatory parallel: architect-reviewer + adversarial-reviewer [+ prompt-engineer when LLM prompts present]) → 5. Quality |
+| **Phases** | 1. Scope → 2. Research (optional, only when scope indicates unknowns) → 3. Plan (implementation-plan) → 4. Review (mandatory parallel: architect-reviewer + adversarial-reviewer + prompt-engineer when LLM prompts present) → 5. Quality |
 | **HALT: halted-malformed-args** | When `args.project` or `args.task_brief` is missing. |
 | **Review mandatory** | Unlike process-build, architect-review is unconditionally mandatory in process-planning: not conditional on any scope flag. |
 | **Typed schemas** | SCOPE_SCHEMA, PLAN_SCHEMA, REVIEW_SCHEMA, QUALITY_SCHEMA |
@@ -95,7 +95,7 @@ For setup instructions, see `INSTALL.md §Workflows`. For the design rationale, 
 |---|---|
 | **Script** | `workflows/process-qa.js` |
 | **Skill** | `process-qa` |
-| **Invocation** | `Workflow({scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-qa.js", args: {project, claims: [...], source?, constraints?}})` |
+| **Invocation** | `Workflow({scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-qa.js", args: {project, claims: ..., source?, constraints?}})` |
 | **Phases** | 1. Scope (N claims in → N results out contract) → 2. Execute (per-claim execution agents with raw tool output) → 3. Report (QA REPORT block with PASS/FAIL per claim + Untested Surface) → 4. Quality |
 | **HALT: halted-malformed-args** | When `args.project` is missing or `args.claims` is empty or not an array. |
 | **AUTO-FAIL rule** | Any claim where the execute-agent used only Read/Grep (no Bash or MCP) to verify a behavioral assertion → automatically downgraded to FAIL. Encoded in the typed schema evaluation, not in prose agent judgment. |
@@ -114,7 +114,7 @@ For setup instructions, see `INSTALL.md §Workflows`. For the design rationale, 
 |---|---|
 | **Script** | `workflows/process-pentest.js` |
 | **Skill** | `process-pentest` |
-| **Invocation** | `Workflow({scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-pentest.js", args: {project, increment_summary, artifacts: [...], constraints?}})` |
+| **Invocation** | `Workflow({scriptPath: "{{VAULT_ROOT}}/.claude/workflows/process-pentest.js", args: {project, increment_summary, artifacts: ..., constraints?}})` |
 | **Phases** | 1. Scope → 2. Attack enumeration (threat-model agent produces ranked attack list) → 3. Execute (per-attack agents in parallel, each returning raw tool output) → 4. Synthesis (pentest-synthesizer) → 5. Report (PENTEST REPORT with per-finding verdict + Untested Surface + overall recommendation) |
 | **HALT: halted-malformed-args** | When `args.project` or `args.increment_summary` is missing. |
 | **Evidence-only gate** | Per-attack execute agents must return raw tool output in `evidence_raw` field. If `evidence_raw` is empty, the attack result is auto-downgraded to INCONCLUSIVE. |
