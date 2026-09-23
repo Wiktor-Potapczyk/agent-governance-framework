@@ -22,6 +22,12 @@ import unittest
 
 HOOK_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory-schema-check.py")
 
+try:
+    import yaml  # noqa: F401
+    HAS_YAML = True
+except ImportError:  # the hook fails open without PyYAML; the four YAML tests skip
+    HAS_YAML = False
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -124,6 +130,7 @@ class TestMemorySchemaCheck(unittest.TestCase):
     # ------------------------------------------------------------------
     # Test 2 — unquoted colon-space → YAML INVALID warning
     # ------------------------------------------------------------------
+    @unittest.skipUnless(HAS_YAML, "PyYAML not installed: the hook fails open, so YAML checks cannot fire")
     def test_unquoted_colon_space_yaml_invalid_warning(self):
         path = _make_memory_path(self.tmp_dir, "test_bad_yaml.md")
         _write_file(path, INVALID_YAML_FRONTMATTER)
@@ -304,6 +311,7 @@ class TestNestedMetadataSupport(unittest.TestCase):
     # ------------------------------------------------------------------
     # Test N4 — top-level type wins over metadata: type on conflict
     # ------------------------------------------------------------------
+    @unittest.skipUnless(HAS_YAML, "PyYAML not installed: the hook fails open, so YAML checks cannot fire")
     def test_top_level_type_wins_over_metadata_type(self):
         """When type exists at both levels, top-level value is validated.
         Top-level has a valid type; metadata has an invalid one — no
@@ -413,11 +421,13 @@ class TestValidateYamlUnit(unittest.TestCase):
             f.write(content)
         return path
 
+    @unittest.skipUnless(HAS_YAML, "PyYAML not installed: the hook fails open, so YAML checks cannot fire")
     def test_validate_yaml_ok_on_valid(self):
         path = self._write_tmp(VALID_FRONTMATTER)
         result = mod.validate_yaml(path)
         self.assertEqual(result, "OK")
 
+    @unittest.skipUnless(HAS_YAML, "PyYAML not installed: the hook fails open, so YAML checks cannot fire")
     def test_validate_yaml_error_on_colon_space(self):
         path = self._write_tmp(INVALID_YAML_FRONTMATTER)
         result = mod.validate_yaml(path)

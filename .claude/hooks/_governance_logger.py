@@ -143,7 +143,9 @@ def session_from(payload):
             return sid.strip()
         tpath = payload.get("transcript_path")
         if isinstance(tpath, str) and tpath.strip():
-            stem = os.path.splitext(os.path.basename(tpath.strip()))[0]
+            # Both separators: a Windows transcript path read on Linux (the
+            # improver sandbox, the public repo's CI) must yield the same id.
+            stem = os.path.splitext(os.path.basename(tpath.strip().replace("\\", "/")))[0]
             return stem or None
     except Exception:
         pass

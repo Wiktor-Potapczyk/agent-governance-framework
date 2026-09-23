@@ -21,7 +21,9 @@ import unittest
 from pathlib import Path
 
 HOOK_PATH = str(Path(__file__).parent / "checkpoint.py")
-PYTHON_EXE = r"C:\Program Files\Python314\python.exe"
+# The interpreter running this suite, never a Windows literal: the literal
+# made both SessionWiringTests fail on any other machine (AGF docs CI, 2026-09-23).
+PYTHON_EXE = sys.executable
 
 
 def _run(payload: dict, userprofile: str, activity_log: str) -> tuple[int, str]:

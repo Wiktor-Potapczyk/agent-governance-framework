@@ -27,7 +27,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-VAULT = Path(os.environ.get("VAULT_DIR", r"C:\Users\WiktorPotapczyk\Desktop\Vault"))
+# Default to the checkout this file lives in (scripts -> .claude -> vault root):
+# the old Windows literal made every clone on another machine or OS look for
+# registry.json under the author's home (AGF docs CI, ubuntu, 2026-09-23).
+VAULT = Path(os.environ.get("VAULT_DIR") or Path(__file__).resolve().parents[2])
 HOOKS_DIR = VAULT / ".claude" / "hooks"
 SCRIPTS_DIR = VAULT / ".claude" / "scripts"
 SETTINGS_FILES = [
